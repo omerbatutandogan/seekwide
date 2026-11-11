@@ -8,6 +8,7 @@ import { createCrawlManager } from './crawl/manager.js';
 import { checkExternalLinks } from './net/link-check.js';
 import { renderHtml } from './report/html.js';
 import { renderMarkdown } from './report/markdown.js';
+import { attachSources, loadProjectSources } from './repo/sources.js';
 import { compareRuns, ensureProject, listRuns, loadRun, newRunId, projectPaths, readProfile, saveRun, writeProfile } from './store/index.js';
 import { measureVitals } from './vitals/measure.js';
 
@@ -43,6 +44,8 @@ export function createToolDeps(env = process.env, measure = measureVitals) {
     renderHtml,
     checkExternalLinks,
     measureVitals: (crawl, options) => measure(crawl, { ...options, apiKey: googleApiKey(env) }),
+    loadProjectSources,
+    attachSources,
     now: () => new Date(),
     defaultProjectDir: () => defaultProjectDir(env),
     env: toolSettings(env),

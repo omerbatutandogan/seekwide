@@ -1,0 +1,16 @@
+{
+  "name": "seekwide-fixture-next-app",
+  "private": true,
+  "version": "0.0.0",
+  "description": "A small Next.js App Router site with deliberate SEO problems, used to test Seekwide's repo mode.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "^15.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}

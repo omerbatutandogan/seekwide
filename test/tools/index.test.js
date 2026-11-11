@@ -12,9 +12,9 @@ const tools = createTools(makeDeps().deps);
 const problems = (name, args) => validate(toolNamed(tools, name).inputSchema, args);
 
 describe('createTools', () => {
-  it('defines the ten tools in a fixed order with titles and descriptions', () => {
+  it('defines the eleven tools in a fixed order with titles and descriptions', () => {
     assert.deepEqual(tools.map((tool) => tool.name), [
-      'crawl_start', 'crawl_status', 'page_get', 'audit_run', 'findings_query',
+      'crawl_start', 'crawl_status', 'page_get', 'project_detect', 'audit_run', 'findings_query',
       'runs_list', 'runs_compare', 'report_render', 'profile_get', 'profile_set',
     ]);
     for (const tool of tools) {

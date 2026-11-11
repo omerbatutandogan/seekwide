@@ -75,6 +75,9 @@ export {};
  * @property {string|null} url        Normalized absolute URL or null when invalid.
  * @property {'html'|'header'} source `<link rel="canonical">` or an HTTP `Link` header.
  * @property {boolean} in_head        True for header canonicals and for link elements inside `<head>`. Google ignores canonicals outside `<head>`.
+ * @property {boolean} [streamed]     True for a link element outside `<head>` that a Next.js App Router page sent in `<body>`
+ *   as streamed metadata: the page has `self.__next_f` data scripts and its `<title>` is in the body too. It stays
+ *   `in_head: false`; the flag moves the finding from `seo.canonical.outside_head` to `seo.canonical.streamed_in_body`.
  * @property {number|null} line
  */
 
@@ -386,6 +389,29 @@ export {};
  * @property {{type: string, snippet?: string}|null} fix
  * @property {string} doc_ref
  * @property {string} detected_at      ISO 8601.
+ * @property {FindingSource} [source]  Repo mode only: the source file the finding comes from. Absent when it
+ *   could not be determined, and in every audit that was not given a source folder. Never part of the id.
+ */
+
+/**
+ * Where in the project a finding's fix belongs.
+ * @typedef {Object} FindingSource
+ * @property {string} file             Path relative to the project folder, forward slashes.
+ * @property {number|null} line        1-based line of the element in `file`; null when it is not known
+ *   (always for a Next.js project, whose code the plugin does not read).
+ * @property {string|null} route       The route that answers the finding's URL: "/blog/[slug]" for Next.js,
+ *   the URL path for plain HTML.
+ */
+
+/**
+ * What repo mode did in one audit. Stored in the run as `repo`.
+ * @typedef {Object} RepoSummary
+ * @property {'next-app'|'html'|'unsupported'|'none'} framework
+ * @property {string} label            Name to show, for example "Next.js (App Router)".
+ * @property {string} source_dir       The web project's folder relative to the project folder; "." when they are the same.
+ * @property {number} findings_with_source
+ * @property {number} pages_matched    Crawled HTML pages that a file of the project answers.
+ * @property {number} pages_total      Crawled HTML pages.
  */
 
 /**
@@ -436,6 +462,8 @@ export {};
  * @property {Finding[]} findings
  * @property {VitalsData|null} [core_web_vitals]  What was measured, passing values included. Null when the
  *   measurement was not asked for; absent in runs stored before it existed.
+ * @property {RepoSummary|null} [repo]  Repo mode: the project whose source files the findings name. Null when
+ *   the audit was not given a source folder; absent in runs stored before it existed.
  */
 
 /**

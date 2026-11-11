@@ -12,6 +12,11 @@ import { isInternalUrl, normalizeUrl } from '../util/url.js';
 import { HTML_NS, SVG_NS, attr, findBaseUrl, insecureUrl, isHtmlElement, lineOf, textOf, tokens } from './dom.js';
 import { parseJsonLd } from './jsonld.js';
 
+/** Script types a browser runs as JavaScript. */
+const SCRIPT_TYPES = new Set(['', 'text/javascript', 'module']);
+/** How the inline data scripts of a Next.js App Router page begin. */
+const NEXT_FLIGHT = /^\s*\(?\s*self\.__next_f\s*(=|\.push\()/;
+
 export const MAX_LINKS = 5000;
 export const MAX_IMAGES = 2000;
 export const MAX_MIXED_CONTENT = 20;
@@ -114,6 +119,8 @@ export function extractHtml(html, context) {
   const baseUrl = findBaseUrl(document, context.responseUrl);
   const https = context.responseUrl.startsWith('https:');
   let upgradeInsecure = context.upgradeInsecure ?? false;
+  let nextFlight = false;
+  let bodyTitle = false;
 
   /** @type {HtmlFields} */
   const out = {
@@ -142,6 +149,7 @@ export function extractHtml(html, context) {
       const lang = attr(node, 'lang')?.trim();
       if (lang) out.html_lang = clip(lang, LIMITS.maxStringLength);
     } else if (tag === 'title') {
+      if (frame.body) bodyTitle = true;
       if (hasRoom(out.titles, CAPS.titles)) out.titles.push(clip(collapseWhitespace(textOf(node, false, LONG_TEXT)), LONG_TEXT));
     } else if (tag === 'meta') {
       const name = attr(node, 'name')?.trim().toLowerCase() ?? '';
@@ -221,6 +229,8 @@ export function extractHtml(html, context) {
       out.headings.push({ level, text: clip(collapseWhitespace(textOf(node, true, LIMITS.maxStringLength)), LIMITS.maxStringLength), line });
     } else if (tag === 'script') {
       const type = (attr(node, 'type') ?? '').split(';', 1)[0].trim().toLowerCase();
+      // The inline scripts that carry a Next.js App Router page's data ("flight" chunks).
+      if (!nextFlight && attr(node, 'src') === null && SCRIPT_TYPES.has(type) && NEXT_FLIGHT.test(node.childNodes?.[0]?.value ?? '')) nextFlight = true;
       if (type === 'application/ld+json' && hasRoom(out.jsonld, CAPS.jsonld)) {
         const source = (node.childNodes ?? []).map((child) => child.value ?? '').join('');
         out.jsonld.push(parseJsonLd(source, line));
@@ -266,6 +276,14 @@ export function extractHtml(html, context) {
   }
 
   if (upgradeInsecure) out.mixed_content = [];
+  // Next.js can append a page's metadata to <body> ("streaming metadata"): the title, the
+  // description and the canonical link arrive there together. Such a canonical is still outside
+  // the head; `streamed` only says why, so the finding can explain it.
+  if (nextFlight && bodyTitle) {
+    for (const canonical of out.canonicals) {
+      if (canonical.source === 'html' && !canonical.in_head) canonical.streamed = true;
+    }
+  }
   const visible = collapseWhitespace(text.join(''));
   out.word_count = visible.match(WORD)?.length ?? 0;
   out.text_hash = visible === '' ? '' : sha1Hex(visible.toLowerCase());

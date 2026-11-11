@@ -15,12 +15,15 @@ skill (SKILL.md)
 MCP server (server/src/index.js)
    ├─ crawl_start / crawl_status ──► crawl/  ──► net/ (safe-fetch, robots, sitemap)
    │                                   └──────► extract/ (HTML → PageRecord)
-   ├─ audit_run ──► net/link-check, vitals/ (PageSpeed Insights, Chrome UX Report) ──► checks/ (engine + seo + links) ──► store/
+   ├─ project_detect ──► repo/ (what kind of project the folder holds, which file answers a URL)
+   ├─ audit_run ──► net/link-check, vitals/ (PageSpeed Insights, Chrome UX Report) ──► checks/ (engine + seo + links) ──► repo/ (source files, repo mode) ──► store/
    ├─ findings_query, page_get, runs_list, runs_compare, profile_get, profile_set ──► store/
    └─ report_render ──► report/ (Markdown, HTML)
 ```
 
-Not in this milestone: repo mode, `/seekwide:fix`, and every module other than `seo` and `links`.
+In repo mode the same flow runs against the project's own local server: `project_detect` says what the folder holds and which command starts the server, the skill has Claude propose that command (it runs only with the user's approval, and the plugin's server never starts anything), and `audit_run` with `source_dir` adds the source file to each finding (4.12).
+
+Not in this milestone: `/seekwide:fix`, the re-audit after a fix, and every module other than `seo` and `links`.
 
 ## 2. Principles that shape the code
 
@@ -30,7 +33,8 @@ Not in this milestone: repo mode, `/seekwide:fix`, and every module other than `
 4. **The crawler is a polite, honest client.** It obeys robots.txt, identifies itself with `USER_AGENT` from `config.js`, sends one request at a time, and stops when a site challenges it. It never impersonates a browser or another bot and never tries to get past a block.
 5. **No private-network access.** Every request goes through `safeFetch`, which refuses non-public addresses.
 6. **A secret stays where it is used.** The Google API key is read in `deps.js`, bound into one function, and sent to Google in a request header. No tool receives it, and it is never part of a URL, a stored file, a log line or a tool result.
-7. **Nothing is half-built.** No stubs, no `TODO`, no skipped tests. A feature is either implemented and tested or absent.
+7. **A project's code is never run, and its source is never read to guess a page.** Repo mode knows a project by its file names, by `package.json` parsed as JSON, and by the text of HTML files that were served as pages. What a page contains is always measured on the served page; the source only says where a fix belongs.
+8. **Nothing is half-built.** No stubs, no `TODO`, no skipped tests. A feature is either implemented and tested or absent.
 
 ## 3. Layout and ownership
 
@@ -45,6 +49,7 @@ server/src/
   checks/seo/     index.js + one file per area
   checks/links/   index.js + one file per area
   vitals/     measure.js select.js psi.js crux.js google-api.js thresholds.js
+  repo/       scan.js detect.js next-routes.js html-routes.js html-lines.js sources.js
   store/      project.js runs.js profile.js compare.js
   report/     markdown.js html.js (+ shared helpers)
   mcp/        stdio.js schema.js
@@ -52,7 +57,7 @@ server/src/
   deps.js     the tools' real dependencies, built from the environment
   index.js    entry point
 test/
-  helpers/{http-server,factories,run-factory}.js    shared
+  helpers/{http-server,factories,run-factory,repo}.js    shared
   <area>/*.test.js                      mirrors server/src
 ```
 
@@ -224,7 +229,7 @@ Pure functions: no I/O. Rules:
 - `titles`: every `<title>` in the HTML namespace (not SVG titles), anywhere in the document.
 - `meta_robots`: tokens from `<meta name="robots">` and `<meta name="googlebot">`.
 - `x_robots`: tokens from each `X-Robots-Tag` line. A line that starts with `<user-agent>:` applies only to that agent; keep it only for `googlebot`. `max-snippet:`, `max-image-preview:`, `max-video-preview:` and `unavailable_after:` are directives, not agents.
-- `canonicals`: `<link rel="canonical">` anywhere, with `in_head` saying whether it is inside `<head>`, plus `Link: <…>; rel="canonical"` headers (`source: 'header'`, `in_head: true`).
+- `canonicals`: `<link rel="canonical">` anywhere, with `in_head` saying whether it is inside `<head>`, plus `Link: <…>; rel="canonical"` headers (`source: 'header'`, `in_head: true`). A link element outside `<head>` also gets `streamed: true` when the page has Next.js App Router data scripts (an inline script that begins with `self.__next_f`) and its `<title>` is in the body too: Next.js sent the metadata there ("streaming metadata"). It stays `in_head: false`.
 - `links`: every `<a>` element, including those with no `href`. `text` is the text content plus the text alternatives inside the link: the `alt` of contained images and a non-empty `aria-label` on any contained element, which stands in for that element's content (an `<svg role="img" aria-label="…">` logo, an icon, an image) unless the element says `aria-hidden="true"`. Heading text takes image `alt` text only, not labels. `title_attr` is the `title` attribute.
 - `mixed_content`: on an https page, `http:` URLs in `img[src]`, `script[src]`, `link[rel~=stylesheet][href]`, `iframe[src]`, `video[src]`, `audio[src]`, `source[src]`, `embed[src]` and `object[data]`. It is empty when the page sends `Content-Security-Policy: upgrade-insecure-requests` as a header or in a `<meta http-equiv>` inside `<head>`, because browsers then load nothing over http.
 - Visible text: text under `<body>` outside `script`, `style`, `noscript`, `template` and `svg`. `word_count` counts runs of letters, combining marks and digits (`/[\p{L}\p{M}\p{N}]+/gu`), so words in scripts that use combining marks count once. `text_hash` is `sha1Hex` of the lower-cased, whitespace-collapsed text.
@@ -290,16 +295,16 @@ Both are pure and depend only on their arguments (dates come from `run.created_a
 
 1. Title: "SEO and link audit", the site, the date, "Prepared by" when `brandName` is given.
 2. Summary: `executiveSummary` when given, otherwise a factual one built from the numbers.
-3. Scope and limits: pages crawled against the budget, truncation, blocks, robots.txt status, sitemap URLs, user agent.
+3. Scope and limits: pages crawled against the budget, truncation, blocks, robots.txt status, sitemap URLs, user agent. In repo mode (`run.repo` is an object) also "Source files": the kind of project and how many findings name a file, or that the project could not be mapped.
 4. Status by layer: technical eligibility (this run), then search visibility, AI visibility, experience and business results. Search visibility, AI visibility and business results are marked "No data in this version" with the source that will provide them. Experience is "Measured in this run" when the run holds real-user Core Web Vitals, and otherwise "No data in this run" with the reason.
 5. Scores: module, score, coverage, checks run.
 6. Core Web Vitals, when the run asked for them (`run.core_web_vitals` is an object): what each source gave or why it gave nothing, then a table with the whole site first and each measured page after it, every value formatted and rated good, needs improvement or poor. Only columns with one or more values are shown. Then the run's notes on the measurement.
 7. Top fixes: findings grouped by check, ordered by severity, then impact (high first), then effort (low first); the first ten groups with count, confidence, recommendation, up to three example URLs and the documentation link.
-8. All findings by check, each with up to `maxUrlsPerCheck` (default 10) URLs and their evidence, and "+N more".
+8. All findings by check, each with up to `maxUrlsPerCheck` (default 10) URLs and their evidence, and "+N more". A finding that names a source file (4.12) shows it as `file` or `file:line`, with its route.
 9. Suggestions (not scored): `recommendations`, when given.
 10. Checks that did not run, with the reason.
 11. Changes since the previous run, when `comparison` is given.
-12. Method: how the crawl works, what "confirmed" and "likely" mean, how Core Web Vitals are measured (when the run asked for them), rule and plugin versions, and a plain statement that the audit does not predict rankings or traffic.
+12. Method: how the crawl works, what "confirmed" and "likely" mean, how Core Web Vitals are measured (when the run asked for them), how source files are found (when the run named any), rule and plugin versions, and a plain statement that the audit does not predict rankings or traffic.
 
 A value in the Core Web Vitals table is rated by `vitals/thresholds.js`, the same code the checks use, from the number in the run. It is shown without further rounding (2549 ms reads "2.549 s"), so a value can never look good next to a rating that says otherwise. Nothing in that part of the run is taken on trust: a value that is not a number is shown as missing.
 
@@ -334,7 +339,8 @@ export class ToolError extends Error {}
 |---|---|---|
 | `crawl_start` | `url` (required), `max_pages` 1–500 (default 25), `include_subdomains` (false), `allow_localhost` (false; accepted only when the start host is a loopback address) | `{job_id, status, start_url, max_pages}` |
 | `crawl_status` | `job_id`, `wait_seconds` 0–25 (default 0) | job snapshot; when finished also `summary: {pages, html_pages, by_status, robots_status, sitemap_urls, truncated, blocked}` |
-| `audit_run` | `job_id`, `modules` (default all), `check_outbound_links` (true), `check_core_web_vitals` (true), `core_web_vitals_pages` 1–10 (default 3), `project_dir` | `{run_id, project_dir, files, crawl, modules, totals, top, core_web_vitals, skipped_checks, notes}` |
+| `project_detect` | `project_dir`, `source_dir` (defaults to the project folder) | `{project_dir, source_dir, framework, label, supported, message, app_dir, dev_server, routes_total, routes, routes_truncated}` |
+| `audit_run` | `job_id`, `modules` (default all), `check_outbound_links` (true), `check_core_web_vitals` (true), `core_web_vitals_pages` 1–10 (default 3), `project_dir`, `source_dir` (repo mode) | `{run_id, project_dir, files, crawl, modules, totals, top, core_web_vitals, repo, skipped_checks, notes}` |
 | `findings_query` | `run_id` ('last'), `project_dir`, `module`, `severity`, `check_id`, `url_contains`, `limit` 1–200 (50), `offset` | `{run_id, total, returned, findings}` |
 | `page_get` | `job_id`, `url` | selected `PageRecord` fields and counts |
 | `report_render` | `run_id` ('last'), `project_dir`, `formats` (both), `executive_summary` ≤ 4000, `recommendations` ≤ 20, `brand_name`, `logo_path`, `compare_to` | `{run_id, files, bytes}` |
@@ -347,6 +353,8 @@ export class ToolError extends Error {}
 - `audit_run` accepts jobs that are `done` or `blocked` (site-level checks still say something about a blocked site) and rejects `running` and `failed` ones with a `ToolError` that says what to do next.
 - `audit_run` checks external links only when the `links` module is requested and `check_outbound_links` is true. The URLs checked are the external link targets plus the destination of every redirect that leaves the site.
 - `audit_run` measures Core Web Vitals (4.11) only when the `seo` module is requested and `check_core_web_vitals` is true, at the same time as the external links are checked. The measurement goes through `deps.measureVitals`, which has the Google API key bound into it; the tool never holds the key. Whatever happens there, the audit completes: a refusal or a timeout comes back as data with a reason, and an unexpected error is logged and turned into a result that says nothing was measured. The run stores the measurement as `core_web_vitals` (null when it was not asked for), and the result returns the same pages and values under `core_web_vitals`, with the measurement's notes in `notes`.
+- `audit_run` with `source_dir` is repo mode (4.12); an empty string counts as not given. It is accepted only for a crawl whose `options.local` is `true`, because a deployed site can differ from the folder at hand; anything else is a `ToolError` raised before a request is sent. The source folder must be the project folder or lie inside it. After the checks ran, `deps.attachSources` adds `source` to the findings; the run stores them and a `repo` summary (null outside repo mode), the result returns `repo`, each group under `top` lists up to three `example_files`, and what limits the mapping goes into `notes`. A project that is not supported is audited all the same, with no source files and a note that says why.
+- `project_detect` reads and starts nothing but the folder listing and `package.json`. `dev_server.command` is the command to propose to the user; `dev_server.script` is the text of the script it runs, clipped, and the result's `_note` says that it is data.
 - A module's result carries `note` whenever its `score` is null. When the crawl was blocked before any HTML page was read, every module's score is null with a note that says so; site-level findings are still returned. `crawl.unreadable_pages` counts the URLs the crawler was refused on, and `notes` says so in plain words.
 - `previous`, in `report_render` and `runs_compare`, means the newest run that is older than the run being rendered or compared. When there is none, a `ToolError` says so.
 - `findings_query` clips evidence in its results; the stored run is unchanged.
@@ -396,6 +404,48 @@ export async function requestJson(url, options)        // → {ok: true, data} |
 - **The result** is always a `VitalsData`. `lab.available` is true when one or more pages have lab values. `field.available` is true when the Chrome UX Report answered for the origin or a page, with a record or with "no data". When a source is not available, `reason` is the sentence shown to the user and used as the skip reason of the checks. `notes` holds the statements that go into `audit_run`'s `notes` and into the report.
 - `measureVitals` rejects with `TypeError` for invalid options. It also rejects when a client itself throws, which is a programming error and not an answer from Google: no further request starts, the requests under way are awaited, and then the error surfaces. `audit_run` contains it (4.10).
 
+### 4.12 `repo/`
+
+Repo mode: which source file a finding comes from. The framework rules were read on 2026-11-11 at nextjs.org/docs/app (project structure, route groups, dynamic routes, metadata files, the `public` folder, `generateMetadata`).
+
+```js
+// scan.js
+export async function resolveSourceDir(projectDir, sourceDir)   // → {projectDir, sourceDir, relative}   throws RepoError
+export async function entryKind(root, relative)                 // → 'file' | 'dir' | null
+export async function listFiles(root, sub, limits)              // → {files: string[], truncated}
+export async function readFileInside(root, relative, maxBytes)  // → Buffer | null
+
+// detect.js
+export async function detectProject(root)                       // → Detection
+
+// next-routes.js                                               pure
+export function buildNextRoutes(files, appDir)                  // → NextRoute[]
+export function matchNextRoute(routes, publicFiles, pathname)   // → NextMatch | null
+
+// html-routes.js, html-lines.js                                pure
+export function matchHtmlFile(files, pathname)                  // → string | null
+export function htmlAnchors(html)                               // → {html, head, title, metaDescription, metaRobots}
+export function sameDocument(served, source)                    // → boolean
+export function sourceLine(servedLine, served, source)          // → number | null
+
+// sources.js
+export async function loadProjectSources(projectDir, sourceDir) // → ProjectSources
+export async function attachSources(findings, crawl, sources)   // → {findings, summary: RepoSummary, notes}
+```
+
+- **The project folder is the boundary** (`scan.js`). `resolveSourceDir` resolves every symbolic link in both paths and refuses a source folder that is not the project folder or inside it. `listFiles` never follows or lists a symbolic link and does not enter `node_modules` or a folder whose name starts with a dot; it stops at `SCAN_LIMITS.maxFiles` files, `SCAN_LIMITS.maxDirs` folders and `SCAN_LIMITS.maxDepth` levels and then reports `truncated`. `entryKind` and `readFileInside` take a path of plain names, check every step with `lstat`, open the file with `O_NOFOLLOW` and check what was opened again. A URL never becomes a file path: it is matched against the listing, which was made before any URL was looked at.
+- **Nothing is executed** (`detect.js`). `package.json` is read with a size limit and parsed as JSON; a file that is not a JSON object counts as absent. No file of the project is imported or required, and no process is started.
+- **Detection.** Next.js is recognized by `next` in `dependencies` or `devDependencies`, or by a `next.config.*` file. The app folder is `app`, or `src/app` when neither `app` nor `pages` exists at the root, as Next.js itself decides. Next.js without an app folder (the Pages Router), every framework named by a dependency (Astro, Nuxt, Remix, SvelteKit, Gatsby, Docusaurus, Eleventy, VitePress, Angular, Create React App, Vite, Parcel, webpack) and every project named by a marker file (WordPress, Jekyll, Hugo, Laravel, Django) is `unsupported`, with a message that names it. A folder with `index.html` or `index.htm` at its root and none of the above is plain HTML. Anything else is `none`.
+- **The dev server command** is `<package manager> run dev` when the project has a `dev` script (the package manager is named by the lock file, npm otherwise), `npx next dev` for a Next.js project without one, and `python3 -m http.server 4173 --bind 127.0.0.1` for a plain HTML folder without a `dev` or `start` script. It is returned as data. The server starts nothing.
+- **Next.js routes** (`next-routes.js`) come from file names only. A route group `(name)` adds nothing to the URL. `[name]` matches one segment, `[...name]` one or more, `[[...name]]` none or more. Private folders (`_name`), slots (`@name`) and intercepting routes (`(.)name`, `(..)name`, `(...)name`) make no route. `%5F` at the start of a folder name is an underscore. `page.*` and `route.*` end a route (`js`, `jsx`, `ts`, `tsx`; for pages also `md` and `mdx`, which a project has only when its `pageExtensions` list them). Metadata files: `robots.txt` or `robots.{js,ts}`, `favicon.ico` and `manifest.*` at the top of the app folder; `sitemap.xml` or `sitemap.{js,ts}` in any segment (a sitemap in code also answers `sitemap/<id>.xml`); `icon`, `apple-icon`, `opengraph-image` and `twitter-image` in any segment, with their extension when static and without it when generated, and with the six-character suffix Next.js adds inside a route group. A file under `public/` answers its own path.
+- **Which route wins**: a route of fixed segments, then a file in `public/`, then the most specific route with dynamic segments, compared segment by segment (fixed before dynamic, dynamic before catch-all, catch-all before optional catch-all). Segments are compared decoded and case-sensitively; the trailing slash and the query play no part. A match is `exact` when every segment of the route is fixed or the file is in `public/`; the `[id]` address of a generated sitemap or image is not. The settings of `next.config` are not known. `loadProjectSources` searches the file as text for `basePath`, `rewrites` and `pageExtensions` and reports the ones it finds (`unreadSettings`), because a URL they change can match nothing, or a dynamic route that is not the one that answered. With `basePath` or `rewrites` present, and for a path with a segment that starts with a dot (a folder of `public/` that is never listed), a match that is not `exact` names no file.
+- **Plain HTML** (`html-routes.js`): `/` is `index.html`; `/about` is the file `about`, then `about.html`, then `about/index.html`; `/about/` is `about/index.html`. `.htm` is accepted wherever `.html` is.
+- **`attachSources`** gives a finding `source` when all of this holds: the finding has a URL on the audited origin; its check is about a file (not `seo.https.site_not_https`, `seo.https.not_enforced` or `seo.cwv.*`, which are about the server or about Google's measurements); and a file answers the URL's path. The finding is otherwise returned as it came in. Ids are never touched.
+  - Next.js: `file` is the route's file, and only when the server's answer fits the route. The status comes from the page record, the sitemap file or robots.txt. With status 200 any match counts. An `exact` match also counts for a URL without a record and for a status of 500 or above (the route's own code failed). Every other case names no file: a redirect or a 404 comes from somewhere else, and a dynamic route would match any name. For `seo.html.lang_missing` and `seo.mobile.viewport_missing` on a page route it is the outermost layout above the page, which renders `<html>`. `line` is null: the code is not read.
+  - An HTML file (a plain HTML project, or an `.html` file in a Next.js `public/` folder) is named only when the record of the URL is a 200 HTML page and `sameDocument` holds: the same titles, the same visible text and the same number of links, images, headings, JSON-LD blocks and canonical links as the file, extracted with `extractPage`. `line` is then the line in the file: for a finding with a line, the line of the same element in the file, found by its position in the record's lists (`sourceLine`), so lines a server inserted do not shift it; for a finding without one, `anchorLine`: the `<title>`, description or robots meta tag the check is about; the `<head>` when a title, description, canonical, viewport or Open Graph tag is missing; the `<html>` tag for a missing `lang`; null for every other check, and whenever the file does not have the element.
+  - `file` is relative to the project folder, with forward slashes. `route` is the Next.js route (`/blog/[slug]`) or the URL path.
+- **Notes** say what limits the mapping: a project that is not supported (with the detection message); no crawled page matching a file of the project; files that differ from what the server sent; a truncated listing; `next.config` settings the mapping does not know; for Next.js, what the file means.
+
 ## 5. Coding rules
 
 - Node 22 or later, ES modules, plain JavaScript with JSDoc types. Import types with `/** @import { PageRecord } from '../types.js' */`.
@@ -409,6 +459,7 @@ export async function requestJson(url, options)        // → {ok: true, data} |
 ## 6. Testing rules
 
 - `node:test` and `node:assert/strict`. Tests live in `test/<area>/<name>.test.js`.
+- Repo-mode tests never install or start a framework. They read the file trees under `fixtures/` (`next-app`, `html-site`), build temporary folders with `makeTree`, serve a folder with `staticRoutes`, and crawl it with the real crawler (`crawlLocal`), all from `test/helpers/repo.js`. A test that audits a project works on a copy, so that `.seekwide/` never lands in a fixture.
 - No request may leave the machine. Use `startServer` from `test/helpers/http-server.js` and pass `allowLoopback: true`. For Google's APIs use `startGoogle` from `test/helpers/google-api.js`, which answers in their format, and point the clients at it with `endpoint`.
 - Inject `sleep` and `now` so tests are instant and repeatable.
 - Every rule in this document and in `CHECKS-SPEC.md` has a test for the failing case and one for the passing case.

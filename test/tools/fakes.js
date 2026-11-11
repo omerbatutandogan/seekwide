@@ -2,6 +2,7 @@
 
 /** @import { CheckDef, CrawlJob, CrawlResult, Run, VitalsData } from '../../server/src/types.js' */
 
+import { attachSources, loadProjectSources } from '../../server/src/repo/sources.js';
 import { assertRunId, projectPaths } from '../../server/src/store/project.js';
 import { makeCrawl, makeLink, makePage, makeVitals } from '../helpers/factories.js';
 
@@ -133,6 +134,8 @@ export function makeDeps(seed = {}) {
       result: async (id) => results.get(id) ?? null,
     },
     checks: CHECKS,
+    loadProjectSources,
+    attachSources,
     projectPaths,
     /** @param {string} dir */
     async ensureProject(dir) {

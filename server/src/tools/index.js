@@ -1,11 +1,13 @@
-// The ten MCP tools. Every dependency is injected so handlers can be tested
+// The eleven MCP tools. Every dependency is injected so handlers can be tested
 // with fakes; server/src/index.js wires the real modules.
 
-/** @import { CheckDef, CrawlJob, CrawlResult, OutboundResult, Profile, Run, RunIndexEntry, Finding, VitalsData } from '../types.js' */
+/** @import { CheckDef, CrawlJob, CrawlResult, OutboundResult, Profile, Run, RunIndexEntry, Finding, RepoSummary, VitalsData } from '../types.js' */
 /** @import { ToolDef } from '../mcp/stdio.js' */
 /** @import { ProjectPaths } from '../store/project.js' */
+/** @import { ProjectSources } from '../repo/sources.js' */
 
 import { auditTools } from './audit.js';
+import { projectTools } from './project.js';
 import { crawlTools } from './crawl.js';
 import { profileTools } from './profile.js';
 import { reportTools } from './report.js';
@@ -46,6 +48,11 @@ import { runTools } from './runs.js';
  * @property {(crawl: CrawlResult, options: {maxPages: number}) => Promise<VitalsData>} measureVitals
  *   Core Web Vitals of a crawl. The Google API key is bound into this function where the server is
  *   wired, so no tool ever holds it.
+ * @property {(projectDir: string, sourceDir?: string) => Promise<ProjectSources>} loadProjectSources
+ *   Repo mode: what kind of web project a folder holds and which file answers a URL. Reads file names and
+ *   package.json as data; throws `RepoError` for a folder that is missing or outside the project.
+ * @property {(findings: Finding[], crawl: CrawlResult, sources: ProjectSources) => Promise<{findings: Finding[], summary: RepoSummary, notes: string[]}>} attachSources
+ *   Repo mode: add `source` to the findings whose source file can be determined.
  * @property {() => Date} now
  * @property {() => string} defaultProjectDir
  * @property {{SEEKWIDE_REPORT_BRAND?: string, SEEKWIDE_REPORT_LOGO?: string}} env
@@ -53,10 +60,10 @@ import { runTools } from './runs.js';
  */
 
 /**
- * Build the tool definitions in a fixed order (crawl, audit, runs, report, profile).
+ * Build the tool definitions in a fixed order (crawl, project, audit, runs, report, profile).
  * @param {ToolDeps} deps
  * @returns {ToolDef[]}
  */
 export function createTools(deps) {
-  return [...crawlTools(deps), ...auditTools(deps), ...runTools(deps), ...reportTools(deps), ...profileTools(deps)];
+  return [...crawlTools(deps), ...projectTools(deps), ...auditTools(deps), ...runTools(deps), ...reportTools(deps), ...profileTools(deps)];
 }

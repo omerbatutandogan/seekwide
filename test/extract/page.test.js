@@ -5,6 +5,15 @@ import { extractPage, redirectRecord, unreadableRecord } from '../../server/src/
 import { makePage } from '../helpers/factories.js';
 import { PAGE_URL, makeFetch, makeInput } from './fetch-result.js';
 
+/**
+ * CPU time this process has used, in milliseconds. The speed limits below use it
+ * instead of the wall clock, so a busy machine does not fail them.
+ */
+const cpuMs = () => {
+  const usage = process.cpuUsage();
+  return (usage.user + usage.system) / 1000;
+};
+
 const FINAL_HTML = '<!doctype html><html lang="en"><head><title>Final</title></head><body><p>Final page body</p></body></html>';
 
 const HOPS = [
@@ -266,9 +275,9 @@ test('a 1 MB HTML document extracts in well under three seconds', () => {
   const chunk = '<div class="card"><h2>Başlık</h2><p>Some <b>body</b> text with a <a href="/p?i=1">link</a> and <img src="/i.png" alt="x"></p></div>\n';
   const html = `<!doctype html><html><head><title>Big</title></head><body>${chunk.repeat(Math.ceil(1_048_576 / chunk.length))}</body></html>`;
   assert.ok(Buffer.byteLength(html) >= 1_048_576);
-  const started = performance.now();
+  const started = cpuMs();
   const record = extractPage(makeInput(makeFetch({ html })));
-  const elapsed = performance.now() - started;
+  const elapsed = cpuMs() - started;
   assert.equal(record.links.length, 5000);
   assert.equal(record.images.length, 2000);
   assert.ok(elapsed < 3000, `took ${Math.round(elapsed)} ms`);

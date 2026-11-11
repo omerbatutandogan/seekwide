@@ -129,6 +129,30 @@ function unreadablePages(run) {
   return Math.max(0, Math.floor(num(obj(run.crawl).unreadable_pages)));
 }
 
+const REPO_FRAMEWORKS = ['next-app', 'html'];
+
+/**
+ * The scope row on source files, or null when the run was not a repo-mode audit.
+ * @param {Run} run
+ * @param {number} findings
+ * @returns {{label: string, value: string, code?: boolean}|null}
+ */
+function viewRepo(run, findings) {
+  if (run.repo === null || typeof run.repo !== 'object' || Array.isArray(run.repo)) return null;
+  const repo = obj(run.repo);
+  const label = text(repo.label, 'Unnamed').slice(0, 80);
+  if (!REPO_FRAMEWORKS.includes(str(repo.framework))) {
+    return { label: 'Source files', value: `Not named. The project in this folder (${label}) is not supported for source mapping yet.` };
+  }
+  const dir = text(repo.source_dir);
+  const where = dir === '' || dir === '.' ? '' : ` in ${clip(dir, 200)}`;
+  const named = Math.min(findings, Math.max(0, Math.floor(num(repo.findings_with_source))));
+  return {
+    label: 'Source files',
+    value: `${label} project${where}. ${named} of ${plural(findings, 'finding')} ${findings === 1 ? 'names' : 'name'} the source file ${findings === 1 ? 'it comes' : 'they come'} from. Paths are relative to the project folder.`,
+  };
+}
+
 /**
  * @param {Run} run
  * @param {{host: string, blocked: ReturnType<typeof viewBlock>}} derived
@@ -139,6 +163,7 @@ function viewScope(run, { host, blocked }) {
   const sitemapUrls = num(crawl.sitemap_urls);
   const robots = str(crawl.robots_status);
   const unreadable = unreadablePages(run);
+  const repo = viewRepo(run, Array.isArray(run.findings) ? run.findings.length : 0);
   const modules = Array.isArray(run.modules_requested) ? orderModules(run.modules_requested.filter((m) => typeof m === 'string')).map(moduleLabel) : [];
   return [
     { label: 'Pages crawled', value: `${pages} of ${plural(num(crawl.max_pages), 'page')} allowed (${num(crawl.html_pages)} HTML, ${num(crawl.indexable_pages)} indexable)` },
@@ -153,6 +178,7 @@ function viewScope(run, { host, blocked }) {
     { label: 'robots.txt', value: Object.hasOwn(ROBOTS_STATUS, robots) ? ROBOTS_STATUS[/** @type {keyof typeof ROBOTS_STATUS} */ (robots)] : text(robots, 'Unknown.') },
     { label: 'Sitemap', value: sitemapUrls > 0 ? `${plural(sitemapUrls, 'URL')} listed in XML sitemaps.` : 'No URLs found in XML sitemaps.' },
     { label: 'Modules', value: modules.length > 0 ? modules.join(', ') : 'None recorded.' },
+    ...(repo ? [repo] : []),
     { label: 'User agent', value: text(crawl.user_agent, 'Not recorded.'), code: true },
   ];
 }
@@ -242,7 +268,7 @@ export function buildReport(run, options = {}) {
       .map((check) => ({ id: str(check.id), status: check.status === 'error' ? 'error' : 'skipped', reason: text(check.skip_reason, 'No reason recorded.') }))
       .sort((a, b) => compareText(a.id, b.id)),
     comparison: opts.comparison ? viewComparison(opts.comparison) : null,
-    method: methodSections({ pluginVersion: text(run.plugin_version, 'unknown'), rulesVersion: text(run.rules_version, 'unknown'), vitals: vitals !== null }),
+    method: methodSections({ pluginVersion: text(run.plugin_version, 'unknown'), rulesVersion: text(run.rules_version, 'unknown'), vitals: vitals !== null, repo: REPO_FRAMEWORKS.includes(str(obj(run.repo).framework)) }),
     pluginVersion: text(run.plugin_version, 'unknown'),
     rulesVersion: text(run.rules_version, 'unknown'),
   };

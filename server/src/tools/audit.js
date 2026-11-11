@@ -10,6 +10,7 @@ import { isUnverifiable } from '../checks/page-helpers.js';
 import { VITALS_ARGUMENTS, collectVitals, vitalsNotes, vitalsOutput } from './audit-vitals.js';
 import { JOB_ID_SCHEMA, PROJECT_DIR_SCHEMA, UNTRUSTED_NOTE, countBy, resolveProjectDir, withStoreErrors } from './common.js';
 import { finishedCrawl } from './crawl.js';
+import { SOURCE_DIR_SCHEMA, auditSources } from './project.js';
 
 const TOP_GROUPS = 10;
 const EXAMPLE_URLS = 3;
@@ -85,6 +86,7 @@ export function topGroups(findings, limit) {
     .map((first) => {
       const list = /** @type {Finding[]} */ (groups.get(first.check_id));
       const urls = [...new Set(list.map((finding) => finding.url).filter((url) => url !== null))];
+      const files = [...new Set(list.flatMap((finding) => (finding.source ? [finding.source.file] : [])))];
       return {
         check_id: first.check_id,
         title: first.title,
@@ -93,6 +95,8 @@ export function topGroups(findings, limit) {
         count: list.length,
         example_urls: urls.slice(0, EXAMPLE_URLS),
         recommendation: first.recommendation,
+        // Repo mode: the source files behind the group, when any finding names one.
+        ...(files.length > 0 ? { example_files: files.slice(0, EXAMPLE_URLS) } : {}),
       };
     });
 }
@@ -104,8 +108,9 @@ export function topGroups(findings, limit) {
  *   `requested`: the links module ran; `checked`: external links were checked.
  * @param {{requested: boolean, checked: boolean, vitals: VitalsData|null}} vitals
  *   `requested`: the seo module ran; `checked`: Core Web Vitals were asked for.
+ * @param {string[]} repoNotes  What repo mode has to say about the source files; empty outside repo mode.
  */
-function runNotes(crawl, outbound, vitals) {
+function runNotes(crawl, outbound, vitals, repoNotes) {
   const notes = [];
   if (crawl.blocked) {
     notes.push(`The crawl was stopped (${crawl.blocked.reason}) at ${crawl.blocked.url}. Findings cover only what was fetched before that; the crawler never tries to get past a block.`);
@@ -127,6 +132,7 @@ function runNotes(crawl, outbound, vitals) {
   const unreadable = unreadableNote(crawl);
   if (unreadable) notes.push(unreadable);
   notes.push(...vitalsNotes(vitals));
+  notes.push(...repoNotes);
   if (!outbound.requested) return notes;
   if (!outbound.checked) {
     notes.push('External links were not checked (check_outbound_links was false), so checks that need them were skipped.');
@@ -186,7 +192,8 @@ export function auditTools(deps) {
         'scores, totals, the top problems and notes on coverage. Accepts crawls that are done or blocked. ' +
         'External links are checked only when the links module runs. With the seo module, Core Web Vitals are measured ' +
         'for a few pages through Google (PageSpeed Insights and the Chrome UX Report), which can take a minute; ' +
-        'when Google refuses or does not answer, those checks are skipped and the audit still completes.',
+        'when Google refuses or does not answer, those checks are skipped and the audit still completes. ' +
+        'With source_dir (repo mode, for a crawl of the project\'s own local server), each finding also names the source file it comes from.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -200,6 +207,12 @@ export function auditTools(deps) {
           check_outbound_links: { type: 'boolean', default: true, description: `With the links module, check up to ${LIMITS.maxOutboundChecks} external links for broken targets.` },
           ...VITALS_ARGUMENTS,
           project_dir: PROJECT_DIR_SCHEMA,
+          source_dir: {
+            ...SOURCE_DIR_SCHEMA,
+            description:
+              'Repo mode: absolute path of the web project whose local server was crawled, as project_detect returned it. ' +
+              'Findings then carry source {file, line, route} where the file can be determined. Accepted only for a crawl of a site on this machine.',
+          },
         },
         required: ['job_id'],
         additionalProperties: false,
@@ -210,6 +223,8 @@ export function auditTools(deps) {
         await withStoreErrors(() => deps.ensureProject(projectDir));
         const modules = args.modules && args.modules.length > 0 ? [...new Set(/** @type {string[]} */ (args.modules))] : [...MODULES];
         const crawl = await finishedCrawl(deps.crawlManager, args.job_id);
+        // Repo mode. A bad source folder fails here, before any request is sent.
+        const sources = await auditSources(deps, projectDir, crawl, args.source_dir);
 
         // External links are checked only for the links module (README, REVIEW-FIXES R7).
         const linksRequested = modules.includes('links');
@@ -230,6 +245,8 @@ export function auditTools(deps) {
         const date = deps.now();
         const detectedAt = date.toISOString();
         const result = runChecks(deps.checks, ctx, { modules, detectedAt });
+        const mapped = sources === null ? null : await deps.attachSources(result.findings, crawl, sources);
+        const findings = mapped === null ? result.findings : mapped.findings;
         const blockedUnread = crawl.blocked !== null && ctx.htmlPages.length === 0;
         /** @type {Record<string, ModuleScore>} */
         const scores = blockedUnread
@@ -261,8 +278,9 @@ export function auditTools(deps) {
           modules_requested: modules,
           modules: scores,
           checks: result.checks,
-          findings: result.findings,
+          findings,
           core_web_vitals: vitals,
+          repo: mapped === null ? null : mapped.summary,
         };
         const saved = await saveWithNewId(deps, projectDir, run, date);
 
@@ -280,13 +298,15 @@ export function auditTools(deps) {
             checks_skipped: result.checks.filter((check) => check.status === 'skipped').length,
             checks_failed_to_run: result.checks.filter((check) => check.status === 'error').length,
           },
-          top: topGroups(result.findings, TOP_GROUPS),
+          top: topGroups(findings, TOP_GROUPS),
           core_web_vitals: vitalsOutput(vitals),
+          repo: run.repo,
           skipped_checks: skippedChecks(result.checks),
           notes: runNotes(
             crawl,
             { requested: linksRequested, checked: checkOutbound, found: external.length },
             { requested: seoRequested, checked: checkVitals, vitals },
+            mapped === null ? [] : mapped.notes,
           ),
           _note: UNTRUSTED_NOTE,
         };

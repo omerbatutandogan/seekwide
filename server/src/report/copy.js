@@ -60,11 +60,12 @@ export const SCORE_NOTE =
 export const CONFIDENCE_NOTE = 'Confirmed means a measured fact. Likely means a strong signal that can have a legitimate exception, so review it before acting.';
 
 /**
- * @param {{pluginVersion: string, rulesVersion: string, vitals?: boolean}} run
+ * @param {{pluginVersion: string, rulesVersion: string, vitals?: boolean, repo?: boolean}} run
  *   `vitals`: the run asked for Core Web Vitals, so the method says how they are measured.
+ *   `repo`: the findings name source files, so the method says how those were found.
  * @returns {{label: string, text: string}[]}
  */
-export function methodSections({ pluginVersion, rulesVersion, vitals = false }) {
+export function methodSections({ pluginVersion, rulesVersion, vitals = false, repo = false }) {
   const vitalsMethod = {
     label: 'How Core Web Vitals are measured',
     text: 'Only a few pages are measured, because each test takes many seconds: the start page, then one page from each of the largest groups of similar pages. Google loads each of them once on an emulated mid-range phone (PageSpeed Insights); that is the lab data, and it changes from run to run. Field data is what real Chrome users on phones experienced over 28 days (Chrome UX Report); it exists only for sites and pages with enough visits, and collecting it needs a Google API key. The URLs of the measured pages are sent to Google.',
@@ -79,6 +80,10 @@ export function methodSections({ pluginVersion, rulesVersion, vitals = false }) 
       text: 'Every finding comes from a scripted check that code ran on the crawled data, and the evidence is shown with it. Confirmed means the problem is a measured fact. Likely means a strong signal that can have a legitimate exception, so review it before acting.',
     },
     ...(vitals ? [vitalsMethod] : []),
+    ...(repo ? [{
+      label: 'How source files are found',
+      text: "The audit ran against the project's own local server. The address of each finding is matched to the file that answers it: by the routing rules of the Next.js App Router, or by its path for plain HTML. The file says where a fix belongs. Everything a finding reports was measured on the page the server sent, never read from the source code.",
+    }] : []),
     { label: 'How scores work', text: SCORE_NOTE },
     {
       label: 'What is not measured',

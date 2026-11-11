@@ -114,6 +114,10 @@ function findingItem(f) {
   if (f.selector) where.push(html`<span class="k">Selector</span><code>${f.selector}</code>`);
   if (f.line !== null) where.push(html`<span class="k">Line</span>${f.line}`);
   if (where.length > 0) rows.push(html`<div>${where}</div>`);
+  if (f.source !== null) {
+    const { file, line, route } = f.source;
+    rows.push(html`<div><span class="k">Source</span><code>${line === null ? file : `${file}:${line}`}</code>${route === null ? '' : html` <span class="k">Route</span><code>${route}</code>`}</div>`);
+  }
   if (f.related.length > 0) {
     const rest = f.related.length - 3;
     rows.push(html`<div><span class="k">Also</span>${f.related.slice(0, 3).map((url) => html`${urlHtml(url)} `)}${rest > 0 ? `+${rest} more` : ''}</div>`);

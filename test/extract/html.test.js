@@ -5,6 +5,15 @@ import { extractPage } from '../../server/src/extract/page.js';
 import { makeFetch, makeInput } from './fetch-result.js';
 
 /**
+ * CPU time this process has used, in milliseconds. The speed limits below use it
+ * instead of the wall clock, so a busy machine does not fail them.
+ */
+const cpuMs = () => {
+  const usage = process.cpuUsage();
+  return (usage.user + usage.system) / 1000;
+};
+
+/**
  * Extract a record from an HTML string served at `url`.
  * @param {string} html
  * @param {{url?: string, siteHost?: string, includeSubdomains?: boolean}} [options]
@@ -144,6 +153,30 @@ test('anchors: labels on images, hidden elements and non-text elements; headings
     <h1><a href="/" aria-label="Go to homepage">Acme</a></h1><h2><div aria-label="Welcome"></div></h2></body>`);
   assert.deepEqual(record.links.slice(0, 6).map((l) => l.text), ['Brand', 'Brand', '', '', 'words', 'Logo']);
   assert.deepEqual(record.headings.map((h) => h.text), ['Acme', '']);
+});
+
+test('canonicals: one that Next.js streamed into the body is marked streamed and stays outside the head', () => {
+  const streamed = '<title>T</title><meta name="description" content="D"><link rel="canonical" href="/x">';
+  /** @param {string} html */
+  const flags = (html) => page(html).canonicals.map((c) => [c.in_head, c.streamed]);
+  const body = (/** @type {string} */ script) => `<html><head></head><body><h1>A</h1>${script}${streamed}</body></html>`;
+  assert.deepEqual(flags(body('<script>self.__next_f.push([1,"a"])</script>')), [[false, true]]);
+  assert.deepEqual(flags(body('<script>(self.__next_f=self.__next_f||[]).push([0])</script>')), [[false, true]]);
+  // Not Next.js data scripts: other code, a comment, JSON-LD, a non-script type, an external file.
+  for (const script of [
+    '<script>var a = 1;</script>',
+    '<script>/* self.__next_f */</script>',
+    '<script type="application/ld+json">{"articleBody":"self.__next_f.push( is Next.js"}</script>',
+    '<script type="text/plain">self.__next_f.push([1])</script>',
+    '<script src="/self.__next_f.js"></script>',
+  ]) assert.deepEqual(flags(body(script)), [[false, undefined]], script);
+  // The title stayed in the head, so the canonical was not streamed: the head was closed early.
+  assert.deepEqual(
+    flags('<html><head><title>T</title><script>self.__next_f.push([1,"a"])</script><img src="a.png"><link rel="canonical" href="/x"></head><body></body></html>'),
+    [[false, undefined]],
+  );
+  // A head canonical on a Next.js page is an ordinary head canonical.
+  assert.deepEqual(flags('<html><head><link rel="canonical" href="/x"></head><body><script>self.__next_f.push([1,"a"])</script></body></html>'), [[true, undefined]]);
 });
 
 test('anchors: internal versus external, subdomains with and without includeSubdomains', () => {
@@ -298,24 +331,24 @@ test('at most 5000 links and 2000 images are kept', () => {
 
 test('nested headings extract in linear time (n = 8000 in well under a second)', () => {
   const html = `<body>${'<h2><div>x'.repeat(8000)}</body>`;
-  const started = performance.now();
+  const started = cpuMs();
   const record = page(html);
-  const elapsed = performance.now() - started;
+  const elapsed = cpuMs() - started;
   assert.equal(record.headings.length, 500);
   assert.equal(record.headings[0].text.length, 300);
   assert.ok(elapsed < 1000, `took ${Math.round(elapsed)} ms`);
   const empty = `<body>${'<h2><div>'.repeat(8000)}</body>`;
-  const startedEmpty = performance.now();
+  const startedEmpty = cpuMs();
   page(empty);
-  assert.ok(performance.now() - startedEmpty < 1000);
+  assert.ok(cpuMs() - startedEmpty < 1000);
 });
 
 test('a heading reads a bounded part of a large subtree', () => {
   // 500 nested headings around 60,000 text elements: reading every subtree whole would visit 30 million nodes.
   const html = `<body>${'<h2><div>'.repeat(500)}${'<span>word </span>'.repeat(60000)}</body>`;
-  const started = performance.now();
+  const started = cpuMs();
   const record = page(html);
-  const elapsed = performance.now() - started;
+  const elapsed = cpuMs() - started;
   assert.equal(record.headings.length, 500);
   assert.equal(record.headings[499].text.length, 300);
   assert.ok(elapsed < 1000, `took ${Math.round(elapsed)} ms`);

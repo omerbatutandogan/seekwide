@@ -36,6 +36,10 @@ function evidenceCell(finding) {
   const parts = finding.evidence.map((part) => `${part.label}: ${part.kind === 'code' ? mdCode(part.value, true) : mdText(part.value)}`);
   if (finding.selector) parts.push(`Selector: ${mdCode(finding.selector, true)}`);
   if (finding.line !== null) parts.push(`Line ${finding.line}`);
+  if (finding.source !== null) {
+    const { file, line, route } = finding.source;
+    parts.push(`Source: ${mdCode(line === null ? file : `${file}:${line}`, true)}${route === null ? '' : ` (route ${mdCode(route, true)})`}`);
+  }
   if (finding.related.length > 0) {
     const shown = finding.related.slice(0, 3).map((url) => mdUrl(url, true));
     const rest = finding.related.length - shown.length;

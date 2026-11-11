@@ -1,4 +1,4 @@
-# Check specification (rules 0.1.1)
+# Check specification (rules 0.1.2)
 
 Every scripted check the plugin ships is defined here. The code in `server/src/checks/` implements this table exactly; `docs/checks.md` is generated from the code for users.
 
@@ -22,6 +22,16 @@ Terms:
 - *tested page*: an entry of `ctx.vitals.pages`, one of the few pages whose Core Web Vitals were measured.
 
 Evidence strings taken from a page are clipped with `clip()`. `related_urls` are sorted.
+
+## Source files (repo mode)
+
+A finding can carry `source: {file, line, route}`: the file of the user's project that the finding comes from. It is added after the checks ran, by `repo/sources.js` (ARCHITECTURE.md 4.12), only in an audit that was given a source folder, and only where the file can be determined. It is not part of a check's result, of the finding id or of the score, so the same crawl gives the same ids with and without it.
+
+- `file`: path relative to the project folder.
+- `line`: the line of the element in `file`, or null. Given for HTML files only.
+- `route`: the Next.js route (`/blog/[slug]`) or the URL path.
+
+No source is given to a site-level finding without a URL, to `seo.https.site_not_https`, `seo.https.not_enforced` and `seo.cwv.*` (they are about the server or about Google's measurements), or to a finding whose URL no file of the project answers. In a Next.js project that includes a URL that redirected or answered 404, and a URL that only a route with a dynamic segment matches unless it answered 200.
 
 ## SEO module (`checks/seo/`)
 
@@ -57,9 +67,10 @@ Evidence strings taken from a page are clipped with `clip()`. `related_urls` are
 | `seo.h1.missing` | Every indexable page | no `h1` with non-empty text | medium / 2 | confirmed | — | TITLE |
 | `seo.h1.multiple` | Every indexable page | more than one `h1` with non-empty text | info / 0 | likely | — | HEADINGS |
 | `seo.headings.skipped_level` | Every indexable page with one or more headings | a heading is more than one level deeper than the heading before it | info / 0 | likely | — | HEADINGS |
-| `seo.canonical.missing` | Every indexable page | no effective canonical | low / 1 | confirmed | — | CANONICAL |
+| `seo.canonical.missing` | Every indexable page, except one whose only canonicals are `streamed` (see `seo.canonical.streamed_in_body`) | no effective canonical | low / 1 | confirmed | — | CANONICAL |
 | `seo.canonical.multiple` | Every html page with one or more effective canonicals | the effective canonicals name more than one distinct URL | high / 4 | confirmed | — | CANONICAL |
-| `seo.canonical.outside_head` | Every html page with one or more canonicals from HTML | a canonical link element is outside `<head>` | medium / 2 | confirmed | — | CANONICAL |
+| `seo.canonical.outside_head` | Every html page with one or more canonicals from HTML that are not `streamed` | a canonical link element is outside `<head>` and is not marked `streamed` | medium / 2 | confirmed | — | CANONICAL |
+| `seo.canonical.streamed_in_body` | Every html page with one or more canonicals from HTML | a canonical is marked `streamed`: a Next.js App Router page (inline `self.__next_f` data scripts) sent it in `<body>` together with the `<title>`. Google documents that a body canonical is ignored; Next.js states that crawlers which run JavaScript read streamed metadata correctly. Such a page is not a unit of `seo.canonical.missing` | medium / 2 | likely | — | CANONICAL |
 | `seo.canonical.invalid` | Every html page with one or more canonicals | a canonical has a null `url` (empty, malformed or not http/https) | medium / 3 | confirmed | — | CANONICAL |
 | `seo.canonical.relative` | Every html page with one or more canonicals | a canonical `href`, trimmed, does not start with `http://` or `https://` (in any letter case) | low / 1 | confirmed | — | CANONICAL |
 | `seo.canonical.target_not_ok` | Every html page whose effective canonicals name exactly one URL, that URL differs from the page URL, a record exists for it, and the crawler could read it | the target's status is not 200, or it is not HTML, or it is noindex | high / 4 | confirmed | — | CANONICAL |

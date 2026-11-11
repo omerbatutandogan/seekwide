@@ -215,7 +215,7 @@ test('scores and coverage are reported for both modules', () => {
     'seo.cwv.field_cls', 'seo.cwv.field_inp', 'seo.cwv.field_lcp', 'seo.cwv.lab_cls', 'seo.cwv.lab_lcp', 'seo.cwv.lab_tbt',
   ]);
   assert.equal(seo.checks_skipped, 6);
-  assert.equal(seo.checks_total, 46);
+  assert.equal(seo.checks_total, 47);
   assert.equal(seo.coverage, 0.87);
   assert.equal(links.checks_skipped, 1);
   assert.ok(audit.checks.every((stat) => stat.status !== 'error'), 'no check may crash');

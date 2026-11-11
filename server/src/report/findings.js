@@ -49,11 +49,25 @@ function evidenceText(value) {
  * @property {string|null} url
  * @property {string|null} selector
  * @property {number|null} line
+ * @property {{file: string, line: number|null, route: string|null}|null} source  Repo mode: where the fix belongs.
  * @property {EvidencePart[]} evidence
  * @property {string[]} related
  * @property {string} recommendation
  * @property {string} docRef
  */
+
+/**
+ * The source file of a finding, when the stored value names one.
+ * @param {unknown} raw
+ * @returns {FindingView['source']}
+ */
+function viewSource(raw) {
+  const source = obj(raw);
+  const file = text(source.file);
+  if (file === '') return null;
+  const line = Number.isInteger(source.line) && /** @type {number} */ (source.line) > 0 ? /** @type {number} */ (source.line) : null;
+  return { file: clip(file, EVIDENCE_MAX), line, route: text(source.route) ? clip(text(source.route), EVIDENCE_MAX) : null };
+}
 
 /**
  * A finding from a stored run, reduced to the fields the reports show. Whatever
@@ -84,6 +98,7 @@ export function viewFinding(raw) {
     url: url === '' ? null : url,
     selector: text(f.selector) || null,
     line: Number.isInteger(f.line) ? /** @type {number} */ (f.line) : null,
+    source: viewSource(f.source),
     evidence: parts,
     related: (Array.isArray(f.related_urls) ? /** @type {unknown[]} */ (f.related_urls) : []).filter((u) => typeof u === 'string'),
     recommendation: text(f.recommendation),

@@ -67,6 +67,28 @@ test('seo.canonical.outside_head fails a canonical link in the body and ignores 
   assert.equal(findings[0].line, 80);
 });
 
+test('seo.canonical.streamed_in_body fails a streamed canonical; outside_head and missing leave that page alone', () => {
+  const pages = [
+    makePage({ url: `${SITE}/streamed`, canonicals: [canonical(`${SITE}/streamed`, { in_head: false, streamed: true, line: 7 })] }),
+    makePage({ url: `${SITE}/both`, canonicals: [canonical(`${SITE}/both`, { source: 'header', line: null }), canonical(`${SITE}/both`, { in_head: false, streamed: true })] }),
+    makePage({ url: `${SITE}/body`, canonicals: [canonical(`${SITE}/body`, { in_head: false })] }),
+    makePage({ url: `${SITE}/head` }),
+    makePage({ url: `${SITE}/header-only`, canonicals: [canonical(`${SITE}/header-only`, { source: 'header', line: null })] }),
+  ];
+  const streamed = audit('seo.canonical.streamed_in_body', { pages });
+  assert.deepEqual(streamed.units, [`${SITE}/body`, `${SITE}/both`, `${SITE}/head`, `${SITE}/streamed`]);
+  assert.deepEqual(streamed.failed, [`${SITE}/both`, `${SITE}/streamed`]);
+  const finding = streamed.findings.find((f) => f.url === `${SITE}/streamed`);
+  assert.equal(finding?.line, 7);
+  assert.equal(finding?.confidence, 'likely');
+  const outside = audit('seo.canonical.outside_head', { pages });
+  assert.deepEqual(outside.units, [`${SITE}/body`, `${SITE}/head`]);
+  assert.deepEqual(outside.failed, [`${SITE}/body`]);
+  const missing = audit('seo.canonical.missing', { pages });
+  assert.deepEqual(missing.units, [`${SITE}/body`, `${SITE}/both`, `${SITE}/head`, `${SITE}/header-only`]);
+  assert.deepEqual(missing.failed, [`${SITE}/body`]);
+});
+
 test('seo.canonical.invalid fails canonicals without a usable URL', () => {
   const pages = [
     makePage({ url: `${SITE}/empty`, canonicals: [canonical('')] }),
