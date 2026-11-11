@@ -114,7 +114,7 @@ export function makeDeps(seed = {}) {
 
   const deps = {
     crawlManager: {
-      /** @param {{url: string, maxPages?: number, includeSubdomains?: boolean, allowLoopback?: boolean}} options */
+      /** @param {{url: string, maxPages?: number, includeSubdomains?: boolean, allowLoopback?: boolean, deployedUrl?: string}} options */
       start(options) {
         record('start', [options]);
         if (options.url.includes('async-reject')) return Promise.reject(new TypeError('allowLoopback needs a loopback start host.'));

@@ -50,6 +50,8 @@ async function unreadNextSettings(root) {
  * @property {string} relative        The source folder seen from the project folder ('' when they are the same).
  * @property {boolean} truncated      The file listing was cut at its limit.
  * @property {{route: string, file: string, kind: string}[]} routes  Pages and files that have a URL, sorted by route.
+ * @property {string[]} files         Every listed file, relative to the source folder: the app and `public` folders of a
+ *   Next.js project, the whole folder of a plain HTML one. Empty for a project that is not supported.
  * @property {(pathname: string) => SourceMatch|null} resolve
  * @property {string[]} unreadSettings  Settings found in next.config that change which file answers a URL and that the
  *   mapping does not know (`basePath`, `rewrites`, `pageExtensions`). The file is searched as text, never run.
@@ -86,6 +88,7 @@ export async function loadProjectSources(projectDir, sourceDir) {
     return {
       ...base,
       truncated: app.truncated || pub.truncated,
+      files: [...app.files, ...pub.files],
       unreadSettings: await unreadNextSettings(dirs.sourceDir),
       // Shown: every route a file certainly has, and the HTML files in public/. The extra addresses a
       // metadata file gets only when its code produces several files ("[id]") are matched but not listed.
@@ -103,6 +106,7 @@ export async function loadProjectSources(projectDir, sourceDir) {
     return {
       ...base,
       truncated: listing.truncated,
+      files: listing.files,
       unreadSettings: [],
       routes: listing.files.filter(isHtmlFile).map((file) => ({ route: `/${file}`, file, kind: 'file' })),
       resolve: (pathname) => {
@@ -111,7 +115,7 @@ export async function loadProjectSources(projectDir, sourceDir) {
       },
     };
   }
-  return { ...base, truncated: false, unreadSettings: [], routes: [], resolve: () => null };
+  return { ...base, truncated: false, files: [], unreadSettings: [], routes: [], resolve: () => null };
 }
 
 /**
@@ -269,6 +273,7 @@ export async function attachSources(findings, crawl, sources) {
       framework: detection.framework,
       label: detection.label,
       source_dir: sources.relative === '' ? '.' : sources.relative,
+      ...(crawl.options?.deployed_origin ? { deployed_origin: crawl.options.deployed_origin, deployed_localized: crawl.options.deployed_localized ?? 0 } : {}),
       findings_with_source: withSource,
       pages_matched: matched,
       pages_total: htmlPages.length,

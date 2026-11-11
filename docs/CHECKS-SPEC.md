@@ -33,6 +33,14 @@ A finding can carry `source: {file, line, route}`: the file of the user's projec
 
 No source is given to a site-level finding without a URL, to `seo.https.site_not_https`, `seo.https.not_enforced` and `seo.cwv.*` (they are about the server or about Google's measurements), or to a finding whose URL no file of the project answers. In a Next.js project that includes a URL that redirected or answered 404, and a URL that only a route with a dynamic segment matches unless it answered 200.
 
+## A local site that names its deployed address
+
+A project's pages name the address the site is deployed at, in canonical links and in the sitemap. Audited on `http://localhost:3000`, such a page would not be indexable (`canonical_elsewhere`), so every check whose unit is an indexable page would skip it, and `seo.canonical.cross_host` would fail on it. When a crawl of a local site is told that address (`site_url` on `crawl_start`; ARCHITECTURE.md 4.5), a canonical URL and a sitemap entry on exactly that origin are recorded as the same path on the local server. The checks themselves do not change and do not know about it: they read the record. `href` in a canonical keeps what the page sent, so `seo.canonical.relative` still judges the page's own text. Finding ids are unchanged, because they are built from the page's URL, which is the local one either way.
+
+## Fixes and their verification
+
+`/seekwide:fix` (ARCHITECTURE.md 4.13) plans changes for the findings of nine checks: `seo.title.missing`, `seo.title.duplicate`, `seo.title.multiple`, `seo.meta_description.missing`, `seo.meta_description.duplicate`, `seo.meta_description.multiple`, `seo.canonical.missing`, `seo.social.og_incomplete` and `seo.sitemap.missing`. A fix never changes a finding, an id or a score; only the next audit does. When that audit verifies fixes, a finding that is gone counts as closed only if its check looked at the same unit again. The unit of each of the nine checks is recorded next to the fix (`FIXABLE_CHECKS` in `repo/fixes.js`), and a test holds that table to what the checks do. Change it together with the check.
+
 ## SEO module (`checks/seo/`)
 
 ### Site level (`scope: 'site'`)

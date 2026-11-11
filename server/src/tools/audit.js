@@ -6,10 +6,13 @@
 
 import { LIMITS, MODULES, RULES_VERSION, SCHEMA_VERSION, SEVERITIES, VERSION } from '../config.js';
 import { buildContext, runChecks } from '../checks/engine.js';
+import { onDeployedHost } from '../crawl/deployed.js';
 import { isUnverifiable } from '../checks/page-helpers.js';
+import { deployedNotes } from './audit-deployed.js';
 import { VITALS_ARGUMENTS, collectVitals, vitalsNotes, vitalsOutput } from './audit-vitals.js';
 import { JOB_ID_SCHEMA, PROJECT_DIR_SCHEMA, UNTRUSTED_NOTE, countBy, resolveProjectDir, withStoreErrors } from './common.js';
 import { finishedCrawl } from './crawl.js';
+import { VERIFY_FIXES_SCHEMA, fixBase, fixOutput, fixVerification } from './fix.js';
 import { SOURCE_DIR_SCHEMA, auditSources } from './project.js';
 
 const TOP_GROUPS = 10;
@@ -27,12 +30,19 @@ const UNREADABLE_REASONS = {
 /**
  * URLs for the external link check, de-duplicated and sorted: the external link
  * targets on the crawled HTML pages (status 200), plus the `final_url` of every
- * record whose redirect chain leaves the site.
+ * record whose redirect chain leaves the site. Every URL on the host of the
+ * deployed site of a local crawl (`options.deployed_origin`) is left out,
+ * whatever its scheme or port, with or without "www.".
  * @param {CrawlResult} crawl
  * @returns {string[]}
  */
 export function externalLinkUrls(crawl) {
   const urls = new Set();
+  // A local crawl that knows where the project is deployed never has that address contacted: its pages
+  // name it, and a request there would say nothing about the project being audited.
+  const deployed = crawl.options.deployed_origin;
+  /** @param {string} url */
+  const onDeployedSite = (url) => Boolean(deployed) && onDeployedHost(url, /** @type {string} */ (deployed));
   for (const page of crawl.pages) {
     if (page.final_external) urls.add(page.final_url);
     if (page.status !== 200 || !page.is_html) continue;
@@ -40,7 +50,7 @@ export function externalLinkUrls(crawl) {
       if (link.url !== null && !link.internal) urls.add(link.url);
     }
   }
-  return [...urls].sort();
+  return [...urls].filter((url) => !onDeployedSite(url)).sort();
 }
 
 /**
@@ -132,6 +142,7 @@ function runNotes(crawl, outbound, vitals, repoNotes) {
   const unreadable = unreadableNote(crawl);
   if (unreadable) notes.push(unreadable);
   notes.push(...vitalsNotes(vitals));
+  notes.push(...deployedNotes(crawl));
   notes.push(...repoNotes);
   if (!outbound.requested) return notes;
   if (!outbound.checked) {
@@ -193,7 +204,8 @@ export function auditTools(deps) {
         'External links are checked only when the links module runs. With the seo module, Core Web Vitals are measured ' +
         'for a few pages through Google (PageSpeed Insights and the Chrome UX Report), which can take a minute; ' +
         'when Google refuses or does not answer, those checks are skipped and the audit still completes. ' +
-        'With source_dir (repo mode, for a crawl of the project\'s own local server), each finding also names the source file it comes from.',
+        'With source_dir (repo mode, for a crawl of the project\'s own local server), each finding also names the source file it comes from. ' +
+        'With verify_fixes (a re-audit after fixes), the run also says what became of each fixed finding of an earlier run.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -213,6 +225,7 @@ export function auditTools(deps) {
               'Repo mode: absolute path of the web project whose local server was crawled, as project_detect returned it. ' +
               'Findings then carry source {file, line, route} where the file can be determined. Accepted only for a crawl of a site on this machine.',
           },
+          verify_fixes: VERIFY_FIXES_SCHEMA,
         },
         required: ['job_id'],
         additionalProperties: false,
@@ -225,6 +238,8 @@ export function auditTools(deps) {
         const crawl = await finishedCrawl(deps.crawlManager, args.job_id);
         // Repo mode. A bad source folder fails here, before any request is sent.
         const sources = await auditSources(deps, projectDir, crawl, args.source_dir);
+        // A re-audit after fixes. A base run that cannot be compared fails here too.
+        const fixRequest = await fixBase(deps, projectDir, crawl, args.verify_fixes);
 
         // External links are checked only for the links module (README, REVIEW-FIXES R7).
         const linksRequested = modules.includes('links');
@@ -281,7 +296,9 @@ export function auditTools(deps) {
           findings,
           core_web_vitals: vitals,
           repo: mapped === null ? null : mapped.summary,
+          fixes: null,
         };
+        run.fixes = fixVerification(deps, fixRequest, run, crawl);
         const saved = await saveWithNewId(deps, projectDir, run, date);
 
         return {
@@ -301,6 +318,7 @@ export function auditTools(deps) {
           top: topGroups(findings, TOP_GROUPS),
           core_web_vitals: vitalsOutput(vitals),
           repo: run.repo,
+          fix_verification: fixOutput(run.fixes ?? null),
           skipped_checks: skippedChecks(result.checks),
           notes: runNotes(
             crawl,

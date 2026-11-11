@@ -66,6 +66,8 @@ function summarize(crawl) {
     sitemap_urls: crawl.sitemap.urls.length,
     truncated: crawl.truncated,
     blocked: crawl.blocked,
+    // A local crawl that was told where the project is deployed.
+    ...(crawl.options.deployed_origin ? { site_url: crawl.options.deployed_origin } : {}),
   };
 }
 
@@ -163,6 +165,14 @@ export function crawlTools(deps) {
             default: false,
             description: 'Audit a site on this machine. Accepted only when the start host is a loopback address (localhost, 127.0.0.1, ::1); the crawl then stays on that one origin.',
           },
+          site_url: {
+            type: 'string',
+            maxLength: 2048,
+            description:
+              'Only with allow_localhost: the address the project is deployed at, for example https://www.example.com. Canonical links, ' +
+              'robots.txt Sitemap lines and sitemap entries on that address are then read as the same path on the local server, ' +
+              'so a page that names its deployed URL is not treated as pointing to another site. The audit requests nothing from that address.',
+          },
         },
         required: ['url'],
         additionalProperties: false,
@@ -181,6 +191,7 @@ export function crawlTools(deps) {
             maxPages,
             includeSubdomains: args.include_subdomains ?? false,
             allowLoopback: args.allow_localhost ?? false,
+            ...(typeof args.site_url === 'string' && args.site_url.trim() !== '' ? { deployedUrl: args.site_url.trim() } : {}),
           });
         } catch (error) {
           if (error instanceof TypeError) {

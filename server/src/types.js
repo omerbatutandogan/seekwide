@@ -219,9 +219,12 @@ export {};
  * @property {string} site_host        Host of the start URL after redirects, with the port when it is not the default (`URL.host`).
  * @property {string} started_at       ISO 8601.
  * @property {string} finished_at      ISO 8601.
- * @property {{max_pages: number, rate_per_sec: number, include_subdomains: boolean, local?: boolean}} options
+ * @property {{max_pages: number, rate_per_sec: number, include_subdomains: boolean, local?: boolean, deployed_origin?: string, deployed_localized?: number}} options
  *   `local` is true when the audited site is on this machine (the crawl was allowed to reach loopback).
- *   Such a site is never named to an outside service.
+ *   Such a site is never named to an outside service. `deployed_origin` is set for a local crawl that was told
+ *   where the project is deployed: canonicals and sitemap entries on that origin were read as local addresses.
+ *   `deployed_localized` counts them (pages with such a canonical, Sitemap lines and sitemap entries); 0 means
+ *   the address given matched nothing.
  * @property {RobotsSummary} robots
  * @property {SitemapSummary} sitemap
  * @property {HttpProbe|null} http_probe   Null when the site is not https or the probe was not possible.
@@ -409,9 +412,37 @@ export {};
  * @property {'next-app'|'html'|'unsupported'|'none'} framework
  * @property {string} label            Name to show, for example "Next.js (App Router)".
  * @property {string} source_dir       The web project's folder relative to the project folder; "." when they are the same.
+ * @property {string} [deployed_origin]  The address the project is deployed at, when the crawl was told (`site_url`):
+ *   canonicals and sitemap entries on it were read as addresses on the local server.
+ * @property {number} [deployed_localized]  How many were; 0 means that address matched nothing the pages name.
  * @property {number} findings_with_source
  * @property {number} pages_matched    Crawled HTML pages that a file of the project answers.
  * @property {number} pages_total      Crawled HTML pages.
+ */
+
+/**
+ * What became of one fixed finding in the run made after the fix.
+ * @typedef {Object} FixResult
+ * @property {string} finding_id       Id of the finding in the base run.
+ * @property {string} check_id
+ * @property {string} title
+ * @property {string} severity
+ * @property {string|null} url
+ * @property {string|null} file        The source file the finding named, relative to the project folder.
+ * @property {'closed'|'open'|'replaced'|'unverified'} outcome
+ *   `closed`: gone, and the check looked again. `open`: still reported. `replaced`: gone, but the run has a new
+ *   finding of the same kind on the same page. `unverified`: gone, but the check did not look (see `detail`).
+ * @property {string} detail           One sentence that says why, in the plugin's words.
+ * @property {{id: string, check_id: string, title: string, severity: string}[]} replaced_by  For `replaced`; otherwise empty.
+ */
+
+/**
+ * The re-audit after `/seekwide:fix`. Stored in the run as `fixes`.
+ * @typedef {Object} FixVerification
+ * @property {string} base_run_id      The run whose findings were fixed.
+ * @property {{closed: number, open: number, replaced: number, unverified: number}} counts
+ * @property {FixResult[]} results     In the order the findings were named.
+ * @property {string[]} notes          What makes the comparison of the two runs unreliable (from `compareRuns`).
  */
 
 /**
@@ -464,6 +495,8 @@ export {};
  *   measurement was not asked for; absent in runs stored before it existed.
  * @property {RepoSummary|null} [repo]  Repo mode: the project whose source files the findings name. Null when
  *   the audit was not given a source folder; absent in runs stored before it existed.
+ * @property {FixVerification|null} [fixes]  A re-audit after fixes: what became of each fixed finding of an earlier
+ *   run. Null when the audit was not asked to verify fixes; absent in runs stored before it existed.
  */
 
 /**

@@ -5,6 +5,7 @@ import { MODULES, SEVERITIES } from '../config.js';
 import { clip, collapseWhitespace } from '../util/strings.js';
 import { ROBOTS_STATUS, TITLE, methodSections } from './copy.js';
 import { changeList, groupByCheck, viewFinding, withLimits } from './findings.js';
+import { viewFixes } from './fixes.js';
 import { describeBlock, describeUnreadable, factualSummary, moduleLabel, plural } from './facts.js';
 import { compareText, num, obj, str, text } from './values.js';
 import { describeVitals, viewLayers, viewVitals } from './vitals.js';
@@ -147,9 +148,13 @@ function viewRepo(run, findings) {
   const dir = text(repo.source_dir);
   const where = dir === '' || dir === '.' ? '' : ` in ${clip(dir, 200)}`;
   const named = Math.min(findings, Math.max(0, Math.floor(num(repo.findings_with_source))));
+  const deployed = text(repo.deployed_origin);
   return {
     label: 'Source files',
-    value: `${label} project${where}. ${named} of ${plural(findings, 'finding')} ${findings === 1 ? 'names' : 'name'} the source file ${findings === 1 ? 'it comes' : 'they come'} from. Paths are relative to the project folder.`,
+    value: `${label} project${where}. ${named} of ${plural(findings, 'finding')} ${findings === 1 ? 'names' : 'name'} the source file ${findings === 1 ? 'it comes' : 'they come'} from. Paths are relative to the project folder.` +
+      (deployed === '' ? '' : num(repo.deployed_localized) > 0
+        ? ` Canonical links and sitemap entries that name the deployed address (${clip(deployed, 200)}) were read as pages of the local server.`
+        : ` The deployed address given for this audit (${clip(deployed, 200)}) matched no canonical link or sitemap entry of the pages, so none was read as a page of the local server.`),
   };
 }
 
@@ -257,6 +262,7 @@ export function buildReport(run, options = {}) {
       { label: 'Checks run', value: `${checksRun} of ${run.checks.length}` },
     ],
     scope: viewScope(run, { host, blocked }),
+    fixes: viewFixes(run),
     layers: viewLayers(vitals),
     scores,
     vitals,

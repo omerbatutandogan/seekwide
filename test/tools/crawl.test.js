@@ -23,6 +23,24 @@ describe('crawl_start', () => {
     assert.deepEqual(fake.calls.start[0][0], { url: 'http://127.0.0.1:8080/', maxPages: 500, includeSubdomains: true, allowLoopback: true });
   });
 
+  it('passes site_url on as the deployed address of a local site, and leaves it out when it is blank', async () => {
+    const fake = makeDeps();
+    await tool(fake, 'crawl_start').handler({ url: 'http://localhost:3000/', allow_localhost: true, site_url: ' https://www.example.com ' });
+    assert.deepEqual(fake.calls.start[0][0], { url: 'http://localhost:3000/', maxPages: 25, includeSubdomains: false, allowLoopback: true, deployedUrl: 'https://www.example.com' });
+    await tool(fake, 'crawl_start').handler({ url: 'http://localhost:3000/', allow_localhost: true, site_url: '  ' });
+    assert.equal('deployedUrl' in /** @type {object} */ (fake.calls.start[1][0]), false);
+  });
+
+  it('a finished local crawl that was told the deployed address says so in its summary', async () => {
+    const crawl = sampleCrawl({ options: { max_pages: 25, rate_per_sec: 1, include_subdomains: false, local: true, deployed_origin: 'https://www.example.com' } });
+    const fake = makeDeps({ jobs: [jobFor(crawl)], results: [crawl] });
+    const status = /** @type {any} */ (await tool(fake, 'crawl_status').handler({ job_id: crawl.id }));
+    assert.equal(status.summary.site_url, 'https://www.example.com');
+    const plain = sampleCrawl();
+    const other = makeDeps({ jobs: [jobFor(plain)], results: [plain] });
+    assert.equal('site_url' in /** @type {any} */ (await tool(other, 'crawl_status').handler({ job_id: plain.id })).summary, false);
+  });
+
   it('rejects a URL that is not http or https', async () => {
     const fake = makeDeps();
     for (const url of ['ftp://example.test/', 'example', '']) {

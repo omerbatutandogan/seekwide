@@ -6,6 +6,7 @@ import { loadSitemaps } from '../net/sitemap.js';
 import { isInternalUrl, looksLikeHtmlUrl, originOf } from '../util/url.js';
 import { createChainFollower, recordsForChain } from './chain.js';
 import { isBotChallenge, RETRY_AFTER_MAX_MS, retryAfterMs } from './challenge.js';
+import { localizeRecord, localizeUrls } from './deployed.js';
 import { createFrontier } from './frontier.js';
 import { probeHttp } from './probe.js';
 
@@ -25,6 +26,8 @@ const STRIKES = 3;
  * @property {number} ratePerSec
  * @property {boolean} includeSubdomains
  * @property {string|null} loopbackOrigin  The start origin when auditing a local site; null otherwise.
+ * @property {string|null} [deployedOrigin]  Local site only: the origin the project is deployed at. Canonicals and
+ *   sitemap entries on it are read as addresses on the local server (crawl/deployed.js); it is never requested.
  */
 
 /**
@@ -46,7 +49,9 @@ const STRIKES = 3;
  * to any other URL; the fetch order depends only on the site's content; a
  * response that refuses the crawler is recorded as unreadable, never as content;
  * the crawl stops at a bot challenge on the start page, or after three
- * challenges or three 429s in a row.
+ * challenges or three 429s in a row. A crawl of a local site (`loopbackOrigin`)
+ * sends no request to any other origin, whatever a redirect says. With `deployedOrigin`, URLs on that origin
+ * in canonical links, robots.txt Sitemap lines and sitemaps count as local ones.
  *
  * @param {CrawlParams} params
  * @param {CrawlDeps} deps
@@ -55,7 +60,20 @@ const STRIKES = 3;
  */
 export async function runCrawl(params, deps, onProgress) {
   const { startUrl, maxPages, ratePerSec, includeSubdomains, loopbackOrigin, startedAt } = params;
-  const { fetch, extract, now, sleep } = deps;
+  const { fetch, now, sleep } = deps;
+  const deployed = loopbackOrigin !== null && params.deployedOrigin ? params.deployedOrigin : null;
+  /** @type {Extractor} */
+  const extract = deployed === null || loopbackOrigin === null ? deps.extract : {
+    ...deps.extract,
+    extractPage: (input) => {
+      const record = deps.extract.extractPage(input);
+      const local = localizeRecord(record, deployed, loopbackOrigin);
+      if (local !== record) localized += 1;
+      return local;
+    },
+  };
+  /** Pages, robots.txt Sitemap lines and sitemap entries that named the deployed origin. */
+  let localized = 0;
   const baseDelayMs = 1000 / ratePerSec;
   let delayMs = baseDelayMs;
   let requests = 0;
@@ -69,6 +87,17 @@ export async function runCrawl(params, deps, onProgress) {
    * @param {number} [waitMs] Wait before this request instead of the normal delay.
    */
   const politeFetch = async (url, options = {}, waitMs = delayMs) => {
+    // A crawl of a local site requests that site and nothing else: a robots.txt, a sitemap or a probe that
+    // leads to another origin is refused here, as the redirect follower refuses it for pages.
+    if (loopbackOrigin !== null && originOf(url) !== loopbackOrigin) {
+      /** @type {FetchResult} */
+      const refused = {
+        url, finalUrl: url, status: 0, headers: {}, headerLines: {}, redirectChain: [], body: null, truncated: false, bytes: 0, elapsedMs: 0,
+        error: { code: 'blocked_address', message: 'A crawl of a site on this machine requests nothing from another address.' },
+      };
+      lastErrors.set(url, refused.error);
+      return refused;
+    }
     if (requests > 0) await sleep(waitMs);
     requests += 1;
     const result = await fetch(url, { ...options, allowLoopback: loopbackOrigin ?? false });
@@ -128,7 +157,7 @@ export async function runCrawl(params, deps, onProgress) {
     const result = {
       schema_version: SCHEMA_VERSION, id: params.id, start_url: startUrl, site_origin: origin, site_host: host,
       started_at: startedAt, finished_at: now().toISOString(),
-      options: { max_pages: maxPages, rate_per_sec: ratePerSec, include_subdomains: includeSubdomains, local: loopbackOrigin !== null },
+      options: { max_pages: maxPages, rate_per_sec: ratePerSec, include_subdomains: includeSubdomains, local: loopbackOrigin !== null, ...(deployed === null ? {} : { deployed_origin: deployed, deployed_localized: localized }) },
       robots: robots.summary, sitemap, http_probe: httpProbe, pages,
       robots_blocked: robotsBlocked, truncated, blocked, user_agent: USER_AGENT,
     };
@@ -228,9 +257,15 @@ export async function runCrawl(params, deps, onProgress) {
   /** @param {string} url */
   const sitemapAllowed = async (url) => (await robotsFor(/** @type {string} */ (originOf(url)))).isAllowed(url);
   const sitemapOptions = { fetch: politeFetch, siteHost: host, includeSubdomains, isAllowed: sitemapAllowed };
-  sitemap = robots.summary.sitemaps.length > 0
-    ? await loadSitemaps(robots.summary.sitemaps, sitemapOptions)
+  const listed = deployed === null || loopbackOrigin === null ? robots.summary.sitemaps : localizeUrls(robots.summary.sitemaps, deployed, loopbackOrigin);
+  sitemap = listed.length > 0
+    ? await loadSitemaps(listed, sitemapOptions)
     : await loadSitemaps([`${origin}/sitemap.xml`], { ...sitemapOptions, probe: true });
+  if (deployed !== null && loopbackOrigin !== null) {
+    const urls = localizeUrls(sitemap.urls, deployed, loopbackOrigin);
+    localized += robots.summary.sitemaps.filter((url) => !listed.includes(url)).length + sitemap.urls.filter((url) => !urls.includes(url)).length;
+    sitemap = { ...sitemap, urls };
+  }
   sitemapSet = new Set(sitemap.urls);
   for (const url of sitemap.urls) if (crawlable(url)) frontier.addSitemap(url);
 

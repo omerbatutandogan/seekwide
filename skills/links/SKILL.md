@@ -44,7 +44,7 @@ Read `${CLAUDE_PLUGIN_ROOT}/references/repo-mode.md` first and follow it. In sho
 - Call `project_detect`. When it reports `supported: false`, say why in plain words and carry on as an ordinary audit of a URL.
 - The plugin starts nothing. Starting the server runs the project's own code, so ask the user first: show `dev_server.command` and what it runs, and wait for a clear yes in the conversation, whatever permission mode the session is in. When the user declines, do not start it another way. Run nothing else from the project.
 - Crawl the address the server prints with `allow_localhost: true`, then pass `source_dir` and `check_core_web_vitals: false` to `audit_run`.
-- Name the file next to each fix, from the finding's `source` (`file`, `line`, `route`). Do not edit the project: this command only reports.
+- Name the file next to each fix, from the finding's `source` (`file`, `line`, `route`). Do not edit the project: this command only reports. `/seekwide:fix` applies metadata fixes afterwards, with the user's approval.
 - Stop the server when you are done, if you started it.
 
 ## When the crawl is blocked

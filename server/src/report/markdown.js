@@ -1,6 +1,6 @@
 /** @import { Run } from '../types.js' */
 
-import { CONFIDENCE_LABELS, CONFIDENCE_NOTE, RATING_LABELS, SCORE_NOTE, SEVERITY_LABELS, SUGGESTIONS_NOTE, SUMMARY_NOTE } from './copy.js';
+import { CONFIDENCE_LABELS, CONFIDENCE_NOTE, FIXES_NOTE, FIX_OUTCOME_LABELS, RATING_LABELS, SCORE_NOTE, SEVERITY_LABELS, SUGGESTIONS_NOTE, SUMMARY_NOTE } from './copy.js';
 import { mdCode, mdText, mdUrl } from './escape.js';
 import { plural } from './facts.js';
 import { buildReport } from './model.js';
@@ -68,6 +68,24 @@ function summary(r) {
 /** @param {Report} r */
 function scope(r) {
   return ['## Scope and limits', '', ...r.scope.map((row) => `- **${mdText(row.label)}:** ${mdText(row.value)}`), ''];
+}
+
+/** @param {Report} r */
+function fixes(r) {
+  const f = r.fixes;
+  if (f === null) return [];
+  const lines = ['## Fixes verified in this run', '', `${mdText(f.summary)} Compared with run ${mdCode(f.baseRunId)}.`, '', `*${mdText(FIXES_NOTE)}*`, ''];
+  const rows = f.rows.map((row) => [
+    `**${FIX_OUTCOME_LABELS[row.outcome]}**`,
+    `${mdText(row.title)} (${mdCode(row.checkId, true)})`,
+    row.url === null ? 'Whole site' : mdUrl(row.url, true),
+    row.file === null ? '—' : mdCode(row.file, true),
+    mdText(row.replacedBy.length > 0 ? `${row.detail} Now reported: ${row.replacedBy.join('; ')}.` : row.detail),
+  ]);
+  lines.push(...table(['Result', 'Finding', 'Page', 'Source file', 'What the re-audit found'], rows), '');
+  if (f.more > 0) lines.push(`+${f.more} more not shown.`, '');
+  if (f.notes.length > 0) lines.push('**Caveats**', '', ...f.notes.map((note) => `- ${mdText(note)}`), '');
+  return lines;
 }
 
 /** @param {Report} r */
@@ -209,7 +227,7 @@ function method(r) {
 export function renderMarkdown(run, options) {
   const r = buildReport(run, options);
   const lines = [
-    ...header(r), ...summary(r), ...scope(r), ...layers(r), ...scores(r), ...vitals(r), ...topFixes(r),
+    ...header(r), ...summary(r), ...scope(r), ...fixes(r), ...layers(r), ...scores(r), ...vitals(r), ...topFixes(r),
     ...allFindings(r), ...suggestions(r), ...notRun(r), ...changes(r), ...method(r),
   ];
   return `${lines.join('\n').trimEnd()}\n`;

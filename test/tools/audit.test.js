@@ -3,10 +3,11 @@ import assert from 'node:assert/strict';
 import { ToolError } from '../../server/src/mcp/stdio.js';
 import { createTools } from '../../server/src/tools/index.js';
 import { BLOCKED_SCORE_NOTE, externalLinkUrls, topGroups } from '../../server/src/tools/audit.js';
+import { deployedNotes, namedOrigin } from '../../server/src/tools/audit-deployed.js';
 import { VITALS_FAILED, VITALS_NOT_ASKED } from '../../server/src/tools/audit-vitals.js';
 import { UNTRUSTED_NOTE } from '../../server/src/tools/common.js';
 import { LIMITS, RULES_VERSION, VERSION } from '../../server/src/config.js';
-import { makeField, makeLab, makeLink, makePage, makeRedirect, makeVitals } from '../helpers/factories.js';
+import { makeCrawl, makeField, makeLab, makeLink, makePage, makeRedirect, makeVitals } from '../helpers/factories.js';
 import { NOW, PROJECT, jobFor, makeCheck, makeDeps, sampleCrawl, toolNamed } from './fakes.js';
 
 /** @param {ReturnType<typeof makeDeps>} fake */
@@ -17,6 +18,60 @@ function setup(overrides = {}, seed = {}) {
   const crawl = sampleCrawl(overrides);
   return { crawl, fake: makeDeps({ jobs: [jobFor(crawl)], results: [crawl], ...seed }) };
 }
+
+describe('what audit_run says about the deployed address of a local crawl', () => {
+  const local = { max_pages: 25, rate_per_sec: 1, include_subdomains: false, local: true };
+  const page = makePage({ url: 'http://localhost:3000/', canonicals: [{ href: 'https://www.example.com/', url: 'https://www.example.com/', source: 'html', in_head: true, line: 3 }] });
+  const other = makePage({ url: 'http://localhost:3000/b', canonicals: [{ href: 'https://www.example.com/b', url: 'https://www.example.com/b', source: 'html', in_head: true, line: 3 }, { href: 'https://zzz.test/b', url: 'https://zzz.test/b', source: 'html', in_head: true, line: 4 }] });
+  const crawlWith = (/** @type {object} */ extra, pages = [page, other]) => makeCrawl({ site_origin: 'http://localhost:3000', pages, options: { ...local, ...extra } });
+
+  it('says entries were read as local pages only when one or more was', () => {
+    assert.deepEqual(deployedNotes(crawlWith({ deployed_origin: 'https://www.example.com', deployed_localized: 4 })).map((note) => note.slice(0, 160)), [
+      'The crawl was told that the project is deployed at https://www.example.com. Canonical links and sitemap entries on that address were read as pages of the local ',
+    ]);
+  });
+
+  it('warns when the address matched nothing, and names the address the pages do use', () => {
+    const [note] = deployedNotes(crawlWith({ deployed_origin: 'http://www.example.com', deployed_localized: 0 }));
+    assert.match(note, /deployed at http:\/\/www\.example\.com, but no canonical link or sitemap entry names that address, so nothing was read as a page of the local server\./);
+    assert.match(note, /The canonical links of the pages name https:\/\/www\.example\.com: .*crawl again with site_url set to exactly that/);
+    assert.doesNotMatch(note, /were read as pages/);
+    // A crawl stored before the count existed is treated as having matched nothing.
+    assert.match(deployedNotes(crawlWith({ deployed_origin: 'http://www.example.com' }))[0], /but no canonical link/);
+  });
+
+  it('says so when the pages name no other address at all, and says nothing for a crawl that was not told one', () => {
+    const plain = makePage({ url: 'http://localhost:3000/' , canonicals: [{ href: '/', url: 'http://localhost:3000/', source: 'html', in_head: true, line: 3 }] });
+    assert.match(deployedNotes(crawlWith({ deployed_origin: 'https://www.example.com', deployed_localized: 0 }, [plain]))[0], /The pages name no other address in their canonical links either\./);
+    assert.deepEqual(deployedNotes(crawlWith({})), []);
+    assert.equal(namedOrigin(crawlWith({})), 'https://www.example.com');
+    assert.equal(namedOrigin(crawlWith({}, [plain])), null);
+  });
+});
+
+describe('externalLinkUrls for a local crawl that knows the deployed address', () => {
+  const pages = () => [
+    makePage({ url: 'http://localhost:3000/', links: [makeLink({ url: 'https://www.example.com/pricing', internal: false }), makeLink({ url: 'https://other.test/a', internal: false }), makeLink({ url: 'http://www.example.com/http', internal: false })] }),
+    makePage({ url: 'http://localhost:3000/old', status: 301, final_url: 'https://www.example.com/new', final_external: true }),
+  ];
+  const options = { max_pages: 25, rate_per_sec: 1, include_subdomains: false, local: true };
+
+  it('leaves out links and redirects to that site, so it is never contacted', () => {
+    const crawl = makeCrawl({ pages: pages(), options: { ...options, deployed_origin: 'https://www.example.com' } });
+    assert.deepEqual(externalLinkUrls(crawl), ['https://other.test/a']);
+  });
+
+  it('leaves them out by host: a site_url with another scheme, without www, or a link with another port or a trailing dot', () => {
+    const variants = [makePage({ url: 'http://localhost:3000/', links: ['https://www.example.com/x', 'https://example.com/apex', 'https://www.example.com:8443/port', 'https://www.example.com./dot', 'https://sub.www.example.com/sub', 'https://other.test/a'].map((url) => makeLink({ url, internal: false })) })];
+    for (const deployed_origin of ['https://www.example.com', 'http://www.example.com', 'https://example.com']) {
+      assert.deepEqual(externalLinkUrls(makeCrawl({ pages: variants, options: { ...options, deployed_origin } })), ['https://other.test/a', 'https://sub.www.example.com/sub'], deployed_origin);
+    }
+  });
+
+  it('checks them like any other link when no deployed address was given', () => {
+    assert.deepEqual(externalLinkUrls(makeCrawl({ pages: pages(), options })), ['http://www.example.com/http', 'https://other.test/a', 'https://www.example.com/new', 'https://www.example.com/pricing']);
+  });
+});
 
 describe('audit_run', () => {
   it('runs every module, checks outbound links, saves the run and returns a compact summary', async () => {

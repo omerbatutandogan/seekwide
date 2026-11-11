@@ -11,6 +11,7 @@ import { log } from '../log.js';
 import { classifyAddress } from '../net/ip.js';
 import { safeFetch } from '../net/safe-fetch.js';
 import { normalizeUrl, originOf } from '../util/url.js';
+import { deployedOriginOf } from './deployed.js';
 import { runCrawl } from './run.js';
 
 /** @import { CrawlJob, CrawlResult } from '../types.js' */
@@ -63,12 +64,12 @@ function defaultId(date) {
 
 /**
  * @param {unknown} options
- * @returns {{startUrl: string, maxPages: number, ratePerSec: number, includeSubdomains: boolean, allowLoopback: boolean}}
+ * @returns {{startUrl: string, maxPages: number, ratePerSec: number, includeSubdomains: boolean, allowLoopback: boolean, deployedOrigin: string|null}}
  */
 function validateStart(options) {
   if (options === null || typeof options !== 'object') throw new TypeError('crawl start options must be an object with a url');
   const { url, maxPages = LIMITS.maxPagesDefault, ratePerSec = LIMITS.ratePerSecDefault } = /** @type {any} */ (options);
-  const { includeSubdomains = false, allowLoopback = false } = /** @type {any} */ (options);
+  const { includeSubdomains = false, allowLoopback = false, deployedUrl } = /** @type {any} */ (options);
   const startUrl = typeof url === 'string' ? normalizeUrl(url) : null;
   if (startUrl === null) {
     throw new TypeError(`"${String(url)}" is not an http or https URL. Pass a full URL such as https://example.com/.`);
@@ -81,7 +82,15 @@ function validateStart(options) {
   }
   if (typeof includeSubdomains !== 'boolean') throw new TypeError('includeSubdomains must be true or false.');
   if (typeof allowLoopback !== 'boolean') throw new TypeError('allowLoopback must be true or false.');
-  return { startUrl, maxPages, ratePerSec, includeSubdomains, allowLoopback };
+  /** @type {string|null} */
+  let deployedOrigin = null;
+  if (deployedUrl !== undefined && deployedUrl !== null && deployedUrl !== '') {
+    if (!allowLoopback) throw new TypeError('deployedUrl is for a crawl of a site on this machine (allowLoopback). A deployed site is crawled at its own address.');
+    deployedOrigin = deployedOriginOf(deployedUrl);
+    // Naming the local server itself changes nothing.
+    if (deployedOrigin === originOf(startUrl)) deployedOrigin = null;
+  }
+  return { startUrl, maxPages, ratePerSec, includeSubdomains, allowLoopback, deployedOrigin };
 }
 
 /**
@@ -89,7 +98,8 @@ function validateStart(options) {
  *
  * Guarantees: `start` validates its input (rejecting with `TypeError`),
  * honours `allowLoopback` only for a start host whose every address is
- * loopback and then limits loopback to the start origin, resolves with a
+ * loopback and then limits loopback to the start origin, accepts `deployedUrl`
+ * only together with it (and never requests that address), resolves with a
  * snapshot as soon as the input is checked, and crawls in the background;
  * `get` and `wait` return copies, never live objects; `result` returns a
  * finished crawl ('done' or 'blocked') from memory (the last five) or from
@@ -210,7 +220,7 @@ export function createCrawlManager(deps = {}) {
 
   return {
     /**
-     * @param {{url: string, maxPages?: number, ratePerSec?: number, includeSubdomains?: boolean, allowLoopback?: boolean}} options
+     * @param {{url: string, maxPages?: number, ratePerSec?: number, includeSubdomains?: boolean, allowLoopback?: boolean, deployedUrl?: string}} options
      * @returns {Promise<CrawlJob>}
      */
     async start(options) {

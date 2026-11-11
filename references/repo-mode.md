@@ -22,13 +22,13 @@ Supported: **Next.js with the App Router** and **plain HTML**. Everything else i
    - `dependencies_installed: false` means the project folder has no `node_modules`. Say so, and ask the same way about the project's install command (for example `npm install`), before the server command. Say that installing downloads the project's dependencies and runs their install scripts. The user decides.
    - Read the address from the server's own output (for example `http://localhost:3000`). `dev_server.default_url` is only the usual one; the server picks another port when that one is taken.
    - Remember whether you started the server.
-3. **Crawl it.** Call `crawl_start` with that address, `allow_localhost: true` and the page budget. Tell the user the address you are crawling. If the job ends as `failed` because nothing answered yet, wait a few seconds and start it again; give up after three tries and show the server's output.
+3. **Crawl it.** Call `crawl_start` with that address, `allow_localhost: true` and the page budget. When you know the address the site is deployed at (the user said it, or `profile_get` has a `site_url` that is not a local address), pass it as `site_url` as well: canonical links and sitemap entries that name the deployed site are then read as pages of the local server, instead of as links to another site. Do not guess it. If `audit_run`'s notes then say that the address matched nothing, pass that on with the address the notes name. Tell the user the address you are crawling. If the job ends as `failed` because nothing answered yet, wait a few seconds and start it again; give up after three tries and show the server's output.
 4. **Wait** with `crawl_status` as usual. A dev server compiles each page on first request, so the crawl can be slower than one page per second.
 5. **Run the checks.** Call `audit_run` as the skill says, and add:
    - `source_dir`: the `source_dir` from `project_detect`;
    - `check_core_web_vitals: false`: Google cannot reach a site on this machine, and nothing about it is ever sent there.
 6. **Report** as the skill says, with the additions below.
-7. **Stop the server** if you started it, by ending its background shell. Leave a server the user was already running alone.
+7. **Stop the server** if you started it, by ending its background shell. Leave a server the user was already running alone. This holds on every way out, not only after a finished audit: when the crawl fails, a tool is refused, or the user changes the subject, stop the server before you end your turn. Leave it running only when you are waiting for an answer that lets the audit go on, and then say plainly that it is still running, at which address, and that you will stop it.
 
 ## Reading the result
 
@@ -61,4 +61,5 @@ Next.js 15.2 and later can append a page's title, description and canonical link
 - Findings about HTTPS (`seo.https.*`) describe the local server, which has no certificate. Say that they do not apply to the deployed site, and leave them out of "what to fix first".
 - A missing or broken `robots.txt` or sitemap is real when the project does not generate one; a `sitemap.xml` that lists `localhost` URLs is how the dev server renders it.
 - A dev build can differ from production (speed, caching, some headers). Recommend auditing the deployed URL as well before drawing conclusions about the live site.
-- If the user asks you to fix something, say that applying fixes is not part of this command.
+- If the user asks you to fix something, say that this command only reports, and that `/seekwide:fix` applies metadata fixes (titles, descriptions, canonicals, Open Graph tags, the sitemap) from this run, each shown as a diff and applied only with their approval.
+- When many pages are reported as not indexable because their canonical names another host (`seo.canonical.cross_host`), the project probably names its deployed address. Say so, ask for that address, and offer to audit again with `site_url`.

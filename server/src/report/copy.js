@@ -22,6 +22,11 @@ export const ROBOTS_STATUS = Object.freeze({
   unreachable: 'Could not be read (server error or network failure), so the crawler treated every URL as disallowed.',
 });
 
+/** What a re-audit says about a finding that was fixed. */
+export const FIX_OUTCOME_LABELS = Object.freeze({ closed: 'Closed', replaced: 'Replaced', open: 'Still open', unverified: 'Not verified' });
+
+export const FIXES_NOTE = 'Closed means the finding is gone and the check measured the same page again. Replaced means it is gone but the page now has another finding of the same kind. Not verified means it is gone, but the check did not look at the page this time, so nothing is claimed.';
+
 export const NO_DATA = 'No data in this version';
 
 /** For a layer this version can measure, when a run brought no data for it. */

@@ -16,14 +16,17 @@ MCP server (server/src/index.js)
    ├─ crawl_start / crawl_status ──► crawl/  ──► net/ (safe-fetch, robots, sitemap)
    │                                   └──────► extract/ (HTML → PageRecord)
    ├─ project_detect ──► repo/ (what kind of project the folder holds, which file answers a URL)
-   ├─ audit_run ──► net/link-check, vitals/ (PageSpeed Insights, Chrome UX Report) ──► checks/ (engine + seo + links) ──► repo/ (source files, repo mode) ──► store/
+   ├─ audit_run ──► net/link-check, vitals/ (PageSpeed Insights, Chrome UX Report) ──► checks/ (engine + seo + links) ──► repo/ (source files, repo mode; fix verification) ──► store/
+   ├─ fix_plan ──► store/ (a saved run) ──► repo/ (which fix applies, in which file)
    ├─ findings_query, page_get, runs_list, runs_compare, profile_get, profile_set ──► store/
    └─ report_render ──► report/ (Markdown, HTML)
 ```
 
 In repo mode the same flow runs against the project's own local server: `project_detect` says what the folder holds and which command starts the server, the skill has Claude propose that command (it runs only with the user's approval, and the plugin's server never starts anything), and `audit_run` with `source_dir` adds the source file to each finding (4.12).
 
-Not in this milestone: `/seekwide:fix`, the re-audit after a fix, and every module other than `seo` and `links`.
+`/seekwide:fix` builds on that (4.13): `fix_plan` says which findings of a repo-mode run a metadata fix exists for and where it belongs, Claude writes each change after the user approved its diff, and a second `audit_run` with `verify_fixes` says what became of each fixed finding. The server plans and verifies; it never writes into a project.
+
+Not in this milestone: fixes other than metadata, and every module other than `seo` and `links`.
 
 ## 2. Principles that shape the code
 
@@ -33,8 +36,9 @@ Not in this milestone: `/seekwide:fix`, the re-audit after a fix, and every modu
 4. **The crawler is a polite, honest client.** It obeys robots.txt, identifies itself with `USER_AGENT` from `config.js`, sends one request at a time, and stops when a site challenges it. It never impersonates a browser or another bot and never tries to get past a block.
 5. **No private-network access.** Every request goes through `safeFetch`, which refuses non-public addresses.
 6. **A secret stays where it is used.** The Google API key is read in `deps.js`, bound into one function, and sent to Google in a request header. No tool receives it, and it is never part of a URL, a stored file, a log line or a tool result.
-7. **A project's code is never run, and its source is never read to guess a page.** Repo mode knows a project by its file names, by `package.json` parsed as JSON, and by the text of HTML files that were served as pages. What a page contains is always measured on the served page; the source only says where a fix belongs.
-8. **Nothing is half-built.** No stubs, no `TODO`, no skipped tests. A feature is either implemented and tested or absent.
+7. **The server never changes a project.** Inside the project folder it writes only under `.seekwide/`, its own folder; outside it, only its cache. A fix is an edit the model makes with its own file tools, after the user approved the diff.
+8. **A project's code is never run, and its source is never read to guess a page.** Repo mode knows a project by its file names, by `package.json` parsed as JSON, and by the text of HTML files that were served as pages. What a page contains is always measured on the served page; the source only says where a fix belongs.
+9. **Nothing is half-built.** No stubs, no `TODO`, no skipped tests. A feature is either implemented and tested or absent.
 
 ## 3. Layout and ownership
 
@@ -44,12 +48,12 @@ server/src/
   util/{url,hash,strings}.js            shared
   checks/{engine,scoring,validate,registry,page-helpers}.js   shared
   net/        safe-fetch.js connect.js ip.js robots.js sitemap.js link-check.js
-  crawl/      manager.js run.js chain.js probe.js frontier.js challenge.js
-  extract/    page.js (+ helpers)
+  crawl/      manager.js run.js chain.js probe.js frontier.js challenge.js deployed.js
+  extract/    page.js indexability.js (+ helpers)
   checks/seo/     index.js + one file per area
   checks/links/   index.js + one file per area
   vitals/     measure.js select.js psi.js crux.js google-api.js thresholds.js
-  repo/       scan.js detect.js next-routes.js html-routes.js html-lines.js sources.js
+  repo/       scan.js detect.js next-routes.js html-routes.js html-lines.js sources.js fixes.js fix-texts.js verify.js
   store/      project.js runs.js profile.js compare.js
   report/     markdown.js html.js (+ shared helpers)
   mcp/        stdio.js schema.js
@@ -170,7 +174,7 @@ export async function checkExternalLinks(urls, options)
  */
 export function createCrawlManager(deps)
 // returns {
-//   start(options: {url: string, maxPages?: number, ratePerSec?: number, includeSubdomains?: boolean, allowLoopback?: boolean}): Promise<CrawlJob>,
+//   start(options: {url: string, maxPages?: number, ratePerSec?: number, includeSubdomains?: boolean, allowLoopback?: boolean, deployedUrl?: string}): Promise<CrawlJob>,
 //   get(id: string): CrawlJob | null,
 //   wait(id: string, timeoutMs: number): Promise<CrawlJob | null>,
 //   result(id: string): Promise<CrawlResult | null>,
@@ -179,7 +183,15 @@ export function createCrawlManager(deps)
 
 `start` validates its input (rejecting with `TypeError`), resolves with a job snapshot as soon as the input is checked, and crawls in the background. `get` and `wait` return copies. `result` returns the stored result once the job is `done` or `blocked`, from memory or from `<dataDir>/crawls/<id>.json`.
 
-**A local site.** `allowLoopback` is honoured only when every address the start host resolves to is loopback; otherwise `start` rejects. When it is honoured, loopback is allowed for the start origin only, so a link, a sitemap or a redirect to another local port is refused. The result records it as `options.local: true`, which keeps the site from being named to an outside service (4.11).
+**A local site.** `allowLoopback` is honoured only when every address the start host resolves to is loopback; otherwise `start` rejects. When it is honoured, the crawl sends no request to any origin but the start origin: every request of the crawl goes through one function, which refuses another origin with `blocked_address` before anything is sent. So a link, a sitemap or a redirect to another local port is refused, and so is a robots.txt, a sitemap or a page of the local server that redirects to a host on the internet. A robots.txt that redirects away therefore counts as one that could not be read, and the crawl ends as `blocked: robots_unreachable`. The result records it as `options.local: true`, which keeps the site from being named to an outside service (4.11).
+
+**A local site that names its deployed address** (`crawl/deployed.js`). A project's pages name the address the site is deployed at: in canonical links, in the `Sitemap:` line of robots.txt and in the sitemap. On `http://localhost:3000` each such page then points to another site, so it is not indexable (`canonical_elsewhere`), the checks on indexable pages skip it, and the sitemap is on another host and is not read. `deployedUrl` tells the crawl that address. It is accepted only together with `allowLoopback` (otherwise `start` rejects) and reduced to its origin; naming the local server itself changes nothing. Then, and only for URLs on exactly that origin (another scheme, host name or port is another site):
+
+- a canonical's `url` becomes the same path on the local server, and the record's indexability is worked out again (`extract/indexability.js`); `href` keeps what the page sent;
+- a `Sitemap:` URL is read from the same path on the local server, while `robots.sitemaps` keeps what robots.txt says;
+- sitemap entries become local URLs, so they are crawled and the sitemap checks can look at them.
+
+The crawl requests nothing from the deployed address (the rule above), and `audit_run` leaves every link and redirect to the deployed site out of the external link check, by host: whatever the scheme or port, with or without `www.` and a trailing dot (`onDeployedHost`). (An external site that itself redirects to the deployed site is still followed there by that check, like any redirect.) The result records the address as `options.deployed_origin` and how many canonicals, Sitemap lines and sitemap entries were read as local as `options.deployed_localized`. When that is 0 the address matched nothing, usually because it differs from what the pages name in scheme or host name: `audit_run`'s note then says so and names the origin most canonical links do name, and neither the note nor the report claims that anything was read as a local page. Not covered: a sitemap index on the local server whose children name the deployed address still gets `'external'` children, and a link or a redirect to the deployed address is external like any other host, so it is recorded and not followed: a page that is linked only by its full deployed URL is not crawled.
 
 The crawl, in order:
 
@@ -295,16 +307,17 @@ Both are pure and depend only on their arguments (dates come from `run.created_a
 
 1. Title: "SEO and link audit", the site, the date, "Prepared by" when `brandName` is given.
 2. Summary: `executiveSummary` when given, otherwise a factual one built from the numbers.
-3. Scope and limits: pages crawled against the budget, truncation, blocks, robots.txt status, sitemap URLs, user agent. In repo mode (`run.repo` is an object) also "Source files": the kind of project and how many findings name a file, or that the project could not be mapped.
-4. Status by layer: technical eligibility (this run), then search visibility, AI visibility, experience and business results. Search visibility, AI visibility and business results are marked "No data in this version" with the source that will provide them. Experience is "Measured in this run" when the run holds real-user Core Web Vitals, and otherwise "No data in this run" with the reason.
-5. Scores: module, score, coverage, checks run.
-6. Core Web Vitals, when the run asked for them (`run.core_web_vitals` is an object): what each source gave or why it gave nothing, then a table with the whole site first and each measured page after it, every value formatted and rated good, needs improvement or poor. Only columns with one or more values are shown. Then the run's notes on the measurement.
-7. Top fixes: findings grouped by check, ordered by severity, then impact (high first), then effort (low first); the first ten groups with count, confidence, recommendation, up to three example URLs and the documentation link.
-8. All findings by check, each with up to `maxUrlsPerCheck` (default 10) URLs and their evidence, and "+N more". A finding that names a source file (4.12) shows it as `file` or `file:line`, with its route.
-9. Suggestions (not scored): `recommendations`, when given.
-10. Checks that did not run, with the reason.
-11. Changes since the previous run, when `comparison` is given.
-12. Method: how the crawl works, what "confirmed" and "likely" mean, how Core Web Vitals are measured (when the run asked for them), how source files are found (when the run named any), rule and plugin versions, and a plain statement that the audit does not predict rankings or traffic.
+3. Scope and limits: pages crawled against the budget, truncation, blocks, robots.txt status, sitemap URLs, user agent. In repo mode (`run.repo` is an object) also "Source files": the kind of project and how many findings name a file, or that the project could not be mapped; and, when the crawl was told the deployed address, that canonical links and sitemap entries naming it were read as pages of the local server, or that the address matched none of them.
+4. Fixes verified in this run, when the run holds a fix verification (`run.fixes` with results; 4.13): one sentence with the counts, the base run, and a row per fixed finding with its outcome (closed, replaced, still open, not verified), the page, the source file and what the re-audit found, closed ones first, at most 100 rows. The counts are made from the rows, and an outcome the plugin does not know is shown as not verified. Then the caveats of the comparison.
+5. Status by layer: technical eligibility (this run), then search visibility, AI visibility, experience and business results. Search visibility, AI visibility and business results are marked "No data in this version" with the source that will provide them. Experience is "Measured in this run" when the run holds real-user Core Web Vitals, and otherwise "No data in this run" with the reason.
+6. Scores: module, score, coverage, checks run.
+7. Core Web Vitals, when the run asked for them (`run.core_web_vitals` is an object): what each source gave or why it gave nothing, then a table with the whole site first and each measured page after it, every value formatted and rated good, needs improvement or poor. Only columns with one or more values are shown. Then the run's notes on the measurement.
+8. Top fixes: findings grouped by check, ordered by severity, then impact (high first), then effort (low first); the first ten groups with count, confidence, recommendation, up to three example URLs and the documentation link.
+9. All findings by check, each with up to `maxUrlsPerCheck` (default 10) URLs and their evidence, and "+N more". A finding that names a source file (4.12) shows it as `file` or `file:line`, with its route.
+10. Suggestions (not scored): `recommendations`, when given.
+11. Checks that did not run, with the reason.
+12. Changes since the previous run, when `comparison` is given.
+13. Method: how the crawl works, what "confirmed" and "likely" mean, how Core Web Vitals are measured (when the run asked for them), how source files are found (when the run named any), rule and plugin versions, and a plain statement that the audit does not predict rankings or traffic.
 
 A value in the Core Web Vitals table is rated by `vitals/thresholds.js`, the same code the checks use, from the number in the run. It is shown without further rounding (2549 ms reads "2.549 s"), so a value can never look good next to a rating that says otherwise. Nothing in that part of the run is taken on trust: a value that is not a number is shown as missing.
 
@@ -337,10 +350,11 @@ export class ToolError extends Error {}
 
 | Tool | Input | Output |
 |---|---|---|
-| `crawl_start` | `url` (required), `max_pages` 1–500 (default 25), `include_subdomains` (false), `allow_localhost` (false; accepted only when the start host is a loopback address) | `{job_id, status, start_url, max_pages}` |
-| `crawl_status` | `job_id`, `wait_seconds` 0–25 (default 0) | job snapshot; when finished also `summary: {pages, html_pages, by_status, robots_status, sitemap_urls, truncated, blocked}` |
+| `crawl_start` | `url` (required), `max_pages` 1–500 (default 25), `include_subdomains` (false), `allow_localhost` (false; accepted only when the start host is a loopback address), `site_url` (only with `allow_localhost`: the address the project is deployed at, 4.5) | `{job_id, status, start_url, max_pages}` |
+| `crawl_status` | `job_id`, `wait_seconds` 0–25 (default 0) | job snapshot; when finished also `summary: {pages, html_pages, by_status, robots_status, sitemap_urls, truncated, blocked}`, with `site_url` when the crawl was told the deployed address |
 | `project_detect` | `project_dir`, `source_dir` (defaults to the project folder) | `{project_dir, source_dir, framework, label, supported, message, app_dir, dev_server, routes_total, routes, routes_truncated}` |
-| `audit_run` | `job_id`, `modules` (default all), `check_outbound_links` (true), `check_core_web_vitals` (true), `core_web_vitals_pages` 1–10 (default 3), `project_dir`, `source_dir` (repo mode) | `{run_id, project_dir, files, crawl, modules, totals, top, core_web_vitals, repo, skipped_checks, notes}` |
+| `audit_run` | `job_id`, `modules` (default all), `check_outbound_links` (true), `check_core_web_vitals` (true), `core_web_vitals_pages` 1–10 (default 3), `project_dir`, `source_dir` (repo mode), `verify_fixes: {base_run_id, finding_ids ≤ 200}` (a re-audit after fixes) | `{run_id, project_dir, files, crawl, modules, totals, top, core_web_vitals, repo, fix_verification, skipped_checks, notes}` |
+| `fix_plan` | `run_id` ('last'), `project_dir`, `site_url`, `check_id`, `limit` 1–200 (50), `offset` | `{run_id, project_dir, source_dir, framework, audited, max_pages, modules, site_url, fixable_total, returned, next_offset, fixes, not_fixable, not_fixable_total, out_of_scope, in_scope_checks, notes}`; `limit` and `offset` page `fixes` only |
 | `findings_query` | `run_id` ('last'), `project_dir`, `module`, `severity`, `check_id`, `url_contains`, `limit` 1–200 (50), `offset` | `{run_id, total, returned, findings}` |
 | `page_get` | `job_id`, `url` | selected `PageRecord` fields and counts |
 | `report_render` | `run_id` ('last'), `project_dir`, `formats` (both), `executive_summary` ≤ 4000, `recommendations` ≤ 20, `brand_name`, `logo_path`, `compare_to` | `{run_id, files, bytes}` |
@@ -351,9 +365,11 @@ export class ToolError extends Error {}
 
 - `project_dir` defaults to `defaultProjectDir()` and must be absolute.
 - `audit_run` accepts jobs that are `done` or `blocked` (site-level checks still say something about a blocked site) and rejects `running` and `failed` ones with a `ToolError` that says what to do next.
-- `audit_run` checks external links only when the `links` module is requested and `check_outbound_links` is true. The URLs checked are the external link targets plus the destination of every redirect that leaves the site.
+- `audit_run` checks external links only when the `links` module is requested and `check_outbound_links` is true. The URLs checked are the external link targets plus the destination of every redirect that leaves the site, without those on the deployed origin of a local crawl (4.5).
 - `audit_run` measures Core Web Vitals (4.11) only when the `seo` module is requested and `check_core_web_vitals` is true, at the same time as the external links are checked. The measurement goes through `deps.measureVitals`, which has the Google API key bound into it; the tool never holds the key. Whatever happens there, the audit completes: a refusal or a timeout comes back as data with a reason, and an unexpected error is logged and turned into a result that says nothing was measured. The run stores the measurement as `core_web_vitals` (null when it was not asked for), and the result returns the same pages and values under `core_web_vitals`, with the measurement's notes in `notes`.
 - `audit_run` with `source_dir` is repo mode (4.12); an empty string counts as not given. It is accepted only for a crawl whose `options.local` is `true`, because a deployed site can differ from the folder at hand; anything else is a `ToolError` raised before a request is sent. The source folder must be the project folder or lie inside it. After the checks ran, `deps.attachSources` adds `source` to the findings; the run stores them and a `repo` summary (null outside repo mode), the result returns `repo`, each group under `top` lists up to three `example_files`, and what limits the mapping goes into `notes`. A project that is not supported is audited all the same, with no source files and a note that says why.
+- `audit_run` with `verify_fixes` is the re-audit after fixes (4.13). Before anything else is done, the base run is loaded and checked: it must hold every named finding and must have audited the origin the crawl is of, because finding ids are built from URLs and two runs of different addresses share none. After the checks ran, the run stores the verification as `fixes` (null when it was not asked for) and the result returns it as `fix_verification`, with at most 50 results.
+- `fix_plan` accepts only a run whose `repo` names a supported project, and a folder that still holds that kind of project; anything else is a `ToolError` that says to audit the project first. It reads the saved run, what `loadProjectSources` reads of the project (the file listing, `package.json`, and `next.config` as text), the crawl behind the run when the cache still has it, and `site_url` from its argument or the profile (a local address does not count). It writes nothing. `not_fixable` is complete in every answer: the refused findings grouped by check and reason, each group with its count and up to three example URLs and files.
 - `project_detect` reads and starts nothing but the folder listing and `package.json`. `dev_server.command` is the command to propose to the user; `dev_server.script` is the text of the script it runs, clipped, and the result's `_note` says that it is data.
 - A module's result carries `note` whenever its `score` is null. When the crawl was blocked before any HTML page was read, every module's score is null with a note that says so; site-level findings are still returned. `crawl.unreadable_pages` counts the URLs the crawler was refused on, and `notes` says so in plain words.
 - `previous`, in `report_render` and `runs_compare`, means the newest run that is older than the run being rendered or compared. When there is none, a `ToolError` says so.
@@ -444,7 +460,46 @@ export async function attachSources(findings, crawl, sources)   // → {findings
   - Next.js: `file` is the route's file, and only when the server's answer fits the route. The status comes from the page record, the sitemap file or robots.txt. With status 200 any match counts. An `exact` match also counts for a URL without a record and for a status of 500 or above (the route's own code failed). Every other case names no file: a redirect or a 404 comes from somewhere else, and a dynamic route would match any name. For `seo.html.lang_missing` and `seo.mobile.viewport_missing` on a page route it is the outermost layout above the page, which renders `<html>`. `line` is null: the code is not read.
   - An HTML file (a plain HTML project, or an `.html` file in a Next.js `public/` folder) is named only when the record of the URL is a 200 HTML page and `sameDocument` holds: the same titles, the same visible text and the same number of links, images, headings, JSON-LD blocks and canonical links as the file, extracted with `extractPage`. `line` is then the line in the file: for a finding with a line, the line of the same element in the file, found by its position in the record's lists (`sourceLine`), so lines a server inserted do not shift it; for a finding without one, `anchorLine`: the `<title>`, description or robots meta tag the check is about; the `<head>` when a title, description, canonical, viewport or Open Graph tag is missing; the `<html>` tag for a missing `lang`; null for every other check, and whenever the file does not have the element.
   - `file` is relative to the project folder, with forward slashes. `route` is the Next.js route (`/blog/[slug]`) or the URL path.
+- `ProjectSources.files` is the listing itself (the app and `public` folders of a Next.js project, the whole folder of a plain HTML one), which the fix plan uses to say whether a file exists.
 - **Notes** say what limits the mapping: a project that is not supported (with the detection message); no crawled page matching a file of the project; files that differ from what the server sent; a truncated listing; `next.config` settings the mapping does not know; for Next.js, what the file means.
+
+### 4.13 Fixes: `repo/fixes.js`, `repo/verify.js`, `tools/fix.js`
+
+```js
+// fixes.js                                                      pure
+export const FIXABLE_CHECKS                                      // check id → {type, action, unit}
+export function planFixes({run, sources, crawl, siteUrl})        // → {fixes: FixEntry[], notFixable, outOfScope}
+
+// verify.js                                                     pure
+export function verifyFixes({base, run, crawl, findingIds, comparison})   // → {verification: FixVerification, unknown: string[]}
+```
+
+**Who does what.** The server plans (`fix_plan`) and verifies (`audit_run` with `verify_fixes`). The model reads the source file, writes the change, shows it as a diff and applies it with its own file tools once the user said yes. No tool takes file content to write, and no code path of the server opens a file of the project for writing. The one place the server writes inside the project folder is its own `.seekwide/` folder (`audit_run`, `report_render`, `profile_set`; 4.8).
+
+**Scope.** Nine checks have a fix: `seo.title.missing`, `.duplicate`, `.multiple`; `seo.meta_description.missing`, `.duplicate`, `.multiple`; `seo.canonical.missing`; `seo.social.og_incomplete`; `seo.sitemap.missing`. The project has no check for a missing robots.txt, so none is fixed on its own: the sitemap fix creates the robots file when the project has none, or adds the sitemap line to the one it has. `seo.canonical.streamed_in_body` is refused with the reason (it is a choice about the project, not a tag to move). Every other finding is counted under `outOfScope`.
+
+**`planFixes`** puts each finding of the run in exactly one place:
+
+- A page finding needs `source`, and its file must still be in the listing. An HTML file (a plain HTML project, or `public/*.html` in a Next.js one) is an `html` fix with the line. In a Next.js project the file must be a `page.{js,jsx,ts,tsx}`; a route handler, a metadata file or an MDX page is refused.
+- Refused for Next.js, because the plugin cannot tell which file writes the tag: a tag sent more than once (`.multiple`), and a canonical that exists but does not count (outside `<head>`, or not valid). In an HTML file the first is `remove_extra` and the second is `repair`: move or correct the link that is there, never add a second.
+- Next.js entries carry `layouts` (the layout files above the page, nearest first) and `dynamic` (the route has a dynamic segment, so a fixed value would repeat on every address).
+- A duplicate carries `shares_with`: the other pages and their files, from the same run.
+- Open Graph carries `missing`, read from the finding's evidence and limited to `og:title` and `og:image`.
+- A canonical carries `canonical: {path, url}`; `url` is null when the deployed address is not known. Canonicals, `og:image` and the sitemap set `needs_site_url`.
+- The sitemap fix names the files to create and edit, in the project's language (`.ts` when the listing has TypeScript files), and the paths to list: the indexable pages of the crawl when it is still stored, otherwise the routes of fixed segments. It is refused when the project already has a sitemap file that was not served, and when robots.txt names a sitemap that could not be read.
+- `current` is what the page sent for titles, descriptions, canonicals and Open Graph tags, clipped, or null without the crawl. No body text and no headings are returned: a new title is written from the project's own source file, not from crawled text.
+- `how` and `reason` are fixed sentences (`fix-texts.js`). The only values put into `how` are the deployed origin and file names from the project's own listing; nothing a page sent, not even the path of its URL, is part of it. `reason` is one of a fixed set of sentences with no value in it: the file it is about is returned beside it. A stored run is a JSON file that can arrive with a repository someone else wrote, so no free text of it is returned next to the instructions: `title` comes from the check definitions (the check id when the check is unknown), `severity` is one of the known values, and a file name from the run is passed on only when it is in the listing or is a plain relative path (`plainPath`: names of letters, digits and `@()[].~+,=-`, no spaces, no `..`, at most 300 characters). The result's `_note` says which fields are instructions and which are data.
+
+**`verifyFixes`** gives each fixed finding one outcome:
+
+| Outcome | When |
+|---|---|
+| `open` | The finding's id is in the new run. |
+| `unverified` | It is gone, but the check did not run, or (for the nine checks above) did not look: the page was not crawled, the crawler was refused, the page answered another status or no HTML, or it is no longer indexable and the check only looks at indexable pages (`FIXABLE_CHECKS[id].unit`, held to the real checks by a test). For a duplicate, the same holds for the pages it shared the value with (`related_urls`): the duplicate checks compare indexable pages that have a value, so when one of those pages was not crawled, is not indexable or has no title (or description) of its own any more, the duplicate may be gone only because there was less to compare with. For a missing sitemap: no sitemap was read, for example because robots.txt now names one on another host. |
+| `replaced` | It is gone and was looked at, but the comparison's `added` findings include one on the same URL in the same area (the check id without its last part: `seo.title`). For a site-level finding the URL does not have to match, and a new `seo.robots.*` finding replaces a fixed missing sitemap. |
+| `closed` | Everything else: gone, and the check looked again. |
+
+A finding of a check outside the nine is never `closed`: it is `open` while its id is in the new run and `unverified` once it is gone, because nothing here knows which pages that check looks at. Ids the base run does not hold are returned under `unknown`; the tool refuses them before the audit runs. `notes` are the comparison's notes.
 
 ## 5. Coding rules
 

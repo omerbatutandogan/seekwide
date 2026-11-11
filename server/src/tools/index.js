@@ -1,4 +1,4 @@
-// The eleven MCP tools. Every dependency is injected so handlers can be tested
+// The twelve MCP tools. Every dependency is injected so handlers can be tested
 // with fakes; server/src/index.js wires the real modules.
 
 /** @import { CheckDef, CrawlJob, CrawlResult, OutboundResult, Profile, Run, RunIndexEntry, Finding, RepoSummary, VitalsData } from '../types.js' */
@@ -9,6 +9,7 @@
 import { auditTools } from './audit.js';
 import { projectTools } from './project.js';
 import { crawlTools } from './crawl.js';
+import { fixTools } from './fix.js';
 import { profileTools } from './profile.js';
 import { reportTools } from './report.js';
 import { runTools } from './runs.js';
@@ -27,7 +28,7 @@ import { runTools } from './runs.js';
 /**
  * @typedef {Object} ToolDeps
  * @property {{
- *   start(options: {url: string, maxPages?: number, ratePerSec?: number, includeSubdomains?: boolean, allowLoopback?: boolean}): CrawlJob|Promise<CrawlJob>,
+ *   start(options: {url: string, maxPages?: number, ratePerSec?: number, includeSubdomains?: boolean, allowLoopback?: boolean, deployedUrl?: string}): CrawlJob|Promise<CrawlJob>,
  *   get(id: string): CrawlJob|null,
  *   wait(id: string, timeoutMs: number): Promise<CrawlJob|null>,
  *   result(id: string): Promise<CrawlResult|null>,
@@ -60,10 +61,10 @@ import { runTools } from './runs.js';
  */
 
 /**
- * Build the tool definitions in a fixed order (crawl, project, audit, runs, report, profile).
+ * Build the tool definitions in a fixed order (crawl, project, audit, fix, runs, report, profile).
  * @param {ToolDeps} deps
  * @returns {ToolDef[]}
  */
 export function createTools(deps) {
-  return [...crawlTools(deps), ...projectTools(deps), ...auditTools(deps), ...runTools(deps), ...reportTools(deps), ...profileTools(deps)];
+  return [...crawlTools(deps), ...projectTools(deps), ...auditTools(deps), ...fixTools(deps), ...runTools(deps), ...reportTools(deps), ...profileTools(deps)];
 }

@@ -1,7 +1,7 @@
 /** @import { Run } from '../types.js' */
 
 import { clip } from '../util/strings.js';
-import { CONFIDENCE_LABELS, CONFIDENCE_NOTE, RATING_LABELS, SCORE_NOTE, SEVERITY_LABELS, SUGGESTIONS_NOTE, SUMMARY_NOTE } from './copy.js';
+import { CONFIDENCE_LABELS, CONFIDENCE_NOTE, FIXES_NOTE, FIX_OUTCOME_LABELS, RATING_LABELS, SCORE_NOTE, SEVERITY_LABELS, SUGGESTIONS_NOTE, SUMMARY_NOTE } from './copy.js';
 import { html, raw, safeHttpUrl } from './escape.js';
 import { plural } from './facts.js';
 import { CSS } from './html-css.js';
@@ -53,6 +53,20 @@ ${r.summary.paragraphs.map((p) => html`<p>${p}</p>`)}
 function scope(r) {
   return html`<section id="scope"><h2>Scope and limits</h2>
 <dl>${r.scope.map((row) => html`<dt>${row.label}</dt><dd>${row.code ? html`<code>${row.value}</code>` : row.value}</dd>`)}</dl>
+</section>`;
+}
+
+/** @param {Report} r */
+function fixes(r) {
+  const f = r.fixes;
+  if (f === null) return '';
+  const rows = f.rows.map((row) => html`<tr><td><strong>${FIX_OUTCOME_LABELS[row.outcome]}</strong></td><td>${row.title} (<code>${row.checkId}</code>)</td><td>${row.url === null ? 'Whole site' : urlHtml(row.url)}</td><td>${row.file === null ? '—' : html`<code>${row.file}</code>`}</td><td>${row.detail}${row.replacedBy.length > 0 ? html` Now reported: ${row.replacedBy.join('; ')}.` : ''}</td></tr>`);
+  return html`<section id="fixes"><h2>Fixes verified in this run</h2>
+<p>${f.summary} Compared with run <code>${f.baseRunId}</code>.</p>
+<p class="note">${FIXES_NOTE}</p>
+<table><thead><tr><th>Result</th><th>Finding</th><th>Page</th><th>Source file</th><th>What the re-audit found</th></tr></thead><tbody>${rows}</tbody></table>
+${f.more > 0 ? html`<p>+${f.more} more not shown.</p>` : ''}
+${f.notes.length > 0 ? html`<div class="warn"><strong>Caveats</strong><ul>${f.notes.map((note) => html`<li>${note}</li>`)}</ul></div>` : ''}
 </section>`;
 }
 
@@ -210,7 +224,7 @@ export function renderHtml(run, options) {
 </head>
 <body>
 <main>
-${titleBlock(r)}${summary(r)}${scope(r)}${layers(r)}${scores(r)}${vitals(r)}${topFixes(r)}${allFindings(r)}${suggestions(r)}${notRun(r)}${changes(r)}${method(r)}
+${titleBlock(r)}${summary(r)}${scope(r)}${fixes(r)}${layers(r)}${scores(r)}${vitals(r)}${topFixes(r)}${allFindings(r)}${suggestions(r)}${notRun(r)}${changes(r)}${method(r)}
 <footer>Seekwide ${r.pluginVersion} &middot; rules ${r.rulesVersion} &middot; run <code>${r.runId}</code> &middot; ${r.date.iso}</footer>
 </main>
 </body>

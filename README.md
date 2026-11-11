@@ -2,7 +2,7 @@
 
 Site audits for Claude Code that you can re-run and trust. Seekwide crawls a site politely, runs scripted SEO, link and Core Web Vitals checks with evidence for every finding, scores the result the same way every time, and writes a report you can send to a client.
 
-> **Status: alpha (0.1.0-alpha.1).** Two modules work today: `seo` and `links`. The roadmap further down lists what is planned and not built yet.
+> **Status: alpha (0.1.0-alpha.1).** Two modules work today, `seo` and `links`, plus metadata fixes for a project in its own folder. The roadmap further down lists what is planned and not built yet.
 
 ## What it does today
 
@@ -12,6 +12,7 @@ Site audits for Claude Code that you can re-run and trust. Seekwide crawls a sit
 - **Scores the same data the same way, every time.** Checks are code, not model judgment, so the same data always gets the same findings, ids and scores, and two audits can be compared finding by finding. What can differ between two audits of an unchanged site is what is fetched or measured at audit time: the answers of external sites, Google's lab test, the real-user data (a 28-day window that moves every day), and whether Google answered at all. A comparison says so when a lab finding changed or a check ran in only one of the two audits.
 - **Shows its evidence.** Each finding has the URL, what was observed, what was expected, a confidence label, and a link to the documentation the rule is based on.
 - **Names the source file** when you audit a project in its own folder (repo mode). For a Next.js App Router project or a plain HTML site, the audit runs against the project's local server and each finding says which file it comes from: `app/about/page.tsx` for the route `/about`, or `services.html:17` for a broken link on line 17. See [Auditing a project in its folder](#auditing-a-project-in-its-folder).
+- **Fixes what it found, and checks the fix.** For a project audited in its folder, `/seekwide:fix` proposes changes for metadata findings (a missing or duplicate title or meta description, a missing canonical, missing Open Graph tags, a missing sitemap) in the file each one comes from. Every change is shown as a diff and written only after you say yes; nothing is committed. A second audit then says, finding by finding, whether it is closed, still open, replaced by another finding, or could not be verified. See [Fixing findings](#fixing-findings).
 - **Writes a report** as Markdown and as one self-contained HTML file, with an optional agency name and logo. The HTML prints cleanly to PDF.
 - **Keeps facts and advice apart.** Claude writes the summary and can suggest better titles, and the report labels those parts as suggestions. They never change a score.
 
@@ -21,7 +22,7 @@ Site audits for Claude Code that you can re-run and trust. Seekwide crawls a sit
 - It does not run JavaScript. Content that appears only after scripts run is not seen.
 - It does not get around firewalls, CAPTCHAs or robots.txt. When a site blocks it, it says so and stops. Pages the site refuses to serve to the crawler are counted and left out of the checks; they are never reported as errors of the site.
 - It does not measure Core Web Vitals of every page. A lab test takes many seconds and Google limits how many can be run, so a few pages stand for the rest.
-- It does not change your code. In repo mode it names the file a fix belongs in; applying fixes is planned and not built yet.
+- It does not change your code by itself. The plugin's own server never writes into a project. With `/seekwide:fix`, Claude edits files with its normal tools, after showing you each diff and getting your yes, and it never commits. Only metadata fixes exist; images, links and content are not touched.
 - It has no image, AI search or local SEO modules yet.
 
 ## Requirements
@@ -57,6 +58,7 @@ Claude Code installs the plugin's two small dependencies (`parse5` and `robots-p
 | `/seekwide:seo [url]` | Technical and on-page SEO audit, with suggested titles and descriptions | 100 |
 | `/seekwide:links [url]` | Link audit, including external links | 100 |
 | `/seekwide:all [url]` | Every installed module in one report | 200 |
+| `/seekwide:fix [run-id]` | Fix metadata findings of an audit of the project in this folder, with your approval for each change, then audit again to verify | The first audit's |
 | `/seekwide:report [run-id]` | Rebuild a report, brand it, or compare two audits | — |
 | `/seekwide:setup [url]` | Save a project profile and report branding | — |
 
@@ -88,6 +90,34 @@ What to know:
 - **Some findings have no file**: a missing sitemap, or a property of the server such as HTTPS. On a local server the HTTPS findings describe the dev server, not your live site.
 - **Core Web Vitals are not measured** for a local site. Its address is never sent to Google.
 - The project folder is the boundary. Symbolic links are not followed, `node_modules` and dot folders are not read, and nothing in the project is imported or executed by the plugin. File paths in the stored run and in the reports are relative to the project folder.
+
+## Fixing findings
+
+`/seekwide:fix` works on a saved audit of the project in the current folder (run `/seekwide:seo` without a URL first). It never works on a site audited by URL only, because then there is no source file to change, and it never fixes something no finding reports.
+
+What it can fix, and where the change goes:
+
+| Finding | Next.js App Router | Plain HTML |
+|---|---|---|
+| Missing or duplicate title or meta description | The `metadata` export or `generateMetadata` of the page file | `<title>` and `<meta name="description">` in the `<head>` |
+| Missing canonical | `alternates.canonical` on the page, `metadataBase` in the root layout | `<link rel="canonical">` in the `<head>` |
+| Missing Open Graph title or image | `openGraph` in the page's metadata | `<meta property="og:…">` in the `<head>` |
+| No sitemap | `app/sitemap.js` (or `.ts`), and the sitemap line in `app/robots.js` or `robots.txt` | `sitemap.xml`, and the `Sitemap:` line in `robots.txt` |
+
+How it goes:
+
+1. The plugin reads the saved run and says, for each finding, whether a fix exists, which file it belongs in and what the page sends today. A finding it cannot fix safely is listed with the reason and left alone: for example a second `<title>` in a Next.js project, where the plugin cannot tell which file writes it, or a canonical that Next.js streamed into the body, which is a choice about the project and not a tag to move.
+2. Claude reads the file and shows you the change as a diff. A new title or description is Claude's suggestion and is labelled as one.
+3. **Nothing is written until you say yes**, for one change or for the set. Claude then edits the file with its normal tools, so Claude Code's own permission prompts apply too. **Nothing is committed.**
+4. The local server is crawled again and the run is saved as a run of its own. For each fixed finding the report says:
+   - **Closed**: the finding is gone, and the check measured the same page again.
+   - **Still open**: it is still reported.
+   - **Replaced**: it is gone, but the page now has another finding of the same kind (a title was added and is a duplicate).
+   - **Not verified**: it is gone, but the check did not look at the page this time (not crawled, an error status, no longer indexable). Nothing is claimed.
+
+Canonical links, `og:image` and sitemaps contain the address your site is deployed at, which a local server does not know. Give it with `--site https://www.example.com`, or save it once with `/seekwide:setup`; Claude asks when it is missing and never guesses a domain. During the second audit that address is passed to the crawl, so that a canonical link or a sitemap entry on it is read as the same page on the local server. The audit requests nothing from the deployed site: a crawl of a local server sends no request to any other address, and links to the deployed site are left out of the external link check. The address has to be the one your pages name, scheme and host name included; when it matches nothing, the audit says so and names the address the pages use.
+
+Limits: an `og:image` is added only when the project has an image for it; a route with a dynamic segment needs its value built in `generateMetadata`, which Claude writes from the data the route already uses or asks about; MDX pages are not changed. A fix verified on a dev server should be audited again on the live site after it ships.
 
 ## How the scores work
 
@@ -137,6 +167,8 @@ Run audits from the folder that belongs to the site. An agency keeps one folder 
 
 Crawl results are cached in the plugin's data directory and can be deleted at any time.
 
+That is all the plugin's own server writes. Apart from that `.seekwide/` folder inside the project folder, it never creates or changes a file of your project. The changes `/seekwide:fix` makes are made by Claude with Claude Code's file tools, after you approved each diff.
+
 ## Network and data
 
 Seekwide has no telemetry and no backend. This is everything it sends or fetches:
@@ -153,9 +185,11 @@ Nothing else leaves your machine. What Claude reads is covered by the terms of y
 
 The Google API key is sent to those two Google APIs only, in a request header and never in a URL. It is not written to `.seekwide/`, to the crawl cache or to a log. The tools that Claude calls are not given the key and return nothing that contains it, so Claude never sees it. A site on your own machine or on a private network address is never named to Google.
 
+`/seekwide:fix` sends nothing anywhere new either. Its plan is made from the saved run and from what repo mode reads of the project (file names, `package.json`, the text of `next.config`); the source files Claude reads to write a change, and the diffs it shows, are part of your Claude session like any file Claude reads. The deployed address you give for canonical links and sitemaps is written into your files and used to interpret the local crawl; the audit does not contact it.
+
 Repo mode sends nothing anywhere new. It reads file names in the project folder, `package.json`, and the HTML files that were served as pages, all on your machine. The file paths it finds (relative to the project folder) and the text of the project's `dev` script become part of the tool results that Claude reads, like the rest of the audit. The local server is started by Claude Code, with your approval, not by the plugin.
 
-Pages, sitemaps and redirect targets on other hosts are never fetched during the crawl. The one exception is a `robots.txt` that redirects to another host: it is read from there, as search engines do. Seekwide refuses to connect to private network addresses, and to `localhost` unless that is the site you asked it to audit.
+Pages, sitemaps and redirect targets on other hosts are never fetched during the crawl. The one exception is a `robots.txt` that redirects to another host: it is read from there, as search engines do. An audit of a site on your own machine does not make that exception: it requests nothing outside the local address. Seekwide refuses to connect to private network addresses, and to `localhost` unless that is the site you asked it to audit.
 
 ## Settings
 
@@ -173,11 +207,10 @@ A project profile (`/seekwide:setup`) overrides them for one client.
 
 Planned, in this order, and not built yet:
 
-1. Metadata fixes for a local project, shown as diffs and applied only with your approval, followed by a second audit that says whether each finding closed. (Auditing a local project and naming source files works today.)
-2. Security signals that can be measured from outside: hidden text and links, scripts and frames from unknown hosts, pages that do not belong to the site, missing security headers. It will not pretend to be a search engine's crawler to look for cloaking.
-3. Images and video, including alt text written from the image.
-4. Answer and AI search readiness, entity checks against Wikidata, E-E-A-T, international, local, programmatic pages, conversion.
-5. Search Console and Bing Webmaster Tools data, backlinks, measured AI visibility, app stores and social search.
+1. Security signals that can be measured from outside: hidden text and links, scripts and frames from unknown hosts, pages that do not belong to the site, missing security headers. It will not pretend to be a search engine's crawler to look for cloaking.
+2. Images and video, including alt text written from the image, and fixes for images and internal links.
+3. Answer and AI search readiness, entity checks against Wikidata, E-E-A-T, international, local, programmatic pages, conversion.
+4. Search Console and Bing Webmaster Tools data, backlinks, measured AI visibility, app stores and social search.
 
 ## Development
 
