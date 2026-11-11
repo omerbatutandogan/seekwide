@@ -1,0 +1,46 @@
+{
+  "name": "seekwide",
+  "displayName": "Seekwide",
+  "version": "0.1.0-alpha.1",
+  "description": "Site audits you can re-run and trust: a polite crawler, scripted SEO, link and Core Web Vitals checks with evidence, repeatable scores and a client-ready report.",
+  "author": {
+    "name": "omerbatutandogan",
+    "url": "https://github.com/omerbatutandogan"
+  },
+  "homepage": "https://github.com/omerbatutandogan/seekwide",
+  "repository": "https://github.com/omerbatutandogan/seekwide",
+  "license": "MIT",
+  "keywords": [
+    "seo",
+    "technical-seo",
+    "site-audit",
+    "broken-links",
+    "internal-links",
+    "canonical",
+    "sitemap",
+    "core-web-vitals",
+    "report",
+    "agency"
+  ],
+  "userConfig": {
+    "report_brand_name": {
+      "type": "string",
+      "title": "Report brand name",
+      "description": "Shown as \"Prepared by\" on audit reports. Leave empty for unbranded reports.",
+      "default": ""
+    },
+    "report_logo_path": {
+      "type": "string",
+      "title": "Report logo file",
+      "description": "Absolute path to a PNG, JPEG, WebP or SVG file of 200 KB or less, shown on audit reports. Leave empty for no logo.",
+      "default": ""
+    },
+    "google_api_key": {
+      "type": "string",
+      "title": "Google API key",
+      "description": "Optional. Used to measure Core Web Vitals with Google's PageSpeed Insights API and Chrome UX Report API; enable both for the key's Google Cloud project. The key is sent only to those two APIs. Without it, real-user data is not collected and Google usually refuses the lab test.",
+      "sensitive": true,
+      "default": ""
+    }
+  }
+}

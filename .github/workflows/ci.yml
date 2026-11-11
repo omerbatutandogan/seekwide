@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      # TypeScript is a development tool only, so it is installed here and not
+      # listed in package.json: Claude Code installs the plugin's dependencies
+      # on every user's machine.
+      - name: Type-check
+        run: |
+          npm install --no-save typescript@5.9.3 @types/node@22
+          npx tsc -p jsconfig.json
+
+      - name: Check that docs/checks.md matches the code
+        run: node scripts/gen-checks-doc.js --check
+
+      - name: Check plugin directory rules
+        run: node scripts/check-directory-rules.js
+
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Claude Code
+        run: npm install --global @anthropic-ai/claude-code
+
+      - name: Validate the plugin manifest and skills
+        run: claude plugin validate . --strict --profile directory

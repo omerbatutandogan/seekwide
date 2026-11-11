@@ -1,0 +1,62 @@
+// The ten MCP tools. Every dependency is injected so handlers can be tested
+// with fakes; server/src/index.js wires the real modules.
+
+/** @import { CheckDef, CrawlJob, CrawlResult, OutboundResult, Profile, Run, RunIndexEntry, Finding, VitalsData } from '../types.js' */
+/** @import { ToolDef } from '../mcp/stdio.js' */
+/** @import { ProjectPaths } from '../store/project.js' */
+
+import { auditTools } from './audit.js';
+import { crawlTools } from './crawl.js';
+import { profileTools } from './profile.js';
+import { reportTools } from './report.js';
+import { runTools } from './runs.js';
+
+/**
+ * @typedef {Object} Comparison
+ * @property {string} base_run_id
+ * @property {string} run_id
+ * @property {Finding[]} resolved
+ * @property {Finding[]} added
+ * @property {number} persisting
+ * @property {Record<string, {from: number|null, to: number|null, delta: number|null}>} scores
+ * @property {string[]} notes
+ */
+
+/**
+ * @typedef {Object} ToolDeps
+ * @property {{
+ *   start(options: {url: string, maxPages?: number, ratePerSec?: number, includeSubdomains?: boolean, allowLoopback?: boolean}): CrawlJob|Promise<CrawlJob>,
+ *   get(id: string): CrawlJob|null,
+ *   wait(id: string, timeoutMs: number): Promise<CrawlJob|null>,
+ *   result(id: string): Promise<CrawlResult|null>,
+ * }} crawlManager
+ * @property {CheckDef[]} checks
+ * @property {(projectDir: string) => ProjectPaths} projectPaths
+ * @property {(projectDir: string) => Promise<ProjectPaths>} ensureProject
+ * @property {(date: Date, existingIds: string[]) => string} newRunId
+ * @property {(projectDir: string, run: Run) => Promise<{runId: string, runDir: string, findingsFile: string, entry: RunIndexEntry}>} saveRun
+ * @property {(projectDir: string, ref: string) => Promise<Run>} loadRun
+ * @property {(projectDir: string) => Promise<RunIndexEntry[]>} listRuns
+ * @property {(projectDir: string) => Promise<Profile|null>} readProfile
+ * @property {(projectDir: string, input: unknown, now: Date) => Promise<Profile>} writeProfile
+ * @property {(base: Run, current: Run) => Comparison} compareRuns
+ * @property {(run: Run, options: object) => string} renderMarkdown
+ * @property {(run: Run, options: object) => string} renderHtml
+ * @property {(urls: string[], options?: {maxLinks?: number, concurrency?: number}) => Promise<Map<string, OutboundResult>>} checkExternalLinks
+ * @property {(crawl: CrawlResult, options: {maxPages: number}) => Promise<VitalsData>} measureVitals
+ *   Core Web Vitals of a crawl. The Google API key is bound into this function where the server is
+ *   wired, so no tool ever holds it.
+ * @property {() => Date} now
+ * @property {() => string} defaultProjectDir
+ * @property {{SEEKWIDE_REPORT_BRAND?: string, SEEKWIDE_REPORT_LOGO?: string}} env
+ *   The report settings from the environment, and nothing else of it (`toolSettings` in config.js).
+ */
+
+/**
+ * Build the tool definitions in a fixed order (crawl, audit, runs, report, profile).
+ * @param {ToolDeps} deps
+ * @returns {ToolDef[]}
+ */
+export function createTools(deps) {
+  return [...crawlTools(deps), ...auditTools(deps), ...runTools(deps), ...reportTools(deps), ...profileTools(deps)];
+}

@@ -1,0 +1,19 @@
+{
+  "name": "seekwide",
+  "version": "0.1.0-alpha.1",
+  "private": true,
+  "description": "Search Everywhere Optimization for Claude Code: deterministic SEO and link audits with evidence, scores and reports.",
+  "type": "module",
+  "license": "MIT",
+  "homepage": "https://github.com/omerbatutandogan/seekwide",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "dependencies": {
+    "parse5": "8.1.1",
+    "robots-parser": "3.0.1"
+  }
+}

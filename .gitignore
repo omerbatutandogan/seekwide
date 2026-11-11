@@ -1,0 +1,16 @@
+node_modules/
+.DS_Store
+*.log
+coverage/
+
+# Audit output written by the plugin itself
+.seekwide/
+
+# Internal planning notes; not part of the published plugin
+docs/internal/
+
+# Local agent state
+.omc/
+
+# Local Claude Code settings
+.claude/
