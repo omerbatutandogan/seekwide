@@ -32,6 +32,10 @@ Seekwide fetches pages from sites it does not control and hands the results to a
 - For a Next.js project, Seekwide cannot check that the local server belongs to the project in the folder. If another project is being served on that address, findings name files of the wrong project. The audit says when no crawled page matches a route of the project.
 - Another program running as the same user can read the environment of the server process, and with it the Google API key. Restrict the key in the Google Cloud console to the two APIs it is used for, so that a leaked key is of little use.
 
+## Dependencies
+
+The plugin has two runtime dependencies, both pinned. CI fails when `npm audit` reports a known vulnerability in them, and Dependabot proposes updates every week.
+
 ## Supported versions
 
 Only the latest release gets fixes while the project is in alpha.

@@ -174,9 +174,10 @@ A project profile (`/seekwide:setup`) overrides them for one client.
 Planned, in this order, and not built yet:
 
 1. Metadata fixes for a local project, shown as diffs and applied only with your approval, followed by a second audit that says whether each finding closed. (Auditing a local project and naming source files works today.)
-2. Images and video, including alt text written from the image.
-3. Answer and AI search readiness, entity checks against Wikidata, E-E-A-T, international, local, programmatic pages, conversion.
-4. Search Console and Bing Webmaster Tools data, backlinks, measured AI visibility, app stores and social search.
+2. Security signals that can be measured from outside: hidden text and links, scripts and frames from unknown hosts, pages that do not belong to the site, missing security headers. It will not pretend to be a search engine's crawler to look for cloaking.
+3. Images and video, including alt text written from the image.
+4. Answer and AI search readiness, entity checks against Wikidata, E-E-A-T, international, local, programmatic pages, conversion.
+5. Search Console and Bing Webmaster Tools data, backlinks, measured AI visibility, app stores and social search.
 
 ## Development
 
