@@ -4,7 +4,7 @@ Notable changes to Seekwide. Versions follow [semantic versioning](https://semve
 
 ## 0.1.0-alpha.1 (unreleased)
 
-First working version. Rule set 0.1.3.
+First working version. Rule set 0.1.4.
 
 Rule set 0.1.1 differs from 0.1.0, which only unreleased builds used, in two ways: a module score is 99 at most when a scored check has a failure, and the `aria-label` of an element inside a link (an SVG logo, an icon, an image) counts as the link's text.
 
@@ -31,6 +31,19 @@ Rule set 0.1.1 differs from 0.1.0, which only unreleased builds used, in two way
 - Page records carry the module's signals (`security`), read while a page is extracted. Records of crawls made before this version have none and are not units of the security checks.
 - A report that includes the security module is titled after its modules (for example "SEO, link and security audit") and says in its method what the module can and cannot see from outside.
 - Fixtures for the security module: a clean copy and a hacked copy of a small site, under `fixtures/security/`.
+
+### Fixed
+
+Rule set 0.1.4 differs from 0.1.3 in the first two of these.
+
+- `links.anchor.uncrawlable` also reports a link whose `href` is a `vbscript:` or `data:` URL, and reads the scheme as browsers do (spaces and control characters around it, and tabs and line breaks inside it, are ignored, so a line break inside `javascript:` does not hide it). Google's crawlable-links page asks for an href that resolves to a web address its crawlers can request; neither scheme gives one. `mailto:`, `tel:` and other links to another program still pass.
+- In a crawl of a local server that was told the deployed address (`site_url`), a link written with the full deployed address now leads to the same page on the local server, like canonical links and sitemap entries already did, so a page linked only that way is crawled and the link checks count such links as internal. The crawl still requests nothing outside the local server; a link to the deployed site in another scheme, host name or port, and a redirect to it, stay external and are left out of the external link check as before.
+- Core Web Vitals are measured once per crawl and page count. The measurement is kept with the crawl, and every later audit of that crawl rates the same numbers, says that it reused them and when they were measured (`core_web_vitals.reused` and `measured_at`), and sends nothing to Google. A measurement in which Google returned nothing is not kept, and two audits of one crawl that run at the same time ask Google once.
+- A deployed address written with a trailing dot (`https://example.com.`) is read without it, in `crawl_start` and in `fix_plan`, so it matches the pages and no fix writes the dot into a project.
+- A Google API key that is set but cannot be sent (a space or a line break inside, a character outside plain ASCII, more than 256 characters) is reported as a key that cannot be used, and nothing is sent to Google; it was reported as no key, and PageSpeed Insights was asked without it.
+- A crawl takes no new page after 30 minutes (`LIMITS.crawlMaxMs`); the page under way finishes. One that still has URLs to visit then ends as truncated with `time_limit_reached`, and the audit's notes, the report and run comparisons name the time limit instead of the page budget. The skip reason of the checks that need a complete crawl names every limit.
+- The README no longer says that Claude Code installs the plugin's dependencies whenever it installs the plugin. Claude Code's documentation says it does so when it copies a plugin into its cache, from the lockfile, and not for a plugin it loads in place, which is what both install commands in the README do; the README now says to run `npm ci --ignore-scripts` first.
+- A test that starts the server as a child process now fails at once when an assertion fails, instead of keeping the test run alive with the server still running.
 
 ### Security
 

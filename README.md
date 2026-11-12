@@ -34,6 +34,12 @@ Site audits for Claude Code that you can re-run and trust. Seekwide crawls a sit
 
 ## Install
 
+Both ways below load the plugin in place from your copy, and Claude Code does not install packages into a folder it loads in place. So install the plugin's two small dependencies (`parse5` and `robots-parser`) in that folder first, with the exact versions the lockfile pins:
+
+```bash
+npm ci --ignore-scripts
+```
+
 From a local copy, for one session:
 
 ```bash
@@ -50,7 +56,7 @@ claude plugin marketplace add /path/to/seekwide
 claude plugin install seekwide@seekwide
 ```
 
-Claude Code installs the plugin's two small dependencies (`parse5` and `robots-parser`) when it installs the plugin.
+When Claude Code installs the plugin from a marketplace it fetches, such as this repository on GitHub, it copies the plugin into its own cache and installs the two dependencies there itself, from `package-lock.json`: the exact versions it pins, with npm from your `PATH` and without running any package's install scripts.
 
 ## Commands
 
@@ -118,7 +124,7 @@ How it goes:
    - **Replaced**: it is gone, but the page now has another finding of the same kind (a title was added and is a duplicate).
    - **Not verified**: it is gone, but the check did not look at the page this time (not crawled, an error status, no longer indexable). Nothing is claimed.
 
-Canonical links, `og:image` and sitemaps contain the address your site is deployed at, which a local server does not know. Give it with `--site https://www.example.com`, or save it once with `/seekwide:setup`; Claude asks when it is missing and never guesses a domain. During the second audit that address is passed to the crawl, so that a canonical link or a sitemap entry on it is read as the same page on the local server. The audit requests nothing from the deployed site: a crawl of a local server sends no request to any other address, and links to the deployed site are left out of the external link check. The address has to be the one your pages name, scheme and host name included; when it matches nothing, the audit says so and names the address the pages use.
+Canonical links, `og:image` and sitemaps contain the address your site is deployed at, which a local server does not know. Give it with `--site https://www.example.com`, or save it once with `/seekwide:setup`; Claude asks when it is missing and never guesses a domain. During the second audit that address is passed to the crawl, so that a canonical link, a link or a sitemap entry on it is read as the same page on the local server, and a page linked only by its full deployed address is crawled too. The audit requests nothing from the deployed site: a crawl of a local server sends no request to any other address, and the other links to the deployed site are left out of the external link check. The address has to be the one your pages name, scheme and host name included; when it matches nothing, the audit says so and names the address the pages use.
 
 Limits: an `og:image` is added only when the project has an image for it; a route with a dynamic segment needs its value built in `generateMetadata`, which Claude writes from the data the route already uses or asks about; MDX pages are not changed. A fix verified on a dev server should be audited again on the live site after it ships.
 
@@ -150,7 +156,9 @@ A value passes when it is in Google's "good" range: LCP of 2.5 s or less, INP of
 
 To get a key, create an API key in the Google Cloud console and enable the PageSpeed Insights API and the Chrome UX Report API for its project. Then run `/plugin` in Claude Code, pick Seekwide on the Installed tab, choose "Configure options" and paste the key into "Google API key". Claude Code keeps it in your system's secure storage. Enter the key in that field only: a key pasted into a chat with Claude becomes part of the conversation.
 
-The plugin's server gets the key when it starts. A Claude Code session that was already open when you saved the key keeps running without it and reports that no key is set; start a new session to use it. `claude plugin configure seekwide@seekwide` shows which settings are saved, without showing the key.
+The plugin's server gets the key when it starts. A Claude Code session that was already open when you saved the key keeps running without it and reports that no key is set; start a new session to use it. `claude plugin configure seekwide@seekwide` shows which settings are saved, without showing the key. A saved value that no request can carry (one with a space or a line break inside, a character outside plain ASCII, or more than 256 characters) is reported as a key that cannot be used, and then nothing is sent to Google.
+
+Core Web Vitals are measured once per crawl. Another audit of the same crawl, with the same number of pages, rates the same numbers again and says that it reused them, so two audits of one crawl cannot disagree because a lab test came out differently. Crawl again for a new measurement. A measurement in which Google returned nothing is not kept, so the next audit asks again.
 
 Field data exists only for sites and pages with enough visits from Chrome users. A small site often has none, and that says nothing about its speed.
 
@@ -190,7 +198,7 @@ Run audits from the folder that belongs to the site. An agency keeps one folder 
   runs/<run-id>/report.html
 ```
 
-Crawl results are cached in the plugin's data directory and can be deleted at any time.
+Crawl results are cached in the plugin's data directory, each with the Core Web Vitals measured for it, and can be deleted at any time.
 
 That is all the plugin's own server writes. Apart from that `.seekwide/` folder inside the project folder, it never creates or changes a file of your project. The changes `/seekwide:fix` makes are made by Claude with Claude Code's file tools, after you approved each diff.
 
@@ -202,7 +210,7 @@ Seekwide has no telemetry and no backend. This is everything it sends or fetches
 |---|---|---|
 | The site you audit | HTTP requests for pages, `robots.txt` and XML sitemaps, and, for a file that one of its redirects leads to, a `HEAD` request (then a `GET` that reads at most 16 KB when the HEAD fails or answers with an error status), with the user agent `seekwide/<version> (+https://github.com/omerbatutandogan/seekwide)`. If the start URL redirects to another host, that host becomes the site. | Every audit |
 | Sites the audited site links to | The `robots.txt` of each site, then a `HEAD` request for the link, and a `GET` when the HEAD fails or answers with an error status. At most 50 links are checked, each through at most 5 redirects. A redirect step gets the same requests, and only when the robots.txt of the site it leads to allows it. This also covers the destination of a redirect that leaves the audited site. | Audits that include the `links` module |
-| Google PageSpeed Insights API (`pagespeedonline.googleapis.com`) | The URL of each page whose Core Web Vitals are measured: 3 pages with `/seekwide:basic`, 5 with `/seekwide:seo` and `/seekwide:all`, never more than 10. One request per page, with your Google API key when one is set. Google then loads those pages itself to test them. | Audits that include the `seo` module, unless you pass `--no-cwv` or the site is on your own machine |
+| Google PageSpeed Insights API (`pagespeedonline.googleapis.com`) | The URL of each page whose Core Web Vitals are measured: 3 pages with `/seekwide:basic`, 5 with `/seekwide:seo` and `/seekwide:all`, never more than 10. One request per page, with your Google API key when one is set. Google then loads those pages itself to test them. | Audits that include the `seo` module, unless you pass `--no-cwv`, the site is on your own machine, or the Google API key that is set cannot be used. Once per crawl: another audit of the same crawl reuses the numbers |
 | Google Chrome UX Report API (`chromeuxreport.googleapis.com`) | The origin of the site and the URLs of the same pages, one request each (4 with `/seekwide:basic`, 6 with `/seekwide:seo` and `/seekwide:all`, never more than 11), with your Google API key | The same audits, and only when a Google API key is set |
 | Anthropic | Tool results that Claude reads during the session: scores, findings, Core Web Vitals values, and short page excerpts when Claude drafts a suggestion | Every audit, as part of your Claude Code session |
 

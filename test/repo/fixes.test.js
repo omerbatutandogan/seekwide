@@ -9,7 +9,8 @@ import { after, before, describe, it } from 'node:test';
 
 import { buildContext, runChecks } from '../../server/src/checks/engine.js';
 import { allChecks } from '../../server/src/checks/registry.js';
-import { FIXABLE_CHECKS, plainPath, planFixes } from '../../server/src/repo/fixes.js';
+import { plainPath } from '../../server/src/repo/fix-common.js';
+import { FIXABLE_CHECKS, planFixes } from '../../server/src/repo/fixes.js';
 import { attachSources, loadProjectSources } from '../../server/src/repo/sources.js';
 import { makeCrawl, makePage } from '../helpers/factories.js';
 import { HTML_FIXTURE, NEXT_FIXTURE, crawlLocal, makeTree, startServer, staticRoutes } from '../helpers/repo.js';

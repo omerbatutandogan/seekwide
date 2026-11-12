@@ -27,7 +27,7 @@ function ranChecks(run) {
 function crawlNote(run, label) {
   const problems = [];
   if (run.crawl.blocked) problems.push(`was blocked (${run.crawl.blocked.reason})`);
-  if (run.crawl.truncated) problems.push('stopped at its page limit');
+  if (run.crawl.truncated) problems.push(run.crawl.time_limit_reached === true ? 'stopped at its time limit' : 'stopped at its page limit');
   if (problems.length === 0) return null;
   return `The ${label} run's crawl ${problems.join(' and ')}, so it covers only part of the site and findings may appear or disappear because of coverage.`;
 }

@@ -5,7 +5,7 @@ import { shortId } from '../util/hash.js';
 import { scoreModules } from './scoring.js';
 
 const SKIP_REASONS = {
-  full_crawl: 'Needs a complete crawl. This crawl stopped at the page limit or was blocked.',
+  full_crawl: 'Needs a complete crawl. This crawl stopped at a limit (of pages, of size or of time) or was blocked.',
   sitemap: 'Needs an XML sitemap. None was found.',
   robots: 'Needs a readable robots.txt.',
   outbound: 'Needs external link checks. They were not run.',

@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { createToolDeps } from '../server/src/deps.js';
-import { makeCrawl, makeVitals } from './helpers/factories.js';
+import { measureVitals } from '../server/src/vitals/measure.js';
+import { SITE, makeCrawl, makePage, makeVitals } from './helpers/factories.js';
 
 const KEY = 'fake-DepsTestKey-0123456789_abcdefghij';
 const ENV = {
@@ -65,4 +66,44 @@ test('building the dependencies touches neither the disk nor the network', () =>
   assert.equal(deps.crawlManager.get('c-unknown'), null);
   assert.equal(typeof deps.measureVitals, 'function');
   assert.ok(deps.checks.length >= 56);
+});
+
+test('the key is read when a measurement starts, so a setting changed after the tools were built counts', async () => {
+  const { calls, measure } = recorder();
+  /** @type {NodeJS.ProcessEnv} */
+  const env = { ...ENV, SEEKWIDE_GOOGLE_API_KEY: undefined };
+  const deps = createToolDeps(env, measure);
+  env.SEEKWIDE_GOOGLE_API_KEY = KEY;
+  await deps.measureVitals(makeCrawl(), { maxPages: 3 });
+  env.SEEKWIDE_GOOGLE_API_KEY = 'two words';
+  await deps.measureVitals(makeCrawl(), { maxPages: 3 });
+  assert.deepEqual(calls, [{ maxPages: 3, apiKey: KEY }, { maxPages: 3, apiKey: null, apiKeyUnusable: true }]);
+});
+
+test('a key that is set but cannot be sent is reported as unusable, never as no key, and nothing goes to Google', async () => {
+  const UNUSABLE = 'AIza Deps Test Key with spaces';
+  const { calls, measure } = recorder();
+  await createToolDeps({ ...ENV, SEEKWIDE_GOOGLE_API_KEY: UNUSABLE }, measure).measureVitals(makeCrawl(), { maxPages: 3 });
+  assert.deepEqual(calls, [{ maxPages: 3, apiKey: null, apiKeyUnusable: true }]);
+
+  // The real measurement, with clients that record what would have been sent.
+  /** @type {string[]} */
+  const sent = [];
+  /** @type {any} */
+  const spy = async (/** @type {unknown} */ target) => {
+    sent.push(JSON.stringify(target));
+    return { ok: false, failure: { kind: 'network', status: 0, reason: null } };
+  };
+  const real = /** @type {typeof measureVitals} */ ((crawl, options) => measureVitals(crawl, { ...options, runPagespeed: spy, queryCrux: spy }));
+  const crawl = makeCrawl({ pages: [makePage({ url: `${SITE}/` })] });
+  const vitals = await createToolDeps({ ...ENV, SEEKWIDE_GOOGLE_API_KEY: UNUSABLE }, real).measureVitals(crawl, { maxPages: 3 });
+  assert.deepEqual(sent, [], 'nothing is sent, not even without the key');
+  assert.match(vitals.lab.reason ?? '', /^The Google API key in the plugin settings cannot be used: .* Nothing was sent to Google\. Check the key in the plugin settings\.$/);
+  assert.equal(vitals.field.reason, vitals.lab.reason);
+  assert.doesNotMatch(JSON.stringify(vitals), /No Google API key is set/);
+  for (const part of UNUSABLE.split(' ')) assert.ok(!JSON.stringify(vitals).includes(part), `the result echoes ${part}`);
+
+  // The same crawl with a usable key is asked about, so the refusal above came from the key alone.
+  await createToolDeps({ ...ENV, SEEKWIDE_GOOGLE_API_KEY: 'AIzaUsable-Key_123' }, real).measureVitals(crawl, { maxPages: 3 });
+  assert.ok(sent.length > 0);
 });

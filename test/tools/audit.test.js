@@ -2,7 +2,8 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { ToolError } from '../../server/src/mcp/stdio.js';
 import { createTools } from '../../server/src/tools/index.js';
-import { BLOCKED_SCORE_NOTE, externalLinkUrls, topGroups } from '../../server/src/tools/audit.js';
+import { topGroups } from '../../server/src/tools/audit-summary.js';
+import { BLOCKED_SCORE_NOTE, externalLinkUrls } from '../../server/src/tools/audit.js';
 import { deployedNotes, namedOrigin } from '../../server/src/tools/audit-deployed.js';
 import { VITALS_FAILED, VITALS_NOT_ASKED } from '../../server/src/tools/audit-vitals.js';
 import { UNTRUSTED_NOTE } from '../../server/src/tools/common.js';
@@ -27,13 +28,13 @@ describe('what audit_run says about the deployed address of a local crawl', () =
 
   it('says entries were read as local pages only when one or more was', () => {
     assert.deepEqual(deployedNotes(crawlWith({ deployed_origin: 'https://www.example.com', deployed_localized: 4 })).map((note) => note.slice(0, 160)), [
-      'The crawl was told that the project is deployed at https://www.example.com. Canonical links and sitemap entries on that address were read as pages of the local ',
+      'The crawl was told that the project is deployed at https://www.example.com. Canonical links, links and sitemap entries on that address were read as pages of the',
     ]);
   });
 
   it('warns when the address matched nothing, and names the address the pages do use', () => {
     const [note] = deployedNotes(crawlWith({ deployed_origin: 'http://www.example.com', deployed_localized: 0 }));
-    assert.match(note, /deployed at http:\/\/www\.example\.com, but no canonical link or sitemap entry names that address, so nothing was read as a page of the local server\./);
+    assert.match(note, /deployed at http:\/\/www\.example\.com, but no canonical link, link or sitemap entry names that address, so nothing was read as a page of the local server\./);
     assert.match(note, /The canonical links of the pages name https:\/\/www\.example\.com: .*crawl again with site_url set to exactly that/);
     assert.doesNotMatch(note, /were read as pages/);
     // A crawl stored before the count existed is treated as having matched nothing.
@@ -135,8 +136,10 @@ describe('audit_run', () => {
     const result = await audit(fake).handler({ job_id: 'c-1' });
 
     assert.deepEqual(fake.calls.measureVitals, [['c-1', { maxPages: LIMITS.vitalsPagesDefault }]]);
-    assert.deepEqual(fake.runs[0].core_web_vitals, vitals, 'the run keeps passing values too, for the report');
+    assert.deepEqual(fake.runs[0].core_web_vitals, { ...vitals, measured_at: NOW.toISOString(), reused: false }, 'the run keeps passing values too, for the report');
     assert.deepEqual(result.core_web_vitals, {
+      measured_at: NOW.toISOString(),
+      reused: false,
       lab: { available: true, reason: null, device: 'mobile' },
       field: { available: true, reason: null, form_factor: 'phone' },
       origin: vitals.origin,

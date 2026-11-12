@@ -154,7 +154,10 @@ describe('the full tool flow on the fixture site', () => {
     assert.ok(firstAudit.top.length > 0 && firstAudit.top.length <= 10);
     assert.ok(firstAudit.top.every((/** @type {any} */ group) => group.example_urls.length <= 3));
     assert.deepEqual(firstAudit.notes, [LOCAL_SITE_NOTE]);
+    assert.ok(!Number.isNaN(Date.parse(firstAudit.core_web_vitals.measured_at)));
     assert.deepEqual(firstAudit.core_web_vitals, {
+      measured_at: firstAudit.core_web_vitals.measured_at,
+      reused: false,
       lab: { available: false, reason: LOCAL_SITE_NOTE, device: 'mobile' },
       field: { available: false, reason: LOCAL_SITE_NOTE, form_factor: 'phone' },
       origin: { origin: server.origin, field: null, field_note: null },

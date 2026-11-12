@@ -1,14 +1,14 @@
 // One crawl, start to finish (ARCHITECTURE.md 4.5, with docs/internal/REVIEW-FIXES.md R2 to R5 and R9).
 
 import { LIMITS, SCHEMA_VERSION, USER_AGENT } from '../config.js';
-import { loadRobots } from '../net/robots.js';
 import { loadSitemaps } from '../net/sitemap.js';
 import { isInternalUrl, looksLikeHtmlUrl, originOf } from '../util/url.js';
 import { createChainFollower, recordsForChain } from './chain.js';
-import { isBotChallenge, RETRY_AFTER_MAX_MS, retryAfterMs } from './challenge.js';
 import { localizeRecord, localizeUrls } from './deployed.js';
 import { createFrontier } from './frontier.js';
 import { probeHttp } from './probe.js';
+import { createRecords } from './records.js';
+import { createRequests } from './requests.js';
 
 /** @import { CrawlBlock, CrawlResult, FetchResult, HttpProbe, PageRecord, SitemapSummary } from '../types.js' */
 /** @import { safeFetch } from '../net/safe-fetch.js' */
@@ -38,6 +38,7 @@ const STRIKES = 3;
  * @property {(ms: number) => Promise<void>} sleep
  * @property {number} [maxStoredChars]  Characters the page records of one crawl may hold in all; defaults
  *   to `MAX_STORED_CHARS`.
+ * @property {number} [maxDurationMs]  How long the crawl may take, by `now`; defaults to `LIMITS.crawlMaxMs`.
  */
 
 /**
@@ -59,9 +60,12 @@ export const MAX_STORED_CHARS = 150_000_000;
  * to any other URL; the fetch order depends only on the site's content; a
  * response that refuses the crawler is recorded as unreadable, never as content;
  * the crawl stops at a bot challenge on the start page, or after three
- * challenges or three 429s in a row. A crawl of a local site (`loopbackOrigin`)
+ * challenges or three 429s in a row; no new page is taken from the frontier once
+ * `maxDurationMs` has passed (the page under way finishes, with its waits, its
+ * 429 retry and its redirect hops), and the crawl ends as truncated, with
+ * `time_limit_reached`, when a URL that could be fetched was left. A crawl of a local site (`loopbackOrigin`)
  * sends no request to any other origin, whatever a redirect says. With `deployedOrigin`, URLs on that origin
- * in canonical links, robots.txt Sitemap lines and sitemaps count as local ones.
+ * in canonical links, links, robots.txt Sitemap lines and sitemaps count as local ones.
  *
  * @param {CrawlParams} params
  * @param {CrawlDeps} deps
@@ -71,10 +75,9 @@ export const MAX_STORED_CHARS = 150_000_000;
 export async function runCrawl(params, deps, onProgress) {
   const { startUrl, maxPages, ratePerSec, includeSubdomains, loopbackOrigin, startedAt } = params;
   const { fetch, now, sleep } = deps;
-  const maxStoredChars = deps.maxStoredChars ?? MAX_STORED_CHARS;
-  let storedChars = 0;
-  /** True once the page records reached `maxStoredChars`. */
-  let full = false;
+  const startedMs = now().getTime();
+  const maxDurationMs = deps.maxDurationMs ?? LIMITS.crawlMaxMs;
+  let timeUp = false;
   const deployed = loopbackOrigin !== null && params.deployedOrigin ? params.deployedOrigin : null;
   /** @type {Extractor} */
   const extract = deployed === null || loopbackOrigin === null ? deps.extract : {
@@ -88,67 +91,8 @@ export async function runCrawl(params, deps, onProgress) {
   };
   /** Pages, robots.txt Sitemap lines and sitemap entries that named the deployed origin. */
   let localized = 0;
-  const baseDelayMs = 1000 / ratePerSec;
-  let delayMs = baseDelayMs;
-  let requests = 0;
-  /** @type {Map<string, FetchResult['error']>} */
-  const lastErrors = new Map();
+  const { politeFetch, fetchPage, robotsFor, knownRobots, lastError } = createRequests({ fetch, now, sleep, ratePerSec, loopbackOrigin });
 
-  /**
-   * Every request of the crawl goes through here.
-   * @param {string} url
-   * @param {Parameters<typeof safeFetch>[1]} [options]
-   * @param {number} [waitMs] Wait before this request instead of the normal delay.
-   */
-  const politeFetch = async (url, options = {}, waitMs = delayMs) => {
-    // A crawl of a local site requests that site and nothing else: a robots.txt, a sitemap or a probe that
-    // leads to another origin is refused here, as the redirect follower refuses it for pages.
-    if (loopbackOrigin !== null && originOf(url) !== loopbackOrigin) {
-      /** @type {FetchResult} */
-      const refused = {
-        url, finalUrl: url, status: 0, headers: {}, headerLines: {}, redirectChain: [], body: null, truncated: false, bytes: 0, elapsedMs: 0,
-        error: { code: 'blocked_address', message: 'A crawl of a site on this machine requests nothing from another address.' },
-      };
-      lastErrors.set(url, refused.error);
-      return refused;
-    }
-    if (requests > 0) await sleep(waitMs);
-    requests += 1;
-    const result = await fetch(url, { ...options, allowLoopback: loopbackOrigin ?? false });
-    lastErrors.set(url, result.error);
-    return result;
-  };
-
-  /**
-   * One page request without automatic redirects; a plain 429 is retried once after Retry-After.
-   * @param {string} url @param {'GET'|'HEAD'} [method] @param {number} [maxBytes]
-   */
-  const fetchPage = async (url, method = 'GET', maxBytes = undefined) => {
-    const options = { maxRedirects: 0, method, ...(maxBytes === undefined ? {} : { maxBytes }) };
-    const result = await politeFetch(url, options);
-    if (result.status !== 429 || isBotChallenge(result)) return result;
-    const wait = Math.min(RETRY_AFTER_MAX_MS, Math.max(delayMs, retryAfterMs(result.headers['retry-after'], now())));
-    return politeFetch(url, options, wait);
-  };
-
-  /** @type {Map<string, Awaited<ReturnType<typeof loadRobots>>>} */
-  const robotsByOrigin = new Map();
-  /** @param {string} origin */
-  const robotsFor = async (origin) => {
-    let robots = robotsByOrigin.get(origin);
-    if (!robots) {
-      robots = await loadRobots(origin, { fetch: politeFetch });
-      robotsByOrigin.set(origin, robots);
-      const crawlDelaySec = Math.min(robots.summary.crawl_delay_sec ?? 0, LIMITS.crawlDelayMaxSec);
-      delayMs = Math.max(delayMs, baseDelayMs, crawlDelaySec * 1000);
-    }
-    return robots;
-  };
-
-  /** @type {PageRecord[]} */
-  const pages = [];
-  /** @type {Map<string, PageRecord>} */
-  const recorded = new Map();
   /** @type {string[]} */
   const robotsBlocked = [];
   const robotsBlockedSet = new Set();
@@ -158,7 +102,6 @@ export async function runCrawl(params, deps, onProgress) {
   let sitemapSet = new Set();
   /** @type {HttpProbe|null} */
   let httpProbe = null;
-  let truncated = false;
   /** @type {CrawlBlock|null} */
   let blocked = null;
   let origin = /** @type {string} */ (originOf(startUrl));
@@ -172,8 +115,9 @@ export async function runCrawl(params, deps, onProgress) {
       schema_version: SCHEMA_VERSION, id: params.id, start_url: startUrl, site_origin: origin, site_host: host,
       started_at: startedAt, finished_at: now().toISOString(),
       options: { max_pages: maxPages, rate_per_sec: ratePerSec, include_subdomains: includeSubdomains, local: loopbackOrigin !== null, ...(deployed === null ? {} : { deployed_origin: deployed, deployed_localized: localized }) },
-      robots: robots.summary, sitemap, http_probe: httpProbe, pages,
-      robots_blocked: robotsBlocked, truncated, blocked, user_agent: USER_AGENT,
+      robots: robots.summary, sitemap, http_probe: httpProbe, pages: records.pages,
+      robots_blocked: robotsBlocked, truncated: records.truncated(), blocked, user_agent: USER_AGENT,
+      ...(timeUp ? { time_limit_reached: true } : {}),
     };
     return { status: blocked ? 'blocked' : 'done', result };
   };
@@ -200,45 +144,16 @@ export async function runCrawl(params, deps, onProgress) {
   };
   /** @param {string} url */
   const crawlable = (url) => isInternalUrl(url, host, includeSubdomains) && looksLikeHtmlUrl(url);
-  /** True when a URL could still be fetched: not recorded and not known to be disallowed. @param {string} url */
-  const fetchable = (url) => {
-    if (recorded.has(url)) return false;
-    const known = robotsByOrigin.get(/** @type {string} */ (originOf(url)));
-    return known === undefined || known.isAllowed(url);
-  };
+  const records = createRecords({ maxPages, maxStoredChars: deps.maxStoredChars ?? MAX_STORED_CHARS, frontier, crawlable, knownRobots });
 
   const followChain = createChainFollower({
     fetchPage, robotsFor, noteRobotsBlocked, loopbackOrigin, site: () => ({ host, includeSubdomains }),
-    recordOf: (url) => recorded.get(url),
+    recordOf: records.get,
   });
 
-  /** @param {PageRecord[]} records */
-  const addRecords = (records) => {
-    for (const record of records) {
-      if (recorded.has(record.url)) continue;
-      if (pages.length >= maxPages || full) {
-        truncated = truncated || fetchable(record.url);
-        return;
-      }
-      const size = JSON.stringify(record).length;
-      if (storedChars + size > maxStoredChars) {
-        full = true;
-        truncated = true;
-        return;
-      }
-      storedChars += size;
-      pages.push(record);
-      recorded.set(record.url, record);
-      frontier.markSeen(record.url);
-      if (record.depth === null || record.status !== 200 || !record.is_html) continue;
-      for (const link of record.links) {
-        if (link.url !== null && crawlable(link.url) && !recorded.has(link.url)) frontier.add(link.url, record.depth + 1);
-      }
-    }
-  };
   /** @param {string} url @param {Chain} chain @param {number|null} depth @param {PageRecord['discovered_via']} discoveredVia */
-  const record = (url, chain, depth, discoveredVia) => addRecords(recordsForChain({
-    url, chain, depth, discoveredVia, extract, siteHost: host, includeSubdomains, isRecorded: (u) => recorded.has(u),
+  const record = (url, chain, depth, discoveredVia) => records.add(recordsForChain({
+    url, chain, depth, discoveredVia, extract, siteHost: host, includeSubdomains, isRecorded: records.has,
   }));
 
   let challenges = 0;
@@ -257,7 +172,7 @@ export async function runCrawl(params, deps, onProgress) {
   if (robots.summary.status === 'unreachable') {
     // robots.txt answered with a redirect to an address this crawl may not request: say where it led.
     if (robots.refusedRedirect !== null) return block('robots_unreachable', robots.summary.url, robots.summary.http_status, robots.refusedRedirect);
-    const error = lastErrors.get(robots.summary.url);
+    const error = lastError(robots.summary.url);
     if (error && (error.code === 'blocked_address' || error.code === 'dns_error')) return failure(startUrl, error);
     return block('robots_unreachable', robots.summary.url, robots.summary.http_status);
   }
@@ -274,7 +189,7 @@ export async function runCrawl(params, deps, onProgress) {
     robots = await robotsFor(origin);
   }
   record(startUrl, start, 0, ['start']);
-  onProgress({ pages_crawled: pages.length, pages_queued: frontier.size() });
+  onProgress({ pages_crawled: records.pages.length, pages_queued: frontier.size() });
   const startStrike = strike(start, true);
   if (startStrike) return block(startStrike, start.finalUrl, start.result?.status ?? 0);
 
@@ -305,10 +220,15 @@ export async function runCrawl(params, deps, onProgress) {
   // 5 to 10. Breadth-first crawl.
   for (let entry = frontier.next(); entry !== null; entry = frontier.next()) {
     const { url, depth } = entry;
-    if (recorded.has(url)) continue;
-    if (full) break;
-    if (pages.length >= maxPages) {
-      truncated = truncated || remainsFetchable(url);
+    if (records.has(url)) continue;
+    if (records.full()) break;
+    if (records.atLimit()) {
+      if (!records.truncated()) records.cutShort(remainsFetchable(url));
+      break;
+    }
+    if (now().getTime() - startedMs >= maxDurationMs) {
+      timeUp = remainsFetchable(url);
+      records.cutShort(timeUp);
       break;
     }
     if (!(await robotsFor(/** @type {string} */ (originOf(url)))).isAllowed(url)) {
@@ -319,7 +239,7 @@ export async function runCrawl(params, deps, onProgress) {
     /** @type {PageRecord['discovered_via']} */
     const discoveredVia = depth === null ? ['sitemap'] : sitemapSet.has(url) ? ['link', 'sitemap'] : ['link'];
     record(url, chain, depth, discoveredVia);
-    onProgress({ pages_crawled: pages.length, pages_queued: frontier.size() });
+    onProgress({ pages_crawled: records.pages.length, pages_queued: frontier.size() });
     const reason = strike(chain, false);
     if (reason) return block(reason, chain.finalUrl, chain.result?.status ?? 0);
   }
@@ -327,9 +247,9 @@ export async function runCrawl(params, deps, onProgress) {
 
   /** @param {string} first A URL taken from the frontier. @returns {boolean} */
   function remainsFetchable(first) {
-    if (fetchable(first)) return true;
+    if (records.fetchable(first)) return true;
     for (let entry = frontier.next(); entry !== null; entry = frontier.next()) {
-      if (fetchable(entry.url)) return true;
+      if (records.fetchable(entry.url)) return true;
     }
     return false;
   }

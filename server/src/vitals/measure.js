@@ -18,6 +18,7 @@ import { selectVitalsPages } from './select.js';
 /**
  * @typedef {Object} MeasureOptions
  * @property {string|null} [apiKey]   Google API key; without one only PageSpeed Insights is asked.
+ * @property {boolean} [apiKeyUnusable]  A key is set but no request can carry it: nothing is sent, and the result says the key cannot be used.
  * @property {number} [maxPages]      Pages to test, 1 to `LIMITS.vitalsPagesMax`. Default `LIMITS.vitalsPagesDefault`.
  * @property {typeof runPagespeed} [runPagespeed]
  * @property {typeof queryCrux} [queryCrux]
@@ -39,6 +40,7 @@ const NOT_PUBLIC = "The audited site is on this machine or on a private network,
 const NOT_KNOWN_PUBLIC = 'This crawl does not record whether the site is on this machine, so nothing was sent to Google. Crawl the site again to measure Core Web Vitals.';
 const NO_PAGES = 'No indexable HTML page was crawled, so there was no page to measure.';
 const NO_KEY = 'No Google API key is set, and the Chrome UX Report API requires one. Add a key in the plugin settings to collect field data.';
+const KEY_UNUSABLE = 'The Google API key in the plugin settings cannot be used: it holds a space, a line break or a character outside plain ASCII, or is longer than 256 characters, so no request can carry it. Nothing was sent to Google. Check the key in the plugin settings.';
 const NO_FIELD_DATA = 'The Chrome UX Report has no phone data for this site or for the tested pages. It only publishes data for sites and pages with enough visits from Chrome users.';
 const NO_ORIGIN_DATA = 'The Chrome UX Report has no phone data for this site.';
 const NO_PAGE_DATA = 'The Chrome UX Report has no phone data for this page.';
@@ -201,7 +203,8 @@ async function collectField(data, { apiKey, crux, run }) {
  * a public host, is named to Google; at most `maxPages` pages are tested,
  * chosen by `selectVitalsPages` and each recorded with the reason it was
  * chosen; PageSpeed Insights gets one request per page, the Chrome UX Report
- * one for the origin and one per page, and only when a key is set; a refusal
+ * one for the origin and one per page, and only when a key is set; nothing is
+ * sent when the key that is set cannot be used (`apiKeyUnusable`); a refusal
  * that concerns the service or the key stops further requests to that service;
  * no new request starts after `deadlineMs`; whatever Google answers, the result
  * is a `VitalsData` whose `lab` and `field` say whether data arrived and, if
@@ -220,12 +223,15 @@ export async function measureVitals(crawl, options = {}) {
   }
   if (!Number.isInteger(concurrency) || concurrency < 1) throw new TypeError('measureVitals concurrency must be a positive integer');
   if (!Number.isFinite(deadlineMs) || deadlineMs < 0) throw new TypeError('measureVitals deadlineMs must be a non-negative number');
+  if (options.apiKeyUnusable !== undefined && typeof options.apiKeyUnusable !== 'boolean') throw new TypeError('measureVitals apiKeyUnusable must be true or false');
 
   const refusedSite = whyNotSent(crawl);
   if (refusedSite !== null) return unavailableVitals(crawl.site_origin, refusedSite);
   // Each page is checked again, so a crawl file that names local pages under a public origin sends none of them.
   const selected = selectVitalsPages(crawl, maxPages).filter((page) => mayLeaveMachine(page.url));
   if (selected.length === 0) return unavailableVitals(crawl.site_origin, NO_PAGES);
+  // Like a key Google refuses, a key that cannot be sent stops both services; running without it would hide the mistake.
+  if (options.apiKeyUnusable === true) return unavailableVitals(crawl.site_origin, KEY_UNUSABLE);
 
   /** @type {VitalsData} */
   const data = {

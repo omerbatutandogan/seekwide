@@ -10,7 +10,7 @@ const pkg = JSON.parse(readFileSync(path.join(PLUGIN_ROOT, 'package.json'), 'utf
 export const VERSION = /** @type {string} */ (pkg.version);
 
 /** Version of the rule set. Bump it whenever a check changes what it reports. */
-export const RULES_VERSION = '0.1.3';
+export const RULES_VERSION = '0.1.4';
 
 /** Version of the JSON written under `.seekwide/`. */
 export const SCHEMA_VERSION = 1;
@@ -33,6 +33,9 @@ export const LIMITS = Object.freeze({
   ratePerSecDefault: 1,
   ratePerSecMax: 2,
   crawlDelayMaxSec: 10,
+  // A crawl that is still going after this long stops as truncated. 500 pages at
+  // one request a second take about 9 minutes; a long crawl-delay can make it hours.
+  crawlMaxMs: 30 * 60_000,
   maxSitemapFiles: 5,
   maxSitemapUrls: 5000,
   maxOutboundChecks: 50,
@@ -75,9 +78,22 @@ const API_KEY_PATTERN = /^[\x21-\x7E]{1,256}$/;
  * @returns {string|null}
  */
 export function googleApiKey(env = process.env) {
+  return googleApiKeySetting(env).key;
+}
+
+/**
+ * What the plugin settings hold for the Google API key: the key, nothing, or
+ * a value that is set but cannot be used, because no request header can carry
+ * it (a space or a line break inside, a character outside printable ASCII, or
+ * more than 256 characters). Blank values and an unsubstituted placeholder
+ * count as nothing.
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {{key: string|null, unusable: boolean}}  `unusable` is true only when a value is set and `key` is null.
+ */
+export function googleApiKeySetting(env = process.env) {
   const value = (env.SEEKWIDE_GOOGLE_API_KEY ?? '').trim();
-  if (value === '' || value.includes('${') || !API_KEY_PATTERN.test(value)) return null;
-  return value;
+  if (value === '' || value.includes('${')) return { key: null, unusable: false };
+  return API_KEY_PATTERN.test(value) ? { key: value, unusable: false } : { key: null, unusable: true };
 }
 
 /**

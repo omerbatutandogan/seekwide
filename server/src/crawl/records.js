@@ -1,0 +1,85 @@
+// The page records of one crawl and its two budgets: the page limit and the
+// characters the records may hold (ARCHITECTURE.md 4.5, steps 9 and 10).
+
+import { originOf } from '../util/url.js';
+
+/** @import { PageRecord } from '../types.js' */
+/** @import { Robots } from './requests.js' */
+/** @import { createFrontier } from './frontier.js' */
+
+/**
+ * The records of one crawl.
+ *
+ * Guarantees: a URL is recorded once, in the order `add` is given records;
+ * once `maxPages` records are kept, or the next record would take the JSON of
+ * all records past `maxStoredChars`, nothing more is kept; `truncated()`
+ * becomes true when a record was left out whose URL could still be fetched
+ * (not recorded and not known to be disallowed) or the character budget was
+ * reached, and stays true. The links of a kept 200 HTML page reached through
+ * links go to the frontier one level deeper, when `crawlable` accepts them.
+ *
+ * @param {{maxPages: number, maxStoredChars: number, frontier: ReturnType<typeof createFrontier>,
+ *          crawlable: (url: string) => boolean, knownRobots: (origin: string) => Robots|undefined}} options
+ */
+export function createRecords({ maxPages, maxStoredChars, frontier, crawlable, knownRobots }) {
+  /** @type {PageRecord[]} */
+  const pages = [];
+  /** @type {Map<string, PageRecord>} */
+  const recorded = new Map();
+  let storedChars = 0;
+  /** True once the page records reached `maxStoredChars`. */
+  let full = false;
+  let truncated = false;
+
+  /** True when a URL could still be fetched: not recorded and not known to be disallowed. @param {string} url */
+  const fetchable = (url) => {
+    if (recorded.has(url)) return false;
+    const known = knownRobots(/** @type {string} */ (originOf(url)));
+    return known === undefined || known.isAllowed(url);
+  };
+
+  /** @param {PageRecord[]} records */
+  const add = (records) => {
+    for (const record of records) {
+      if (recorded.has(record.url)) continue;
+      if (pages.length >= maxPages || full) {
+        truncated = truncated || fetchable(record.url);
+        return;
+      }
+      const size = JSON.stringify(record).length;
+      if (storedChars + size > maxStoredChars) {
+        full = true;
+        truncated = true;
+        return;
+      }
+      storedChars += size;
+      pages.push(record);
+      recorded.set(record.url, record);
+      frontier.markSeen(record.url);
+      if (record.depth === null || record.status !== 200 || !record.is_html) continue;
+      for (const link of record.links) {
+        if (link.url !== null && crawlable(link.url) && !recorded.has(link.url)) frontier.add(link.url, record.depth + 1);
+      }
+    }
+  };
+
+  return {
+    /** The kept records, in order. The crawl result holds this array. */
+    pages,
+    add,
+    fetchable,
+    /** @param {string} url */
+    has: (url) => recorded.has(url),
+    /** @param {string} url */
+    get: (url) => recorded.get(url),
+    /** True when the character budget was reached. */
+    full: () => full,
+    /** True when the page limit was reached. */
+    atLimit: () => pages.length >= maxPages,
+    truncated: () => truncated,
+    /** Mark the crawl as truncated when `cutShort` is true; it stays truncated. @param {boolean} cutShort */
+    cutShort: (cutShort) => {
+      truncated = truncated || cutShort;
+    },
+  };
+}

@@ -66,9 +66,10 @@ export function describeUnreadable(count) {
  *   host: string, pages: number, htmlPages: number, indexablePages: number, maxPages: number,
  *   checksRun: number, checksTotal: number, findings: number, checksWithFindings: number,
  *   severityCounts: Record<string, number>, scores: {label: string, score: number|null}[],
- *   truncated: boolean, blocked: {reason: string, url: string, status: number}|null, unreadablePages: number,
+ *   truncated: boolean, timeLimited?: boolean, blocked: {reason: string, url: string, status: number}|null, unreadablePages: number,
  *   vitals?: string|null,
- * }} facts  `vitals` is one sentence on the Core Web Vitals of the run, when they were asked for.
+ * }} facts  `vitals` is one sentence on the Core Web Vitals of the run, when they were asked for. `timeLimited`:
+ *   the crawl was truncated by its time limit, not by its page limit.
  * @returns {string[]} Paragraphs.
  */
 export function factualSummary(facts) {
@@ -95,7 +96,9 @@ export function factualSummary(facts) {
   if (facts.blocked) paragraphs.push(`${describeBlock(facts.blocked)} These results are partial.`);
   if (facts.unreadablePages > 0) paragraphs.push(describeUnreadable(facts.unreadablePages));
   if (facts.truncated) {
-    paragraphs.push(`The crawl stopped at its limit of ${plural(facts.maxPages, 'page')}, so these results describe the pages crawled, not the whole site.`);
+    paragraphs.push(facts.timeLimited
+      ? 'The crawl stopped at its time limit, so these results describe the pages crawled, not the whole site.'
+      : `The crawl stopped at its limit of ${plural(facts.maxPages, 'page')}, so these results describe the pages crawled, not the whole site.`);
   }
   return paragraphs;
 }

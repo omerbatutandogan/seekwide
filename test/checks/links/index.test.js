@@ -76,7 +76,8 @@ test('each check points at the documentation page that was verified for it', () 
 
 test('every definition carries a verified documentation reference and plain user-facing text', () => {
   for (const check of checks) {
-    assert.equal(check.last_verified, '2026-11-11', check.id);
+    // The anchor checks rest on the crawlable-links page, read again on 2026-11-12.
+    assert.equal(check.last_verified, check.id.startsWith('links.anchor.') ? '2026-11-12' : '2026-11-11', check.id);
     assert.match(check.doc_ref, /^https:\/\/(developers\.google\.com|web\.dev)\//, check.id);
     assert.match(check.title, /^[A-Z][^.]*$/, check.id);
     assert.ok(check.recommendation.length > 20 && check.recommendation.endsWith('.'), check.id);

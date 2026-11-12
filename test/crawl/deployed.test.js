@@ -6,6 +6,7 @@ import { after, describe, it } from 'node:test';
 
 import { deployedOriginOf, localizeRecord, localizeUrls, onDeployedHost, toLocalUrl } from '../../server/src/crawl/deployed.js';
 import { createCrawlManager } from '../../server/src/crawl/manager.js';
+import { safeFetch } from '../../server/src/net/safe-fetch.js';
 import { makePage } from '../helpers/factories.js';
 import { startServer } from '../helpers/http-server.js';
 import { removeTempDirs, tempDir } from './harness.js';
@@ -24,6 +25,21 @@ describe('deployedOriginOf', () => {
   it('rejects anything else with a TypeError that says what to pass', () => {
     for (const value of ['example', 'ftp://example.com/', '', null, 7]) {
       assert.throws(() => deployedOriginOf(value), (error) => error instanceof TypeError && /deployed at, such as https:\/\/www\.example\.com/.test(error.message));
+    }
+  });
+
+  it('drops the trailing dot of a fully qualified host name, so the origin is the one the pages name', () => {
+    assert.equal(deployedOriginOf('https://www.example.com.'), DEPLOYED);
+    assert.equal(deployedOriginOf('HTTPS://WWW.Example.COM./shop?x=1'), DEPLOYED);
+    assert.equal(deployedOriginOf('http://example.com.:8080/'), 'http://example.com:8080');
+    assert.equal(toLocalUrl(`${DEPLOYED}/about`, deployedOriginOf('https://www.example.com.'), LOCAL), `${LOCAL}/about`);
+  });
+
+  it('keeps a host name without a trailing dot as it is, and refuses one with an empty label', () => {
+    assert.equal(deployedOriginOf('https://example.com'), 'https://example.com');
+    assert.equal(deployedOriginOf('https://1.2.3.4./'), 'https://1.2.3.4');
+    for (const value of ['https://example.com..', 'https://./']) {
+      assert.throws(() => deployedOriginOf(value), (error) => error instanceof TypeError && /empty label/.test(error.message), value);
     }
   });
 });
@@ -85,6 +101,17 @@ describe('localizeRecord', () => {
     assert.deepEqual(localizeRecord(record, DEPLOYED, LOCAL).indexability, { indexable: false, reasons: ['noindex_meta'] });
   });
 
+  it('reads a link on the deployed origin as an internal link to the local page, keeping what the page sent', () => {
+    const link = { href: 'https://www.example.com/pricing?plan=a', url: 'https://www.example.com/pricing?plan=a', text: 'Pricing', aria_label: null, title_attr: null, rel: [], internal: false, has_onclick: false, line: 7 };
+    const other = { ...link, href: 'http://www.example.com/x', url: 'http://www.example.com/x' };
+    const record = makePage({ url, links: [link, other] });
+    const local = localizeRecord(record, DEPLOYED, LOCAL);
+    assert.deepEqual(local.links[0], { ...link, url: `${LOCAL}/pricing?plan=a`, internal: true });
+    assert.equal(local.links[1], other, 'another scheme is another site');
+    assert.equal(local.indexability, record.indexability, 'links do not change whether the page is indexable');
+    assert.equal(record.links[0].url, link.url, 'the record it was given is not changed');
+  });
+
   it('returns a record without such a canonical as it is', () => {
     const record = makePage({ url, canonicals: [{ href: 'https://other.test/x', url: 'https://other.test/x', source: 'html', in_head: true, line: 1 }, { href: '::', url: null, source: 'html', in_head: true, line: 2 }] });
     assert.equal(localizeRecord(record, DEPLOYED, LOCAL), record);
@@ -129,6 +156,18 @@ describe('a crawl of a local server whose pages name the deployed site', () => {
       assert.deepEqual(result.robots.sitemaps, [`${DEPLOYED}/sitemap.xml`]);
       assert.equal(result.pages[1].canonicals[0].href, `${DEPLOYED}/about`);
       assert.ok(server.requests.every((request) => request.headers.host === new URL(server.origin).host));
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('with the deployed address written with a trailing dot: the same origin, the same pages read as local', async () => {
+    const server = await startServer(routes());
+    try {
+      const result = await run(server.origin, { deployedUrl: 'https://www.example.com./' });
+      assert.equal(result.options.deployed_origin, DEPLOYED);
+      assert.equal(result.options.deployed_localized, 6);
+      assert.ok(result.pages.every((p) => p.indexability.indexable));
     } finally {
       await server.close();
     }
@@ -224,5 +263,70 @@ describe('deployedUrl on start', () => {
     const manager = createCrawlManager({ dataDir: await tempDir(), sleep: async () => {} });
     await assert.rejects(async () => manager.start({ url: 'https://example.test/', deployedUrl: DEPLOYED }), (error) => error instanceof TypeError && /deployedUrl is for a crawl of a site on this machine/.test(error.message));
     await assert.rejects(async () => manager.start({ url: 'http://127.0.0.1:9/', allowLoopback: true, deployedUrl: 'nonsense' }), (error) => error instanceof TypeError && /is not an http or https URL/.test(error.message));
+  });
+});
+
+describe('links to the deployed address in a crawl of a local server', () => {
+  const html = (/** @type {string} */ path, /** @type {string[]} */ links) => ({
+    headers: { 'content-type': 'text/html; charset=utf-8' },
+    body: `<!doctype html><html lang="en"><head><title>Page ${path}</title></head><body><h1>${path}</h1>${links.map((href) => `<a href="${href}">link</a>`).join('')}</body></html>`,
+  });
+  const routes = () => ({
+    '/robots.txt': { headers: { 'content-type': 'text/plain' }, body: 'User-agent: *\nAllow: /\n' },
+    '/': html('/', [`${DEPLOYED}/linked-in-full`, 'http://www.example.com/other-scheme', 'https://example.com/no-www', 'https://www.example.com:8443/other-port']),
+    '/linked-in-full': html('/linked-in-full', ['/']),
+    '/other-scheme': html('/other-scheme', []),
+    '/no-www': html('/no-www', []),
+    '/other-port': html('/other-port', []),
+  });
+
+  /** Crawl with the real fetch, recording every URL the crawl asks it for. @param {string} origin @param {object} options */
+  async function run(origin, options) {
+    /** @type {string[]} */
+    const requested = [];
+    /** @type {typeof safeFetch} */
+    const fetch = (url, fetchOptions) => {
+      requested.push(url);
+      return safeFetch(url, fetchOptions);
+    };
+    const manager = createCrawlManager({ dataDir: await tempDir(), sleep: async () => {}, fetch });
+    const job = await manager.start({ url: `${origin}/`, allowLoopback: true, ...options });
+    const done = await manager.wait(job.id, 30_000);
+    assert.equal(done?.status, 'done', done?.error ?? '');
+    const result = await manager.result(job.id);
+    assert.ok(result);
+    return { result, requested };
+  }
+
+  it('with the deployed address: a page linked only by its full deployed URL is crawled as a local page, and nothing else is requested', async () => {
+    const server = await startServer(routes());
+    try {
+      const { result, requested } = await run(server.origin, { deployedUrl: DEPLOYED });
+      assert.deepEqual(result.pages.map((p) => new URL(p.url).pathname), ['/', '/linked-in-full']);
+      const home = result.pages[0];
+      assert.deepEqual(home.links.map((link) => [link.href, link.url, link.internal]), [
+        [`${DEPLOYED}/linked-in-full`, `${server.origin}/linked-in-full`, true],
+        ['http://www.example.com/other-scheme', 'http://www.example.com/other-scheme', false],
+        ['https://example.com/no-www', 'https://example.com/no-www', false],
+        ['https://www.example.com:8443/other-port', 'https://www.example.com:8443/other-port', false],
+      ]);
+      assert.equal(result.pages[1].depth, 1);
+      assert.equal(result.options.deployed_localized, 1, 'the home page named the deployed address');
+      assert.ok(requested.length > 0 && requested.every((url) => url.startsWith(`${server.origin}/`)), requested.join(' '));
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('without it: that page is not crawled and the link stays a link to another site', async () => {
+    const server = await startServer(routes());
+    try {
+      const { result, requested } = await run(server.origin, {});
+      assert.deepEqual(result.pages.map((p) => new URL(p.url).pathname), ['/']);
+      assert.deepEqual(result.pages[0].links.map((link) => link.internal), [false, false, false, false]);
+      assert.ok(requested.every((url) => url.startsWith(`${server.origin}/`)), requested.join(' '));
+    } finally {
+      await server.close();
+    }
   });
 });

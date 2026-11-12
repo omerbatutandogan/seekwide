@@ -120,7 +120,7 @@ describe('the scope row of a local audit that knows the deployed address', () =>
     for (const extra of [{ deployed_localized: 0 }, {}, { deployed_localized: 'many' }]) {
       const missed = makeRun({ repo: /** @type {any} */ ({ ...repo, deployed_origin: 'http://www.example.com', ...extra }) });
       for (const out of [renderMarkdown(missed), renderHtml(missed)]) {
-        assert.match(out, /The deployed address given for this audit \(http:\/\/www\.example\.com\) matched no canonical link or sitemap entry of the pages/);
+        assert.match(out, /The deployed address given for this audit \(http:\/\/www\.example\.com\) matched no canonical link, link or sitemap entry of the pages/);
         assert.doesNotMatch(out, /were read as pages of the local server/);
       }
     }

@@ -5,7 +5,7 @@ import { after, before, describe, it } from 'node:test';
 import { ToolError } from '../../server/src/mcp/stdio.js';
 import { createTools } from '../../server/src/tools/index.js';
 import { PROJECT_NOTE } from '../../server/src/tools/project.js';
-import { topGroups } from '../../server/src/tools/audit.js';
+import { topGroups } from '../../server/src/tools/audit-summary.js';
 import { makePage } from '../helpers/factories.js';
 import { makeFinding } from '../helpers/run-factory.js';
 import { HTML_FIXTURE, NEXT_FIXTURE, makeTree } from '../helpers/repo.js';

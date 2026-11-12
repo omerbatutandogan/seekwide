@@ -8,7 +8,8 @@
 import { normalizeUrl } from '../util/url.js';
 import { decodeBody, isHtmlResponse, mediaTypeOf } from './decode.js';
 import { headerValues, parseLinkHeaders, parseXRobots, selectHeaders } from './headers.js';
-import { CAPS, extractHtml, upgradesInsecureRequests } from './html.js';
+import { extractHtml } from './html.js';
+import { CAPS, upgradesInsecureRequests } from './html-elements.js';
 import { indexabilityOf } from './indexability.js';
 import { securityHeaders } from './security-headers.js';
 import { emptySecurity } from './security.js';

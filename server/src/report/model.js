@@ -153,8 +153,8 @@ function viewRepo(run, findings) {
     label: 'Source files',
     value: `${label} project${where}. ${named} of ${plural(findings, 'finding')} ${findings === 1 ? 'names' : 'name'} the source file ${findings === 1 ? 'it comes' : 'they come'} from. Paths are relative to the project folder.` +
       (deployed === '' ? '' : num(repo.deployed_localized) > 0
-        ? ` Canonical links and sitemap entries that name the deployed address (${clip(deployed, 200)}) were read as pages of the local server.`
-        : ` The deployed address given for this audit (${clip(deployed, 200)}) matched no canonical link or sitemap entry of the pages, so none was read as a page of the local server.`),
+        ? ` Canonical links, links and sitemap entries that name the deployed address (${clip(deployed, 200)}) were read as pages of the local server.`
+        : ` The deployed address given for this audit (${clip(deployed, 200)}) matched no canonical link, link or sitemap entry of the pages, so none was read as a page of the local server.`),
   };
 }
 
@@ -172,12 +172,14 @@ function viewScope(run, { host, blocked }) {
   const modules = Array.isArray(run.modules_requested) ? orderModules(run.modules_requested.filter((m) => typeof m === 'string')).map(moduleLabel) : [];
   return [
     { label: 'Pages crawled', value: `${pages} of ${plural(num(crawl.max_pages), 'page')} allowed (${num(crawl.html_pages)} HTML, ${num(crawl.indexable_pages)} indexable)` },
-    {
-      label: 'Page limit reached',
-      value: crawl.truncated === true
-        ? 'Yes. The crawl stopped before every URL it found was visited, so the findings describe the pages crawled only.'
-        : 'No. The crawl ran out of URLs before it ran out of budget.',
-    },
+    crawl.time_limit_reached === true
+      ? { label: 'Time limit reached', value: 'Yes. The crawl stopped at its time limit before every URL it found was visited, so the findings describe the pages crawled only.' }
+      : {
+        label: 'Page limit reached',
+        value: crawl.truncated === true
+          ? 'Yes. The crawl stopped before every URL it found was visited, so the findings describe the pages crawled only.'
+          : 'No. The crawl ran out of URLs before it ran out of budget.',
+      },
     { label: 'Blocked', value: blocked ? describeBlock(blocked) : 'No.' },
     ...(unreadable > 0 ? [{ label: 'Pages not read', value: describeUnreadable(unreadable) }] : []),
     { label: 'robots.txt', value: Object.hasOwn(ROBOTS_STATUS, robots) ? ROBOTS_STATUS[/** @type {keyof typeof ROBOTS_STATUS} */ (robots)] : text(robots, 'Unknown.') },
@@ -239,6 +241,7 @@ export function buildReport(run, options = {}) {
       severityCounts,
       scores: scores.map(({ label, score }) => ({ label, score })),
       truncated: crawl.truncated === true,
+      timeLimited: crawl.time_limit_reached === true,
       blocked,
       unreadablePages: unreadablePages(run),
       vitals: describeVitals(vitals),

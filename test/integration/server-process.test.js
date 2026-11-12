@@ -7,13 +7,16 @@ import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { after, before, test } from 'node:test';
+import { after, afterEach, before, test } from 'node:test';
 
 import { UNTRUSTED_NOTE } from '../../server/src/tools/common.js';
 import { PROFILE_NOTE } from '../../server/src/tools/profile.js';
 import { startServer } from '../helpers/http-server.js';
+import { startProcess as startServerProcess, stopAll } from '../helpers/server-process.js';
 
-const ENTRY = fileURLToPath(new URL('../../server/src/index.js', import.meta.url));
+const FAILING_RUN = fileURLToPath(new URL('../helpers/failing-server-run.js', import.meta.url));
+/** Longest a test run with one failing test may take before it counts as hanging. */
+const RUN_LIMIT_MS = 60_000;
 const META = {
   'io.modelcontextprotocol/protocolVersion': '2026-07-28',
   'io.modelcontextprotocol/clientCapabilities': {},
@@ -25,6 +28,8 @@ let tmp;
 before(async () => {
   tmp = await mkdtemp(path.join(os.tmpdir(), 'seekwide-proc-'));
 });
+// A test that fails part-way leaves no server running, so the run ends at once.
+afterEach(stopAll);
 after(async () => {
   await rm(tmp, { recursive: true, force: true });
 });
@@ -32,73 +37,18 @@ after(async () => {
 /**
  * Start the real entry point as a child process and talk to it over stdio.
  * @param {Record<string, string>} [extraEnv]
+ * @param {{requestTimeoutMs?: number}} [options]
  */
-function startProcess(extraEnv = {}) {
-  const child = spawn(process.execPath, [ENTRY], {
-    cwd: tmp,
-    env: {
-      PATH: process.env.PATH,
-      HOME: tmp,
-      SEEKWIDE_DATA_DIR: path.join(tmp, 'data'),
-      CLAUDE_PROJECT_DIR: tmp,
-      // What .mcp.json passes when the plugin settings are not filled in.
-      SEEKWIDE_REPORT_BRAND: '${user_config.report_brand_name}',
-      SEEKWIDE_REPORT_LOGO: '',
-      SEEKWIDE_GOOGLE_API_KEY: '${user_config.google_api_key}',
-      ...extraEnv,
-    },
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
-  const exited = new Promise((resolve) => child.on('exit', (code, signal) => resolve({ code, signal })));
-
-  /** @type {string[]} */
-  const lines = [];
-  /** @type {Map<string|number, (message: any) => void>} */
-  const waiting = new Map();
-  const io = { buffer: '', stderr: '' };
-  child.stdout.setEncoding('utf8');
-  child.stdout.on('data', (chunk) => {
-    io.buffer += chunk;
-    let newline = io.buffer.indexOf('\n');
-    while (newline !== -1) {
-      const line = io.buffer.slice(0, newline);
-      io.buffer = io.buffer.slice(newline + 1);
-      lines.push(line);
-      const message = JSON.parse(line);
-      waiting.get(message.id)?.(message);
-      newline = io.buffer.indexOf('\n');
-    }
-  });
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', (chunk) => {
-    io.stderr += chunk;
-  });
-
-  /** @param {Record<string, unknown>} message @returns {Promise<any>} */
-  const request = (message) => {
-    const answer = new Promise((resolve) => waiting.set(/** @type {string|number} */ (message.id), resolve));
-    child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', ...message })}\n`);
-    return answer;
-  };
-  /** @param {any} response */
-  const toolResult = (response) => {
-    assert.equal(response.result.isError, undefined, response.result.content?.[0]?.text);
-    return JSON.parse(response.result.content[0].text);
-  };
-  /** Close stdin and wait for the server to exit on its own. */
-  const close = async () => {
-    child.stdin.end();
-    /** @type {NodeJS.Timeout|undefined} */
-    let timer;
-    const { code, signal } = /** @type {{code: number|null, signal: string|null}} */ (
-      await Promise.race([exited, new Promise((resolve) => { timer = setTimeout(() => resolve({ code: null, signal: 'timeout' }), 10_000); })])
-    );
-    clearTimeout(timer);
-    if (signal === 'timeout') child.kill('SIGKILL');
-    assert.equal(signal, null, 'the server exits on its own when stdin closes');
-    assert.equal(code, 0, io.stderr);
-  };
-  return { child, lines, io, request, toolResult, close };
+function startProcess(extraEnv = {}, options = {}) {
+  return startServerProcess(tmp, {
+    SEEKWIDE_DATA_DIR: path.join(tmp, 'data'),
+    CLAUDE_PROJECT_DIR: tmp,
+    // What .mcp.json passes when the plugin settings are not filled in.
+    SEEKWIDE_REPORT_BRAND: '${user_config.report_brand_name}',
+    SEEKWIDE_REPORT_LOGO: '',
+    SEEKWIDE_GOOGLE_API_KEY: '${user_config.google_api_key}',
+    ...extraEnv,
+  }, options);
 }
 
 test('the server speaks both protocol styles over stdio and exits when stdin closes', async () => {
@@ -187,4 +137,38 @@ test('with a Google API key set, nothing the server writes contains it: no tool 
   } finally {
     await site.close();
   }
+});
+
+test('a test that fails while the server runs ends at once and reports the failure', async () => {
+  // A run of its own, not a subtest of this one: without the variable the test runner sets for its files.
+  const { NODE_TEST_CONTEXT, ...env } = process.env;
+  // Its own process group, so that a run that hangs can be killed with everything it started.
+  const run = spawn(process.execPath, ['--test', '--test-reporter=tap', FAILING_RUN], { env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+  let output = '';
+  run.stdout.setEncoding('utf8').on('data', (chunk) => { output += chunk; });
+  run.stderr.setEncoding('utf8').on('data', (chunk) => { output += chunk; });
+  /** @type {NodeJS.Timeout|undefined} */
+  let timer;
+  const ended = await Promise.race([
+    new Promise((resolve) => run.on('exit', (code) => resolve({ code }))),
+    new Promise((resolve) => { timer = setTimeout(() => resolve(null), RUN_LIMIT_MS); }),
+  ]);
+  clearTimeout(timer);
+  if (ended === null) process.kill(-(/** @type {number} */ (run.pid)), 'SIGKILL');
+  assert.ok(ended !== null, `the run was still going after ${RUN_LIMIT_MS} ms:\n${output}`);
+  assert.equal(/** @type {{code: number}} */ (ended).code, 1, output);
+  assert.match(output, /^not ok 1 - a test that fails while the server runs$/m);
+  assert.match(output, /this assertion fails on purpose/);
+});
+
+test('a request fails instead of waiting when the server exits or does not answer', async () => {
+  const crashed = startProcess();
+  await crashed.request({ id: 1, method: 'ping' });
+  crashed.child.kill('SIGKILL');
+  await assert.rejects(crashed.request({ id: 2, method: 'ping' }), /exited/);
+
+  // An id the server cannot echo is answered with id null, so the request with that id never gets its answer.
+  const silent = startProcess({}, { requestTimeoutMs: 300 });
+  await assert.rejects(silent.request({ id: /** @type {any} */ ({ not: 'an id' }), method: 'ping' }), /did not answer request/);
+  await silent.close();
 });

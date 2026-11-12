@@ -30,34 +30,97 @@ export const VITALS_ARGUMENTS = Object.freeze({
 });
 
 /**
- * Measure Core Web Vitals for a crawl. Whatever goes wrong, the audit goes on:
- * an unexpected error is logged and becomes a result that says nothing was measured.
+ * The sentence that says a measurement was taken from an earlier audit.
+ * @param {string} measuredAt
+ */
+export function reusedNote(measuredAt) {
+  return `These Core Web Vitals were measured on ${measuredAt} for an earlier audit of this crawl and reused: this audit sent nothing to Google, so the values and the findings based on them match that audit. Crawl the site again for a new measurement.`;
+}
+
+/**
+ * Ask Google, or take what is stored for the crawl. A measurement that has
+ * values from either source is stored; one that has none (Google refused, a
+ * site that is not public) is not, so the next audit asks again.
  * @param {ToolDeps} deps
  * @param {CrawlResult} crawl
  * @param {number} maxPages
- * @returns {Promise<VitalsData>}
+ * @returns {Promise<{vitals: VitalsData, stored: boolean}>}  `stored`: taken from an earlier audit.
  */
-export async function collectVitals(deps, crawl, maxPages) {
+async function measureOnce(deps, crawl, maxPages) {
+  let stored = null;
   try {
-    return await deps.measureVitals(crawl, { maxPages });
+    stored = await deps.crawlManager.storedVitals(crawl.id, maxPages);
+  } catch (error) {
+    log.warn('could not read stored core web vitals', { id: crawl.id, error: String(error) });
+  }
+  if (stored !== null) return { vitals: { ...stored.vitals, measured_at: stored.measured_at }, stored: true };
+  const measuredAt = deps.now().toISOString();
+  /** @type {VitalsData} */
+  let vitals;
+  try {
+    vitals = await deps.measureVitals(crawl, { maxPages });
   } catch (error) {
     log.error('core web vitals measurement failed', { error: error instanceof Error ? (error.stack ?? error.message) : String(error) });
-    return unavailableVitals(crawl.site_origin, VITALS_FAILED);
+    return { vitals: unavailableVitals(crawl.site_origin, VITALS_FAILED), stored: false };
   }
+  vitals = { ...vitals, measured_at: measuredAt };
+  if (vitals.lab.available || vitals.field.available) {
+    try {
+      await deps.crawlManager.storeVitals(crawl.id, maxPages, vitals, measuredAt);
+    } catch (error) {
+      log.warn('could not store core web vitals', { id: crawl.id, error: String(error) });
+    }
+  }
+  return { vitals, stored: false };
+}
+
+/**
+ * Core Web Vitals for a crawl, measured once per crawl and page count.
+ *
+ * Guarantees: Google is asked only when nothing is stored for this crawl and
+ * page count and no other audit of it is asking right now; a measurement with
+ * values is kept with the crawl, and every later audit of the crawl with the
+ * same page count gets those same numbers, marked `reused` with a note that
+ * says when they were measured. Whatever goes wrong, the audit goes on: an
+ * unexpected error is logged and becomes a result that says nothing was
+ * measured.
+ * @param {ToolDeps} deps
+ * @param {CrawlResult} crawl
+ * @param {number} maxPages
+ * @param {Map<string, Promise<{vitals: VitalsData, stored: boolean}>>} pending  Measurements under way in this
+ *   server, by crawl and page count.
+ * @returns {Promise<VitalsData>}
+ */
+export async function collectVitals(deps, crawl, maxPages, pending) {
+  const key = `${crawl.id}\n${maxPages}`;
+  let measurement = pending.get(key);
+  // Another audit of this crawl is measuring: wait for its numbers instead of asking Google twice.
+  const joined = measurement !== undefined;
+  if (measurement === undefined) {
+    measurement = measureOnce(deps, crawl, maxPages).finally(() => pending.delete(key));
+    pending.set(key, measurement);
+  }
+  const { vitals, stored } = await measurement;
+  const available = vitals.lab.available || vitals.field.available;
+  if (!(stored || (joined && available)) || vitals.measured_at === undefined) return { ...vitals, reused: false };
+  return { ...vitals, reused: true, notes: [reusedNote(vitals.measured_at), ...vitals.notes] };
 }
 
 /**
  * The measurement as audit_run returns it: which pages were tested and why,
- * their values, and why a source gave nothing. The notes are returned with
- * the run's other notes.
+ * their values, why a source gave nothing, when Google was asked and whether
+ * an earlier audit's measurement was reused. The notes are returned with the
+ * run's other notes.
  * @param {VitalsData|null} vitals
- * @returns {{lab: VitalsData['lab'], field: VitalsData['field'], origin: VitalsData['origin'], pages: VitalsData['pages']}|null}
+ * @returns {{measured_at: string|null, reused: boolean, lab: VitalsData['lab'], field: VitalsData['field'], origin: VitalsData['origin'], pages: VitalsData['pages']}|null}
  *   Null when the measurement was not asked for. Otherwise every tested page with the reason it was
  *   chosen, in the order it was chosen, whether or not Google returned values for it.
  */
 export function vitalsOutput(vitals) {
   if (vitals === null) return null;
   return {
+    measured_at: vitals.measured_at ?? null,
+    reused: vitals.reused === true,
     lab: { available: vitals.lab.available, reason: vitals.lab.reason, device: vitals.lab.device },
     field: { available: vitals.field.available, reason: vitals.field.reason, form_factor: vitals.field.form_factor },
     origin: vitals.origin,

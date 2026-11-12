@@ -2,7 +2,6 @@
 
 import { randomBytes } from 'node:crypto';
 import dns from 'node:dns';
-import { chmod, lstat, mkdir, readdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import net from 'node:net';
 import path from 'node:path';
 
@@ -14,15 +13,14 @@ import { normalizeUrl, originOf } from '../util/url.js';
 import { deployedOriginOf } from './deployed.js';
 import { MAX_RUNNING, busy, siteKey } from './admission.js';
 import { runCrawl } from './run.js';
+import { createCrawlStore } from './store.js';
 
-/** @import { CrawlJob, CrawlResult } from '../types.js' */
+/** @import { CrawlJob, CrawlResult, VitalsData } from '../types.js' */
+/** @import { StoredVitals } from './store.js' */
 /** @import { Extractor } from './chain.js' */
 
 const ID_PATTERN = /^[A-Za-z0-9_-]{1,100}$/;
 const RESULTS_IN_MEMORY = 5;
-const FILES_KEPT = 20;
-/** A temporary file this old is left over from a write that never finished. */
-const STALE_TEMP_MS = 24 * 60 * 60 * 1000;
 
 /** @typedef {(hostname: string, options: {all: true}) => Promise<{address: string, family: number}[]>} Lookup */
 
@@ -104,9 +102,11 @@ function validateStart(options) {
  * snapshot as soon as the input is checked, and crawls in the background;
  * `get` and `wait` return copies, never live objects; `result` returns a
  * finished crawl ('done' or 'blocked') from memory (the last five) or from
- * `<dataDir>/crawls/<id>.json`, and null for anything else. The crawl
- * directory is private to the user (0700, files 0600, older files included once
- * it is opened) and keeps the 20 newest files.
+ * `<dataDir>/crawls/<id>.json`, and null for anything else; `storeVitals`
+ * keeps Core Web Vitals with a crawl, per page count, and `storedVitals` returns
+ * them, or null. The crawl directory is private to the user (0700, files 0600,
+ * older files included once it is opened) and keeps the 20 newest crawls, each
+ * with its stored measurements (`crawl/store.js`).
  *
  * @param {{dataDir?: string, fetch?: typeof safeFetch, extract?: Extractor, lookup?: Lookup,
  *          now?: () => Date, sleep?: (ms: number) => Promise<void>, idFactory?: () => string, maxStoredChars?: number}} [deps]
@@ -114,7 +114,7 @@ function validateStart(options) {
 export function createCrawlManager(deps = {}) {
   const { dataDir = defaultDataDir(), fetch = safeFetch, now = () => new Date(), sleep = realSleep, idFactory } = deps;
   const lookup = deps.lookup ?? /** @type {Lookup} */ ((hostname, options) => dns.promises.lookup(hostname, options));
-  const crawlsDir = path.join(dataDir, 'crawls');
+  const store = createCrawlStore(path.join(dataDir, 'crawls'));
 
   /** @type {Map<string, {job: CrawlJob, done: Promise<void>}>} */
   const jobs = new Map();
@@ -130,55 +130,6 @@ export function createCrawlManager(deps = {}) {
       if (typeof module[name] !== 'function') throw new Error(`extract/page.js does not export ${name}`);
     }
     return { extractPage: module.extractPage, redirectRecord: module.redirectRecord, unreadableRecord: module.unreadableRecord };
-  };
-
-  /** Delete all but the newest `FILES_KEPT` crawl files, and temporary files older than a day. */
-  const prune = async () => {
-    const all = await readdir(crawlsDir);
-    const cutoff = Date.now() - STALE_TEMP_MS;
-    for (const name of all.filter((entry) => entry.endsWith('.tmp'))) {
-      const file = path.join(crawlsDir, name);
-      const info = await lstat(file).catch(() => null);
-      if (info !== null && info.isFile() && info.mtimeMs < cutoff) await unlink(file).catch(() => {});
-    }
-    const names = all.filter((name) => name.endsWith('.json'));
-    if (names.length <= FILES_KEPT) return;
-    const dated = await Promise.all(names.map(async (name) => ({ name, mtime: (await stat(path.join(crawlsDir, name))).mtimeMs })));
-    dated.sort((a, b) => b.mtime - a.mtime || (a.name < b.name ? 1 : -1));
-    await Promise.all(dated.slice(FILES_KEPT).map(({ name }) => unlink(path.join(crawlsDir, name)).catch(() => {})));
-  };
-
-  /** @type {Promise<void>|null} */
-  let opened = null;
-  /**
-   * Create the crawl directory if needed and make it and every regular file in it
-   * private (0700 and 0600), whatever the file's name: older crawl files and
-   * temporary files left by an interrupted write too. Symbolic links are left
-   * alone. Once per manager.
-   */
-  const openDir = () => {
-    opened ??= (async () => {
-      await mkdir(crawlsDir, { recursive: true, mode: 0o700 });
-      await chmod(crawlsDir, 0o700);
-      for (const name of await readdir(crawlsDir)) {
-        const file = path.join(crawlsDir, name);
-        if ((await lstat(file)).isFile()) await chmod(file, 0o600);
-      }
-    })().catch((error) => {
-      opened = null;
-      throw error;
-    });
-    return opened;
-  };
-
-  /** @param {CrawlResult} result */
-  const persist = async (result) => {
-    await openDir();
-    const file = path.join(crawlsDir, `${result.id}.json`);
-    const temp = `${file}.${process.pid}.tmp`;
-    await writeFile(temp, JSON.stringify(result), { encoding: 'utf8', mode: 0o600 });
-    await rename(temp, file);
-    await prune();
   };
 
   /** @param {CrawlResult} result */
@@ -205,7 +156,7 @@ export function createCrawlManager(deps = {}) {
       const { result } = outcome;
       remember(result);
       try {
-        await persist(result);
+        await store.save(result);
       } catch (error) {
         log.warn('could not store crawl result', { id: job.id, error: String(error) });
       }
@@ -300,15 +251,26 @@ export function createCrawlManager(deps = {}) {
       if (typeof id !== 'string' || !ID_PATTERN.test(id)) return null;
       const entry = jobs.get(id);
       if (entry && entry.job.status !== 'done' && entry.job.status !== 'blocked') return null;
-      const cached = results.get(id);
-      if (cached) return cached;
-      try {
-        await openDir();
-        return JSON.parse(await readFile(path.join(crawlsDir, `${id}.json`), 'utf8'));
-      } catch (error) {
-        if (/** @type {NodeJS.ErrnoException} */ (error).code !== 'ENOENT') log.warn('could not read crawl result', { id, error: String(error) });
-        return null;
-      }
+      return results.get(id) ?? store.load(id);
+    },
+
+    /**
+     * The Core Web Vitals kept with a crawl for a page count, or null.
+     * @param {string} id @param {number} pages @returns {Promise<StoredVitals|null>}
+     */
+    async storedVitals(id, pages) {
+      if (typeof id !== 'string' || !ID_PATTERN.test(id) || !Number.isInteger(pages)) return null;
+      return store.loadVitals(id, pages);
+    },
+
+    /**
+     * Keep Core Web Vitals with a crawl, so that later audits of it reuse them.
+     * @param {string} id @param {number} pages @param {VitalsData} vitals @param {string} measuredAt
+     */
+    async storeVitals(id, pages, vitals, measuredAt) {
+      if (typeof id !== 'string' || !ID_PATTERN.test(id)) throw new TypeError(`crawl id ${String(id)} is not a safe file name`);
+      if (!Number.isInteger(pages) || pages < 1) throw new TypeError('pages must be a whole number of 1 or more.');
+      await store.saveVitals(id, pages, { vitals, measured_at: measuredAt });
     },
   };
 }

@@ -34,20 +34,20 @@ export function namedOrigin(crawl) {
  * name. Empty when the crawl was not told one.
  *
  * Guarantees: "were read as pages of the local server" is said only when one
- * or more canonical or sitemap entry was.
+ * or more canonical, link or sitemap entry was.
  * @param {CrawlResult} crawl
  * @returns {string[]}
  */
 export function deployedNotes(crawl) {
   const deployed = crawl.options.deployed_origin;
   if (!deployed) return [];
-  const requests = 'The crawl requested nothing from that site, and links to it were left out of the external link check.';
+  const requests = 'The crawl requested nothing from that site, and links to it that were not read as local pages were left out of the external link check.';
   if ((crawl.options.deployed_localized ?? 0) > 0) {
-    return [`The crawl was told that the project is deployed at ${deployed}. Canonical links and sitemap entries on that address were read as pages of the local server. ${requests}`];
+    return [`The crawl was told that the project is deployed at ${deployed}. Canonical links, links and sitemap entries on that address were read as pages of the local server. ${requests}`];
   }
   const named = namedOrigin(crawl);
   return [
-    `The crawl was told that the project is deployed at ${deployed}, but no canonical link or sitemap entry names that address, so nothing was read as a page of the local server. ` +
+    `The crawl was told that the project is deployed at ${deployed}, but no canonical link, link or sitemap entry names that address, so nothing was read as a page of the local server. ` +
     (named === null
       ? 'The pages name no other address in their canonical links either.'
       : `The canonical links of the pages name ${named}: if that is where the site is deployed, crawl again with site_url set to exactly that (scheme and host name must match), otherwise those pages count as pointing to another site.`) +

@@ -1,8 +1,9 @@
 // A project's local server answers at http://localhost:3000, but its pages name
-// the address the site is deployed at: in canonical links, in the Sitemap line
-// of robots.txt and in the sitemap itself. Read literally, every such page
-// points away from the site being audited. When the user names the deployed
-// address, URLs on it are read as the same path on the local server.
+// the address the site is deployed at: in canonical links, in links written
+// with the full address, in the Sitemap line of robots.txt and in the sitemap
+// itself. Read literally, every such page points away from the site being
+// audited. When the user names the deployed address, URLs on it are read as the
+// same path on the local server.
 //
 // Nothing is ever requested from the deployed address.
 
@@ -12,10 +13,13 @@ import { indexabilityOf } from '../extract/indexability.js';
 import { normalizeUrl, originOf } from '../util/url.js';
 
 /**
- * The origin of the deployed site named by `value`.
+ * The origin of the deployed site named by `value`. A host name written fully
+ * qualified, with a trailing dot (`https://example.com.`), names the same site
+ * as one without, and the pages of the site name it without, so the dot is
+ * dropped.
  * @param {unknown} value  For example "https://www.example.com".
- * @returns {string}
- * @throws {TypeError} when the value is not an http or https URL.
+ * @returns {string}  Lower-case scheme and host, no trailing dot, the port only when it is not the default.
+ * @throws {TypeError} when the value is not an http or https URL, or its host name has an empty label.
  */
 export function deployedOriginOf(value) {
   const url = typeof value === 'string' ? normalizeUrl(value) : null;
@@ -23,7 +27,13 @@ export function deployedOriginOf(value) {
   if (origin === null) {
     throw new TypeError(`"${String(value).slice(0, 200)}" is not an http or https URL. Pass the address the site is deployed at, such as https://www.example.com.`);
   }
-  return origin;
+  const parsed = new URL(origin);
+  if (!parsed.hostname.endsWith('.')) return origin;
+  parsed.hostname = parsed.hostname.slice(0, -1);
+  if (parsed.hostname === '' || parsed.hostname.endsWith('.') || parsed.hostname.includes('..')) {
+    throw new TypeError(`"${String(value).slice(0, 200)}" has a host name with an empty label. Pass the address the site is deployed at, such as https://www.example.com.`);
+  }
+  return parsed.origin;
 }
 
 /**
@@ -65,27 +75,37 @@ export function onDeployedHost(url, deployedOrigin) {
 }
 
 /**
- * A page record whose canonicals on the deployed origin name the local server,
- * with its indexability worked out again. `href` keeps what the page sent, so
- * evidence still quotes the page. A record without such a canonical is
- * returned as it is.
+ * A page record whose canonicals and links on the deployed origin name the
+ * local server: the canonicals with the record's indexability worked out
+ * again, the links as internal links that the crawl follows like any other.
+ * `href` keeps what the page sent, so evidence and selectors still quote the
+ * page. A record with neither is returned as it is.
  * @param {PageRecord} record
  * @param {string} deployedOrigin
- * @param {string} localOrigin
+ * @param {string} localOrigin  The origin of the local crawl, which is the audited site.
  * @returns {PageRecord}
  */
 export function localizeRecord(record, deployedOrigin, localOrigin) {
-  let changed = false;
+  let canonicalChanged = false;
   const canonicals = record.canonicals.map((canonical) => {
     if (canonical.url === null) return canonical;
     const url = toLocalUrl(canonical.url, deployedOrigin, localOrigin);
     if (url === canonical.url) return canonical;
-    changed = true;
+    canonicalChanged = true;
     return { ...canonical, url };
   });
-  if (!changed) return record;
+  let linkChanged = false;
+  const links = record.links.map((link) => {
+    if (link.url === null) return link;
+    const url = toLocalUrl(link.url, deployedOrigin, localOrigin);
+    if (url === link.url) return link;
+    linkChanged = true;
+    return { ...link, url, internal: true };
+  });
+  if (!canonicalChanged && !linkChanged) return record;
+  if (!canonicalChanged) return { ...record, links };
   const { indexability: _old, ...rest } = record;
-  const next = { ...rest, canonicals };
+  const next = { ...rest, canonicals, links };
   return { ...next, indexability: indexabilityOf(next) };
 }
 

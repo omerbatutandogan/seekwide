@@ -111,6 +111,8 @@ export function makeDeps(seed = {}) {
   /** @type {Run[]} */
   const runs = [...(seed.runs ?? [])];
   let profile = seed.profile ?? null;
+  /** Core Web Vitals kept with a crawl, by crawl id and page count. @type {Map<string, {vitals: VitalsData, measured_at: string}>} */
+  const storedVitals = new Map();
 
   const deps = {
     crawlManager: {
@@ -132,6 +134,16 @@ export function makeDeps(seed = {}) {
       },
       /** @param {string} id */
       result: async (id) => results.get(id) ?? null,
+      /** @param {string} id @param {number} pages */
+      async storedVitals(id, pages) {
+        record('storedVitals', [id, pages]);
+        return storedVitals.get(`${id} ${pages}`) ?? null;
+      },
+      /** @param {string} id @param {number} pages @param {VitalsData} vitals @param {string} measuredAt */
+      async storeVitals(id, pages, vitals, measuredAt) {
+        record('storeVitals', [id, pages, vitals, measuredAt]);
+        storedVitals.set(`${id} ${pages}`, structuredClone({ vitals, measured_at: measuredAt }));
+      },
     },
     checks: CHECKS,
     loadProjectSources,

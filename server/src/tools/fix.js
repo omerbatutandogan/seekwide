@@ -233,7 +233,7 @@ export function fixTools(deps) {
           );
         }
         if (siteUrl !== null) {
-          notes.push(`After the fixes, crawl the local server with site_url "${siteUrl}", so that canonical links and sitemap entries on that address are read as pages of the local server.`);
+          notes.push(`After the fixes, crawl the local server with site_url "${siteUrl}", so that canonical links, links and sitemap entries on that address are read as pages of the local server.`);
         }
         return {
           run_id: loaded.run_id,

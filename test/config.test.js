@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { CAPABILITIES, LIMITS, googleApiKey, toolSettings } from '../server/src/config.js';
+import { CAPABILITIES, LIMITS, googleApiKey, googleApiKeySetting, toolSettings } from '../server/src/config.js';
 
 test('googleApiKey returns the key from the plugin settings, trimmed', () => {
   assert.equal(googleApiKey({ SEEKWIDE_GOOGLE_API_KEY: 'AIzaSyExample-Key_123' }), 'AIzaSyExample-Key_123');
@@ -20,6 +20,16 @@ test('googleApiKey refuses a value that could not be sent in a request header', 
   assert.equal(googleApiKey({ SEEKWIDE_GOOGLE_API_KEY: 'line\nbreak' }), null);
   assert.equal(googleApiKey({ SEEKWIDE_GOOGLE_API_KEY: 'anahtar-ü' }), null);
   assert.equal(googleApiKey({ SEEKWIDE_GOOGLE_API_KEY: 'x'.repeat(257) }), null);
+});
+
+test('googleApiKeySetting tells a key that is set but cannot be used from no key at all', () => {
+  for (const value of ['two words', 'line\nbreak', 'anahtar-ü', 'x'.repeat(257), 'tab\tinside']) {
+    assert.deepEqual(googleApiKeySetting({ SEEKWIDE_GOOGLE_API_KEY: value }), { key: null, unusable: true }, JSON.stringify(value));
+  }
+  for (const value of [undefined, '', '   ', '${user_config.google_api_key}']) {
+    assert.deepEqual(googleApiKeySetting({ SEEKWIDE_GOOGLE_API_KEY: value }), { key: null, unusable: false }, JSON.stringify(value));
+  }
+  assert.deepEqual(googleApiKeySetting({ SEEKWIDE_GOOGLE_API_KEY: ' AIzaSyExample-Key_123\n' }), { key: 'AIzaSyExample-Key_123', unusable: false });
 });
 
 test('the Core Web Vitals budget is small and bounded', () => {

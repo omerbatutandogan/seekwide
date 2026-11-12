@@ -1,41 +1,18 @@
-// HTML document → content fields of a PageRecord. Pure.
+// HTML document → content fields of a PageRecord. Pure. This file walks the
+// document and collects the visible text; html-elements.js reads each element.
 
 /** @import { CanonicalRef, Heading, HreflangRef, ImageRecord, JsonLdBlock, LinkRecord, PageSecurity } from '../types.js' */
 /** @import { DomNode } from './dom.js' */
+/** @import { Frame, HtmlState } from './html-elements.js' */
 
 import { parse } from 'parse5';
 
 import { LIMITS } from '../config.js';
 import { sha1Hex } from '../util/hash.js';
-import { clip, collapseWhitespace } from '../util/strings.js';
-import { isInternalUrl, normalizeUrl } from '../util/url.js';
-import { HTML_NS, MAX_LIST_CHARS, SVG_NS, attr, findBaseUrl, insecureUrl, isHtmlElement, lineOf, parsedPart, textChars, textOf, tokens } from './dom.js';
-import { parseJsonLd } from './jsonld.js';
+import { collapseWhitespace } from '../util/strings.js';
+import { HTML_NS, SVG_NS, findBaseUrl, parsedPart } from './dom.js';
+import { visitElement } from './html-elements.js';
 import { documentSecurity, emptySecurity } from './security.js';
-
-/** Script types a browser runs as JavaScript. */
-const SCRIPT_TYPES = new Set(['', 'text/javascript', 'module']);
-/**
- * How the inline data scripts of a Next.js App Router page begin. Written so
- * that no two quantifiers can match the same run of spaces: a script of spaces
- * followed by anything else is rejected in linear time.
- */
-const NEXT_FLIGHT = /^\s*(?:\(\s*)?self\.__next_f\s*(=|\.push\()/;
-/** Only the start of a script is tested; a data script begins with its marker. */
-const NEXT_FLIGHT_PREFIX = 1024;
-
-export const MAX_LINKS = 5000;
-export const MAX_IMAGES = 2000;
-export const MAX_MIXED_CONTENT = 20;
-/** Per-page caps on lists, in document order (REVIEW-FIXES R8). */
-export const CAPS = Object.freeze({
-  titles: 20, meta_descriptions: 20, canonicals: 20, hreflang: 500, headings: 500, jsonld: 100, meta_robots: 50,
-});
-const LONG_TEXT = 1000;
-/** A link's rel attribute has a few tokens; more are not kept. */
-const MAX_REL_TOKENS = 20;
-
-const MAX_SOCIAL_KEYS = 50;
 
 /** Elements whose text is not part of the visible body text. */
 const HIDDEN_TEXT = new Set(['script', 'style', 'noscript', 'template']);
@@ -44,12 +21,6 @@ const INLINE = new Set([
   'a', 'abbr', 'b', 'bdi', 'bdo', 'cite', 'code', 'data', 'del', 'dfn', 'em', 'font', 'i', 'ins',
   'kbd', 'label', 'mark', 'q', 's', 'samp', 'small', 'span', 'strong', 'sub', 'sup', 'time', 'u', 'var', 'wbr',
 ]);
-/** Subresource elements checked for mixed content, with the attribute that loads them. */
-const SUBRESOURCE_ATTR = new Map([
-  ['img', 'src'], ['script', 'src'], ['iframe', 'src'], ['video', 'src'], ['audio', 'src'],
-  ['source', 'src'], ['embed', 'src'], ['object', 'data'],
-]);
-const HEADING_LEVELS = new Map([['h1', 1], ['h2', 2], ['h3', 3], ['h4', 4], ['h5', 5], ['h6', 6]]);
 const WORD = /[\p{L}\p{M}\p{N}]+/gu;
 const SPACE = Symbol('space');
 
@@ -76,45 +47,6 @@ const SPACE = Symbol('space');
  */
 
 /**
- * @template T
- * @param {T[]} list
- * @param {number} max
- * @returns {boolean} True while `list` has room for another entry.
- */
-function hasRoom(list, max) {
-  return list.length < max;
-}
-
-/**
- * True when a Content-Security-Policy value contains `upgrade-insecure-requests`.
- * @param {string|null|undefined} policy
- * @returns {boolean}
- */
-export function upgradesInsecureRequests(policy) {
-  if (!policy) return false;
-  return policy.split(/[;,]/).some((directive) => directive.trim().toLowerCase().split(/\s+/)[0] === 'upgrade-insecure-requests');
-}
-
-/**
- * @typedef {Object} Frame
- * @property {DomNode} node
- * @property {boolean} head  Inside `<head>`.
- * @property {boolean} body  Inside `<body>`.
- * @property {boolean} hidden  Text here is not visible body text.
- */
-
-/**
- * @param {Record<string, string>} target
- * @param {string} key
- * @param {string|null} value
- */
-function setFirst(target, key, value) {
-  if (key === '' || value === null || Object.hasOwn(target, key)) return;
-  if (Object.keys(target).length >= MAX_SOCIAL_KEYS) return;
-  target[clip(key, LIMITS.maxStringLength)] = clip(collapseWhitespace(value), LIMITS.maxStringLength);
-}
-
-/**
  * Extract every content field of a PageRecord from a decoded HTML document.
  * Relative URLs resolve against the first `<base href>`, else `responseUrl`.
  * Line numbers are 1-based lines of `html`. Lists are capped (`CAPS`,
@@ -129,17 +61,6 @@ export function extractHtml(html, context) {
   const markup = parsedPart(html);
   const document = /** @type {DomNode} */ (/** @type {unknown} */ (parse(markup, { sourceCodeLocationInfo: true })));
   const baseUrl = findBaseUrl(document, context.responseUrl);
-  const https = context.responseUrl.startsWith('https:');
-  let upgradeInsecure = context.upgradeInsecure ?? false;
-  let nextFlight = false;
-  let bodyTitle = false;
-  /** Characters held by the link, image and hreflang lists so far (`MAX_LIST_CHARS`). */
-  let listChars = 0;
-  /** @template {object} T @param {T[]} list @param {T} entry */
-  const keep = (list, entry) => {
-    list.push(entry);
-    listChars += textChars(entry);
-  };
 
   /** @type {HtmlFields} */
   const out = {
@@ -147,118 +68,13 @@ export function extractHtml(html, context) {
     headings: [], viewport: null, og: {}, twitter: {}, links: [], images: [], jsonld: [], mixed_content: [],
     word_count: 0, text_hash: '', text_excerpt: '', security: emptySecurity(),
   };
+  /** @type {HtmlState} */
+  const state = {
+    out, baseUrl, https: context.responseUrl.startsWith('https:'), siteHost: context.siteHost, includeSubdomains: context.includeSubdomains,
+    listChars: 0, upgradeInsecure: context.upgradeInsecure ?? false, nextFlight: false, bodyTitle: false,
+  };
   /** @type {string[]} */
   const text = [];
-
-  /** @param {string|null} raw */
-  const addMixed = (raw) => {
-    if (!https || out.mixed_content.length >= MAX_MIXED_CONTENT) return;
-    const url = insecureUrl(raw, baseUrl);
-    if (url !== null && !out.mixed_content.includes(url)) out.mixed_content.push(url);
-  };
-
-  /**
-   * @param {DomNode} node
-   * @param {Frame} frame
-   */
-  const visit = (node, frame) => {
-    const tag = /** @type {string} */ (node.tagName);
-    const line = lineOf(node);
-    if (tag === 'html') {
-      const lang = attr(node, 'lang')?.trim();
-      if (lang) out.html_lang = clip(lang, LIMITS.maxStringLength);
-    } else if (tag === 'title') {
-      if (frame.body) bodyTitle = true;
-      if (hasRoom(out.titles, CAPS.titles)) out.titles.push(clip(collapseWhitespace(textOf(node, false, LONG_TEXT)), LONG_TEXT));
-    } else if (tag === 'meta') {
-      const name = attr(node, 'name')?.trim().toLowerCase() ?? '';
-      const property = attr(node, 'property')?.trim().toLowerCase() ?? '';
-      const content = attr(node, 'content');
-      const httpEquiv = attr(node, 'http-equiv')?.trim().toLowerCase();
-      if (httpEquiv === 'content-security-policy' && frame.head && upgradesInsecureRequests(content)) upgradeInsecure = true;
-      if (name === 'description') {
-        if (hasRoom(out.meta_descriptions, CAPS.meta_descriptions)) out.meta_descriptions.push(clip(collapseWhitespace(content ?? ''), LONG_TEXT));
-      } else if (name === 'robots' || name === 'googlebot') {
-        for (const token of (content ?? '').split(',')) {
-          const value = collapseWhitespace(token).toLowerCase();
-          if (value !== '' && hasRoom(out.meta_robots, CAPS.meta_robots)) out.meta_robots.push(clip(value, LIMITS.maxStringLength));
-        }
-      } else if (name === 'viewport' && out.viewport === null) {
-        out.viewport = clip(collapseWhitespace(content ?? ''), LIMITS.maxStringLength);
-      }
-      for (const key of [property, name]) {
-        if (key.startsWith('og:')) setFirst(out.og, key.slice(3), content);
-        else if (key.startsWith('twitter:')) setFirst(out.twitter, key.slice(8), content);
-      }
-    } else if (tag === 'link') {
-      const rel = tokens(attr(node, 'rel'));
-      const href = attr(node, 'href');
-      if (rel.includes('canonical') && href !== null && hasRoom(out.canonicals, CAPS.canonicals)) {
-        const url = normalizeUrl(href, baseUrl);
-        out.canonicals.push({ href: clip(href, LIMITS.maxStringLength), url, source: 'html', in_head: frame.head, line });
-      }
-      const lang = attr(node, 'hreflang')?.trim();
-      if (rel.includes('alternate') && lang && href !== null && hasRoom(out.hreflang, CAPS.hreflang) && listChars < MAX_LIST_CHARS) {
-        keep(out.hreflang, {
-          hreflang: clip(lang, LIMITS.maxStringLength), href: clip(href, LIMITS.maxStringLength),
-          url: normalizeUrl(href, baseUrl), source: 'html',
-        });
-      }
-      if (rel.includes('stylesheet')) addMixed(href);
-    } else if (tag === 'a') {
-      if (out.links.length < MAX_LINKS && listChars < MAX_LIST_CHARS) {
-        const href = attr(node, 'href');
-        const url = href === null ? null : normalizeUrl(href, baseUrl);
-        keep(out.links, {
-          href: clip(href ?? '', LIMITS.maxStringLength),
-          url,
-          text: clip(collapseWhitespace(textOf(node, true, LIMITS.maxStringLength, true)), LIMITS.maxStringLength),
-          aria_label: clip(attr(node, 'aria-label')?.trim() ?? '', LIMITS.maxStringLength) || null,
-          title_attr: clip(attr(node, 'title')?.trim() ?? '', LIMITS.maxStringLength) || null,
-          rel: tokens(attr(node, 'rel')).slice(0, MAX_REL_TOKENS).map((token) => clip(token, LIMITS.maxStringLength)),
-          internal: url !== null && isInternalUrl(url, context.siteHost, context.includeSubdomains),
-          has_onclick: attr(node, 'onclick') !== null,
-          line,
-        });
-      }
-    } else if (tag === 'img') {
-      if (out.images.length < MAX_IMAGES && listChars < MAX_LIST_CHARS) {
-        const src = attr(node, 'src');
-        const parent = node.parentNode;
-        const pictureSrcset = parent && isHtmlElement(parent, 'picture')
-          && (parent.childNodes ?? []).some((child) => isHtmlElement(child, 'source') && attr(child, 'srcset') !== null);
-        /** @param {string} name */
-        const optional = (name) => {
-          const value = attr(node, name);
-          return value === null ? null : clip(value, LIMITS.maxStringLength);
-        };
-        keep(out.images, {
-          src: clip(src ?? '', LIMITS.maxStringLength),
-          url: src === null ? null : normalizeUrl(src, baseUrl),
-          alt: optional('alt'),
-          width: optional('width'),
-          height: optional('height'),
-          loading: optional('loading'),
-          has_srcset: attr(node, 'srcset') !== null || Boolean(pictureSrcset),
-          line,
-        });
-      }
-    } else if (HEADING_LEVELS.has(tag) && hasRoom(out.headings, CAPS.headings)) {
-      const level = /** @type {Heading['level']} */ (HEADING_LEVELS.get(tag));
-      out.headings.push({ level, text: clip(collapseWhitespace(textOf(node, true, LIMITS.maxStringLength)), LIMITS.maxStringLength), line });
-    } else if (tag === 'script') {
-      const type = (attr(node, 'type') ?? '').split(';', 1)[0].trim().toLowerCase();
-      // The inline scripts that carry a Next.js App Router page's data ("flight" chunks).
-      const start = (node.childNodes?.[0]?.value ?? '').slice(0, NEXT_FLIGHT_PREFIX);
-      if (!nextFlight && attr(node, 'src') === null && SCRIPT_TYPES.has(type) && NEXT_FLIGHT.test(start)) nextFlight = true;
-      if (type === 'application/ld+json' && hasRoom(out.jsonld, CAPS.jsonld)) {
-        const source = (node.childNodes ?? []).map((child) => child.value ?? '').join('');
-        out.jsonld.push(parseJsonLd(source, line));
-      }
-    }
-    const sourceAttr = SUBRESOURCE_ATTR.get(tag);
-    if (sourceAttr) addMixed(attr(node, sourceAttr));
-  };
 
   /** @type {(Frame|typeof SPACE)[]} */
   const stack = [{ node: document, head: false, body: false, hidden: false }];
@@ -276,7 +92,7 @@ export function extractHtml(html, context) {
     let frame = item;
     if (node.tagName) {
       const html = node.namespaceURI === HTML_NS;
-      if (html) visit(node, item);
+      if (html) visitElement(node, item, state);
       frame = {
         node,
         head: item.head || (html && node.tagName === 'head'),
@@ -295,11 +111,11 @@ export function extractHtml(html, context) {
     }
   }
 
-  if (upgradeInsecure) out.mixed_content = [];
+  if (state.upgradeInsecure) out.mixed_content = [];
   // Next.js can append a page's metadata to <body> ("streaming metadata"): the title, the
   // description and the canonical link arrive there together. Such a canonical is still outside
   // the head; `streamed` only says why, so the finding can explain it.
-  if (nextFlight && bodyTitle) {
+  if (state.nextFlight && state.bodyTitle) {
     for (const canonical of out.canonicals) {
       if (canonical.source === 'html' && !canonical.in_head) canonical.streamed = true;
     }

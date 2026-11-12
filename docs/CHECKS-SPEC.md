@@ -1,4 +1,4 @@
-# Check specification (rules 0.1.3)
+# Check specification (rules 0.1.4)
 
 Every scripted check the plugin ships is defined here. The code in `server/src/checks/` implements this table exactly; `docs/checks.md` is generated from the code for users.
 
@@ -136,7 +136,7 @@ Notes:
 | `links.internal.redirect` | page | For each html page, each distinct internal link target that has a record | the target is a redirect record and its chain ends in a 200–399 response, leaves the site, or ends at a URL the crawler could not read | low / 2 | confirmed | — | SITE_MOVE |
 | `links.internal.nofollow` | page | For each html page, each distinct internal link target | any link to that target on the page has `nofollow` in `rel` | low / 1 | confirmed | — | QUALIFY_LINKS |
 | `links.internal.insecure` | page | When the site is https: for each html page, each distinct internal link target | the link's URL starts with `http://` | low / 1 | confirmed | — | ENABLE_HTTPS |
-| `links.anchor.uncrawlable` | page | Every `<a>` element on an html page, internal or not | the trimmed `href` starts with `javascript:` (any case), or `href` is empty and the element has `onclick` | medium / 2 | confirmed | — | LINKS |
+| `links.anchor.uncrawlable` | page | Every `<a>` element on an html page, internal or not | the scheme of `href` is `javascript:`, `vbscript:` or `data:` (any case, read as browsers read it: spaces and control characters around the URL and tabs and line breaks inside it are ignored), or `href` is empty and the element has `onclick` | medium / 2 | confirmed | — | LINKS |
 | `links.anchor.empty` | page | Every `<a>` element with a non-null `url` on an html page | `text` is empty and both `aria_label` and `title_attr` are null. `text` already holds image `alt` text and the `aria-label` of elements inside the link | medium / 2 | confirmed | — | LINKS |
 | `links.anchor.generic` | page | Every `<a>` element with a non-null `url` and non-empty `text` on an html page | the text, lower-cased with punctuation removed, is in the generic-anchor list | info / 0 | likely | — | LINKS |
 | `links.orphan.sitemap_only` | site | Every internal sitemap URL other than the start URL and the start page's URL, `url` = that URL | no html page links to it, directly or through a redirect | medium / 2 | likely | full_crawl, sitemap | LINKS |
@@ -151,6 +151,7 @@ Notes:
 - External link results: `broken` means 404, 410, or a host name that does not exist. A site that refuses automated requests, a robots.txt rule, a timeout or a temporary DNS failure gives `unverifiable`, which is not a unit.
 - `links.orphan.sitemap_only`: build the set of linked URLs from every internal link on every html page, adding `ctx.resolve(link.url)?.url` so a link to a redirect counts for its destination. A link from a page to itself does not count.
 - Selectors of the form `a[href="…"]` escape `\` and `"` inside the href.
+- `links.anchor.uncrawlable`: Google's page (LINKS, read 2026-11-12) asks that the URL in an `<a>` element resolve to an actual web address that its crawlers can send requests to, and names `javascript:` hrefs as not recommended. A `vbscript:` URL is a script like `javascript:`, and a `data:` URL carries its document inside the link, so neither is an address a crawler can request. `mailto:`, `tel:` and other schemes that hand the link to another program open no page, so they are not units that fail.
 - Generic-anchor list (compared after lower-casing and removing punctuation): English "click here", "here", "read more", "more", "learn more", "this", "link", "this link", "this page", "continue", "continue reading", "details", "more info", "more information"; Turkish "tıklayın", "buraya tıklayın", "burada", "buraya", "devamı", "devamını oku", "daha fazla", "detaylar", "incele"; German "hier", "hier klicken", "mehr", "weiterlesen", "mehr erfahren"; Spanish "aquí", "haz clic aquí", "leer más", "más", "ver más"; French "ici", "cliquez ici", "lire la suite", "en savoir plus", "plus".
 
 ## Security module (`checks/security/`)

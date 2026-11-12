@@ -2,7 +2,7 @@
 
 This document is the contract between the modules. If code and this document disagree, fix one of them in the same change.
 
-Data shapes live in [`server/src/types.js`](../server/src/types.js). Check definitions are specified in [`CHECKS-SPEC.md`](CHECKS-SPEC.md).
+Data shapes live in [`server/src/types.js`](../server/src/types.js), which names the shapes defined per area under `server/src/types/`. Check definitions are specified in [`CHECKS-SPEC.md`](CHECKS-SPEC.md).
 
 ## 1. What v0.1 core does
 
@@ -44,25 +44,25 @@ Not in this milestone: fixes other than metadata, and every module other than `s
 
 ```
 server/src/
-  config.js  types.js  log.js           shared
+  config.js  types.js (+ types/)  log.js   shared
   util/{url,hash,strings}.js            shared
   checks/{engine,scoring,validate,registry,page-helpers}.js   shared
   net/        safe-fetch.js connect.js ip.js robots.js robots-match.js sitemap.js link-check.js
-  crawl/      manager.js admission.js run.js chain.js probe.js frontier.js challenge.js deployed.js
+  crawl/      manager.js admission.js run.js requests.js records.js chain.js probe.js frontier.js challenge.js deployed.js
   extract/    page.js indexability.js (+ helpers)
   checks/seo/     index.js + one file per area
   checks/links/   index.js + one file per area
   checks/security/  index.js + one file per area (4.14)
   vitals/     measure.js select.js psi.js crux.js google-api.js thresholds.js
-  repo/       scan.js detect.js next-routes.js html-routes.js html-lines.js sources.js fixes.js fix-texts.js verify.js
+  repo/       scan.js detect.js next-routes.js html-routes.js html-lines.js sources.js fixes.js fix-common.js fix-page.js fix-sitemap.js fix-texts.js verify.js
   store/      project.js runs.js run-validate.js profile.js compare.js
   report/     markdown.js html.js (+ shared helpers)
-  mcp/        stdio.js schema.js
+  mcp/        stdio.js registry.js protocol.js lines.js schema.js
   tools/      index.js (+ one file per tool group)
   deps.js     the tools' real dependencies, built from the environment
   index.js    entry point
 test/
-  helpers/{http-server,factories,run-factory,repo}.js    shared
+  helpers/{http-server,factories,run-factory,repo,server-process}.js    shared
   <area>/*.test.js                      mirrors server/src
 ```
 
@@ -185,6 +185,8 @@ export function createCrawlManager(deps)
 //   get(id: string): CrawlJob | null,
 //   wait(id: string, timeoutMs: number): Promise<CrawlJob | null>,
 //   result(id: string): Promise<CrawlResult | null>,
+//   storedVitals(id: string, pages: number): Promise<{vitals: VitalsData, measured_at: string} | null>,
+//   storeVitals(id: string, pages: number, vitals: VitalsData, measuredAt: string): Promise<void>,
 // }
 ```
 
@@ -192,13 +194,14 @@ export function createCrawlManager(deps)
 
 **A local site.** `allowLoopback` is honoured only when every address the start host resolves to is loopback; otherwise `start` rejects. When it is honoured, the crawl sends no request to any origin but the start origin: every request of the crawl goes through one function, which refuses another origin with `blocked_address` before anything is sent. So a link, a sitemap or a redirect to another local port is refused, and so is a robots.txt, a sitemap or a page of the local server that redirects to a host on the internet. A robots.txt that redirects away therefore counts as one that could not be read, and the crawl ends as `blocked: robots_unreachable`. The result records it as `options.local: true`, which keeps the site from being named to an outside service (4.11).
 
-**A local site that names its deployed address** (`crawl/deployed.js`). A project's pages name the address the site is deployed at: in canonical links, in the `Sitemap:` line of robots.txt and in the sitemap. On `http://localhost:3000` each such page then points to another site, so it is not indexable (`canonical_elsewhere`), the checks on indexable pages skip it, and the sitemap is on another host and is not read. `deployedUrl` tells the crawl that address. It is accepted only together with `allowLoopback` (otherwise `start` rejects) and reduced to its origin; naming the local server itself changes nothing. Then, and only for URLs on exactly that origin (another scheme, host name or port is another site):
+**A local site that names its deployed address** (`crawl/deployed.js`). A project's pages name the address the site is deployed at: in canonical links, in the `Sitemap:` line of robots.txt and in the sitemap. On `http://localhost:3000` each such page then points to another site, so it is not indexable (`canonical_elsewhere`), the checks on indexable pages skip it, and the sitemap is on another host and is not read. `deployedUrl` tells the crawl that address. It is accepted only together with `allowLoopback` (otherwise `start` rejects) and reduced to its origin, without the trailing dot of a fully qualified host name (`https://example.com.` is `https://example.com`; a host name that still ends in an empty label is refused); naming the local server itself changes nothing. Then, and only for URLs on exactly that origin (another scheme, host name or port is another site):
 
 - a canonical's `url` becomes the same path on the local server, and the record's indexability is worked out again (`extract/indexability.js`); `href` keeps what the page sent;
+- a link's `url` becomes the same path on the local server and the link is internal, so the crawl follows it and a page linked only by its full deployed URL is crawled; `href` keeps what the page sent;
 - a `Sitemap:` URL is read from the same path on the local server, while `robots.sitemaps` keeps what robots.txt says;
 - sitemap entries become local URLs, so they are crawled and the sitemap checks can look at them.
 
-The crawl requests nothing from the deployed address (the rule above), and `audit_run` leaves every link and redirect to the deployed site out of the external link check, by host: whatever the scheme or port, with or without `www.` and a trailing dot (`onDeployedHost`). (An external site that itself redirects to the deployed site is still followed there by that check, like any redirect.) The result records the address as `options.deployed_origin` and how many canonicals, Sitemap lines and sitemap entries were read as local as `options.deployed_localized`. When that is 0 the address matched nothing, usually because it differs from what the pages name in scheme or host name: `audit_run`'s note then says so and names the origin most canonical links do name, and neither the note nor the report claims that anything was read as a local page. Not covered: a sitemap index on the local server whose children name the deployed address still gets `'external'` children, and a link or a redirect to the deployed address is external like any other host, so it is recorded and not followed: a page that is linked only by its full deployed URL is not crawled.
+The crawl requests nothing from the deployed address (the rule above), and `audit_run` leaves every link and redirect to the deployed site out of the external link check, by host: whatever the scheme or port, with or without `www.` and a trailing dot (`onDeployedHost`). (An external site that itself redirects to the deployed site is still followed there by that check, like any redirect.) The result records the address as `options.deployed_origin` and how many were read as local as `options.deployed_localized`: pages with such a canonical or link, Sitemap lines and sitemap entries. When that is 0 the address matched nothing, usually because it differs from what the pages name in scheme or host name: `audit_run`'s note then says so and names the origin most canonical links do name, and neither the note nor the report claims that anything was read as a local page. Not covered: a sitemap index on the local server whose children name the deployed address still gets `'external'` children, and a redirect to the deployed address, or a link to that site in another scheme, host name or port, is external like any other host, so it is recorded and not followed.
 
 The crawl, in order:
 
@@ -218,9 +221,11 @@ The crawl, in order:
    - does not pass `looksLikeHtmlUrl` (a file, not a page) → requested with `HEAD`, so no body is downloaded. When the HEAD fails or answers 400 or above, and that answer is not a refusal (429 or a bot challenge), one `GET` limited to 16 KB is sent and its answer is used. The target gets no record of its own;
    - otherwise it is requested.
 9. Records are built with the three functions in 4.6. The requested URL gets a redirect record; the response at the end of a chain gets its own record under its URL when that URL is internal, not yet recorded and was requested as a page; hops in between get none. A record whose URL is already recorded is skipped. Every record counts toward `maxPages`.
-10. Stop with `truncated: true` when the budget is used up and a URL that could still be fetched remains (internal, not yet recorded, and not known to be disallowed). That includes a redirect target that was fetched but did not fit the budget. Once set, `truncated` stays true.
+10. Stop with `truncated: true` when the budget is used up and a URL that could still be fetched remains (internal, not yet recorded, and not known to be disallowed). That includes a redirect target that was fetched but did not fit the budget. Once set, `truncated` stays true. **Time limit.** No new page is taken from the frontier once `LIMITS.crawlMaxMs` (30 minutes) has passed since the crawl started, by the injected clock (the page under way finishes, with its waits, a 429 retry and its redirect hops, so the crawl can end up to about a minute later); when a URL that could still be fetched remains, the crawl ends with `truncated: true` and `time_limit_reached: true`, which `crawl_status`, `audit_run`'s notes, the report and run comparisons name instead of the page budget.
 11. **Challenges.** A 403, 429 or 503 whose headers or body show a bot challenge (`cf-mitigated: challenge`, or markers such as "Just a moment", "cf-chl", "challenge-platform", "captcha", "Incapsula") is recorded with `unreadableRecord` and `fetch_error: 'bot_challenge'`; no content is taken from it. It stops the crawl with `blocked: bot_challenge` when it happens on the start page or on three pages in a row. A 429 is retried once after `Retry-After` (at most 30 s); if it persists the URL is recorded with `fetch_error: 'rate_limited'`, and three in a row stop the crawl with `blocked: rate_limited`. The crawler never retries with different headers and never tries to get past the challenge.
-12. Write the `CrawlResult` to disk and keep the last five results in memory. The crawl directory has mode `0700` and its files `0600`. Both are set again for every file when the directory is first opened, so files written by an older version are covered too. Only the 20 newest results are kept, and a `.tmp` file left behind by an interrupted write is deleted once it is a day old.
+12. Write the `CrawlResult` to disk and keep the last five results in memory. The crawl directory has mode `0700` and its files `0600`. Both are set again for every file when the directory is first opened, so files written by an older version are covered too. Only the 20 newest results are kept, each with its Core Web Vitals file, and a `.tmp` file left behind by an interrupted write is deleted once it is a day old (`crawl/store.js`).
+
+**Core Web Vitals kept with a crawl.** `storeVitals` keeps a measurement for a page count in `<dataDir>/crawls/<id>.vitals.json`, beside those for other counts, written whole like a crawl file. `storedVitals` returns it, or null, also for a file the plugin did not write: another schema version or crawl id, a measurement without the shape of a `VitalsData`, a date that does not parse, a symbolic link, or more than 1 MB. A measurement file is deleted with its crawl file, and on its own once that file is gone. A crawl id that is not a safe file name is never used as a path.
 
 Job ids look like `c-20261111T140322Z-a1b2c3`.
 
@@ -368,7 +373,7 @@ export class ToolError extends Error {}
 | Tool | Input | Output |
 |---|---|---|
 | `crawl_start` | `url` (required), `max_pages` 1–500 (default 25), `include_subdomains` (false), `allow_localhost` (false; accepted only when the start host is a loopback address), `site_url` (only with `allow_localhost`: the address the project is deployed at, 4.5) | `{job_id, status, start_url, max_pages}` |
-| `crawl_status` | `job_id`, `wait_seconds` 0–25 (default 0) | job snapshot; when finished also `summary: {pages, html_pages, by_status, robots_status, sitemap_urls, truncated, blocked}`, with `site_url` when the crawl was told the deployed address |
+| `crawl_status` | `job_id`, `wait_seconds` 0–25 (default 0) | job snapshot; when finished also `summary: {pages, html_pages, by_status, robots_status, sitemap_urls, truncated, blocked}`, with `time_limit_reached: true` when the crawl stopped at its time limit and `site_url` when it was told the deployed address |
 | `project_detect` | `project_dir`, `source_dir` (defaults to the project folder) | `{project_dir, source_dir, framework, label, supported, message, app_dir, dev_server, routes_total, routes, routes_truncated}` |
 | `audit_run` | `job_id`, `modules` (default all), `check_outbound_links` (true), `check_core_web_vitals` (true), `core_web_vitals_pages` 1–10 (default 3), `project_dir`, `source_dir` (repo mode), `verify_fixes: {base_run_id, finding_ids ≤ 200}` (a re-audit after fixes) | `{run_id, project_dir, files, crawl, modules, totals, top, core_web_vitals, repo, fix_verification, skipped_checks, notes}` |
 | `fix_plan` | `run_id` ('last'), `project_dir`, `site_url`, `check_id`, `limit` 1–200 (50), `offset` | `{run_id, project_dir, source_dir, framework, audited, max_pages, modules, site_url, fixable_total, returned, next_offset, fixes, not_fixable, not_fixable_total, out_of_scope, in_scope_checks, notes}`; `limit` and `offset` page `fixes` only |
@@ -384,6 +389,7 @@ export class ToolError extends Error {}
 - `audit_run` accepts jobs that are `done` or `blocked` (site-level checks still say something about a blocked site) and rejects `running` and `failed` ones with a `ToolError` that says what to do next.
 - `audit_run` checks external links only when the `links` module is requested and `check_outbound_links` is true. The URLs checked are the external link targets plus the destination of every redirect that leaves the site, without those on the deployed origin of a local crawl (4.5).
 - `audit_run` measures Core Web Vitals (4.11) only when the `seo` module is requested and `check_core_web_vitals` is true, at the same time as the external links are checked. The measurement goes through `deps.measureVitals`, which has the Google API key bound into it; the tool never holds the key. Whatever happens there, the audit completes: a refusal or a timeout comes back as data with a reason, and an unexpected error is logged and turned into a result that says nothing was measured. The run stores the measurement as `core_web_vitals` (null when it was not asked for), and the result returns the same pages and values under `core_web_vitals`, with the measurement's notes in `notes`.
+- **Once per crawl.** Core Web Vitals are measured once per crawl and page count (`collectVitals` in `tools/audit-vitals.js`). A measurement in which either source returned values is kept with the crawl (`storeVitals`, 4.5); a later audit of the same crawl with the same page count takes it from there, sends nothing to Google, and marks it `reused: true` with a first note that says when it was measured. One that returned nothing is not kept, so the next audit asks again. Measurements under way are shared inside the server, so two audits of one crawl at the same time ask Google once. The stored and returned measurement carries `measured_at` (when Google was asked) and `reused`; a store that cannot be read or written never fails the audit.
 - `audit_run` with `source_dir` is repo mode (4.12); an empty string counts as not given. It is accepted only for a crawl whose `options.local` is `true`, because a deployed site can differ from the folder at hand; anything else is a `ToolError` raised before a request is sent. The source folder must be the project folder or lie inside it. After the checks ran, `deps.attachSources` adds `source` to the findings; the run stores them and a `repo` summary (null outside repo mode), the result returns `repo`, each group under `top` lists up to three `example_files`, and what limits the mapping goes into `notes`. A project that is not supported is audited all the same, with no source files and a note that says why.
 - `audit_run` with `verify_fixes` is the re-audit after fixes (4.13). Before anything else is done, the base run is loaded and checked: it must hold every named finding and must have audited the origin the crawl is of, because finding ids are built from URLs and two runs of different addresses share none. After the checks ran, the run stores the verification as `fixes` (null when it was not asked for) and the result returns it as `fix_verification`, with at most 50 results.
 - `fix_plan` accepts only a run whose `repo` names a supported project, and a folder that still holds that kind of project; anything else is a `ToolError` that says to audit the project first. It reads the saved run, what `loadProjectSources` reads of the project (the file listing, `package.json`, and `next.config` as text), the crawl behind the run when the cache still has it, and `site_url` from its argument or the profile (a local address does not count). It writes nothing. `not_fixable` is complete in every answer: the refused findings grouped by check and reason, each group with its count and up to three example URLs and files.
@@ -405,7 +411,7 @@ Core Web Vitals come from two Google services. Their documentation was read on 2
 // measure.js
 /**
  * @param {CrawlResult} crawl
- * @param {{apiKey?: string|null, maxPages?: number, runPagespeed?, queryCrux?, now?: () => number,
+ * @param {{apiKey?: string|null, apiKeyUnusable?: boolean, maxPages?: number, runPagespeed?, queryCrux?, now?: () => number,
  *          deadlineMs?: number, concurrency?: number}} [options]
  * @returns {Promise<VitalsData>}
  */
@@ -424,6 +430,7 @@ export async function queryCrux(target, options)       // target: {url} | {origi
 export async function requestJson(url, options)        // → {ok: true, data} | {ok: false, failure: ApiFailure}
 ```
 
+- **A key that cannot be used.** `deps.js` reads the setting with `googleApiKeySetting`: a key, nothing, or a value that is set but that no request header can carry (a space or a line break inside, a character outside printable ASCII, more than 256 characters). For the last it passes `apiKeyUnusable: true`, and `measureVitals` then sends nothing, to either service, and both sources give one fixed sentence that says the key in the plugin settings cannot be used and to check it. The value is never quoted. It is not reported as no key, and PageSpeed Insights is not asked without it.
 - **One request path.** Both clients send their request through `requestJson`, which sends it through `safeFetch` with `maxRedirects: 0`. The key, when there is one, goes in the `x-goog-api-key` header, as Google recommends, and never in the URL.
 - **PageSpeed Insights** (`GET https://pagespeedonline.googleapis.com/pagespeedonline/v5/runPagespeed`, with `url`, `category=PERFORMANCE` and `strategy=MOBILE`): one lab test of one page. The client reads `largest-contentful-paint`, `cumulative-layout-shift` and `total-blocking-time` from `lighthouseResult.audits`, as numbers. It refuses a result that is not for the mobile form factor, because the values are rated with the mobile thresholds, and reports `lighthouseResult.runtimeError` as a page that could not be loaded. It does not read `loadingExperience`: Google plans to remove that field data from the answer.
 - **Chrome UX Report** (`POST https://chromeuxreport.googleapis.com/v1/records:queryRecord`, with `url` or `origin`, `formFactor: PHONE` and the three metric names): the 75th percentile of each metric, the share of loads in the good range (only when the first histogram bin ends at this plugin's threshold), and the collection period. Google's own "not found" is a normal answer, `record: null`; a 404 without it is a failure, so a wrong address is not mistaken for "no data". The API requires a key.

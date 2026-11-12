@@ -67,6 +67,8 @@ function summarize(crawl) {
     robots_status: crawl.robots.status,
     sitemap_urls: crawl.sitemap.urls.length,
     truncated: crawl.truncated,
+    // The crawl stopped at its time limit, not at its page budget.
+    ...(crawl.time_limit_reached === true ? { time_limit_reached: true } : {}),
     blocked: crawl.blocked,
     // A local crawl that was told where the project is deployed.
     ...(crawl.options.deployed_origin ? { site_url: crawl.options.deployed_origin } : {}),
@@ -171,7 +173,7 @@ export function crawlTools(deps) {
             type: 'string',
             maxLength: 2048,
             description:
-              'Only with allow_localhost: the address the project is deployed at, for example https://www.example.com. Canonical links, ' +
+              'Only with allow_localhost: the address the project is deployed at, for example https://www.example.com. Canonical links, links, ' +
               'robots.txt Sitemap lines and sitemap entries on that address are then read as the same path on the local server, ' +
               'so a page that names its deployed URL is not treated as pointing to another site. The audit requests nothing from that address.',
           },

@@ -86,6 +86,13 @@ describe('fix_plan', () => {
     assert.equal((await plan({ profile: { site_url: 'https://profile.example/' } }).call()).site_url, 'https://profile.example');
   });
 
+  it('drops the trailing dot of a deployed address, so a fix never writes it into the project', async () => {
+    const fromArg = await plan().call({ site_url: 'https://www.example.com.' });
+    assert.equal(fromArg.site_url, 'https://www.example.com');
+    assert.deepEqual(fromArg.fixes[1].canonical, { path: '/about', url: 'https://www.example.com/about' });
+    assert.equal((await plan({ profile: { site_url: 'https://profile.example./' } }).call()).site_url, 'https://profile.example');
+  });
+
   it('does not take this machine or the audited server for the deployed address', async () => {
     for (const site_url of [LOCAL, 'http://localhost:8080', 'http://localhost./', 'http://127.0.0.1/', 'http://[::1]:3000', 'http://app.localhost', 'http://192.168.1.20:3000', 'http://0.0.0.0:3000', 'http://[::]:3000']) {
       assert.equal((await plan().call({ site_url })).site_url, null, site_url);

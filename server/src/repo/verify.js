@@ -10,7 +10,8 @@
 
 import { firstNonEmpty, isUnverifiable } from '../checks/page-helpers.js';
 import { SEVERITIES } from '../config.js';
-import { FIXABLE_CHECKS, plainPath } from './fixes.js';
+import { plainPath } from './fix-common.js';
+import { FIXABLE_CHECKS } from './fixes.js';
 
 const MAX_REPLACEMENTS = 5;
 

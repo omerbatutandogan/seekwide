@@ -49,6 +49,48 @@ test('links.anchor.uncrawlable fails on javascript: hrefs and onclick-only links
   assert.match(onclick?.evidence.detail ?? '', /no href.*onclick/);
 });
 
+test('links.anchor.uncrawlable fails on vbscript: and data: hrefs, read as browsers read them', () => {
+  const home = makePage({
+    url: `${SITE}/`,
+    links: [
+      makeRawLink({ href: 'vbscript:msgbox("hi")', line: 4 }),
+      makeRawLink({ href: 'data:text/html;base64,PGgxPmhpPC9oMT4=', line: 5 }),
+      makeRawLink({ href: ' DATA:text/plain,x' }),
+      makeRawLink({ href: 'java\nscript:void(0)' }),
+      makeRawLink({ href: '\tjavascript:void(0)' }),
+    ],
+  });
+  const { result } = audit([home]);
+  const stat = statFor(result, 'links.anchor.uncrawlable');
+  assert.equal(stat.applicable, 5);
+  assert.equal(stat.failed, 5);
+  const findings = findingsFor(result, 'links.anchor.uncrawlable');
+  assert.deepEqual(findings.map((f) => f.evidence.detail).sort(), [
+    'The href is a data: URL.', 'The href is a data: URL.', 'The href is a javascript: URL.', 'The href is a javascript: URL.', 'The href is a vbscript: URL.',
+  ]);
+  assert.equal(findings.find((f) => f.line === 4)?.evidence.detail, 'The href is a vbscript: URL.');
+});
+
+test('links.anchor.uncrawlable passes links to other programs and paths that only look like a scheme', () => {
+  const home = makePage({
+    url: `${SITE}/`,
+    links: [
+      makeRawLink({ href: 'mailto:hi@example.test' }),
+      makeRawLink({ href: 'tel:+15551234567' }),
+      makeRawLink({ href: 'sms:+15551234567' }),
+      makeRawLink({ href: 'ftp://files.example.test/a.zip' }),
+      makeLink({ url: `${SITE}/data/report.html`, href: 'data/report.html' }),
+      makeLink({ url: `${SITE}/javascript-guide`, href: 'javascript-guide' }),
+      makeLink({ url: `${SITE}/vbscript:x`, href: './vbscript:x' }),
+      makeLink({ url: `${SITE}/data:x`, href: '/data:x' }),
+    ],
+  });
+  const { result } = audit([home]);
+  const stat = statFor(result, 'links.anchor.uncrawlable');
+  assert.equal(stat.applicable, 8);
+  assert.equal(stat.failed, 0);
+});
+
 test('links.anchor.uncrawlable passes ordinary links', () => {
   const home = makePage({
     url: `${SITE}/`,
