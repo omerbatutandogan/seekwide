@@ -10,7 +10,7 @@ import { scanDocument } from './security-scan.js';
 import { NO_SECURITY_HEADERS, securityHeaders } from './security-headers.js';
 import { scriptLetters, spamTermHits, topicHits, urlWords } from './terms.js';
 
-export { MAX_EMBEDS, MAX_HIDDEN_HOSTS, MAX_VISIBLE_HOSTS } from './security-scan.js';
+export { MAX_EMBEDS, MAX_HIDDEN_HOSTS, MAX_TRACKED_HOSTS, MAX_VISIBLE_HOSTS } from './security-scan.js';
 
 /**
  * The security part of a page record, as far as the document can tell.
@@ -27,12 +27,12 @@ export { MAX_EMBEDS, MAX_HIDDEN_HOSTS, MAX_VISIBLE_HOSTS } from './security-scan
  * @param {DomNode} document
  * @param {ScanContext} context
  * @param {{titles: string[], metaDescriptions: string[], headings: Heading[], visibleText: string}} text
- * @returns {PageSecurity}
+ * @returns {{security: PageSecurity, limits: string[]}}  `limits`: the scan's caps the page reached (`ScanResult`).
  */
 export function documentSecurity(document, context, text) {
   const scan = scanDocument(document, context);
   const linkWords = context.links.filter((link) => !link.internal && link.url !== null).map((link) => urlWords(/** @type {string} */ (link.url)));
-  return {
+  const security = {
     hidden_links: scan.hidden_links,
     visible_hosts: scan.visible_hosts,
     embeds: scan.embeds,
@@ -41,6 +41,7 @@ export function documentSecurity(document, context, text) {
     scripts: scriptLetters(text.visibleText),
     headers: securityHeaders(null, { metaCsp: scan.meta_csp, metaReferrer: scan.meta_referrer }),
   };
+  return { security, limits: scan.limits };
 }
 
 /**

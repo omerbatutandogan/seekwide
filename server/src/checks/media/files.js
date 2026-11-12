@@ -1,9 +1,8 @@
 /** @import { CheckContext, CheckDef, CheckResult, ImageFileResult } from '../../types.js' */
 /** @import { FileUse } from './select.js' */
+/** @import { SiteIdentity } from '../../util/site-identity.js' */
 
-import { siteLabel } from '../../util/site-name.js';
 import { clip } from '../../util/strings.js';
-import { hostKey } from '../../util/url.js';
 import { DOCS, MEDIA, attributeSelector, imageName } from './helpers.js';
 import { fileUses } from './select.js';
 
@@ -30,22 +29,20 @@ function negotiates(vary) {
 }
 
 /**
- * True when an image URL is on the audited site: the site's own host, or the same registered name (`acme` in
- * acme.com, cdn.acme.com and acme.co.uk; a customer's own host under a shared hosting domain, `siteLabel`), so its
- * robots.txt is the owner's to change.
+ * True when an image URL is on a host of the audited site's organisation (`SiteIdentity.isSameOrganisation`: its
+ * registered domain, cdn.acme.com for acme.com; the same name under another ending when a page links there visibly),
+ * so its robots.txt is the owner's to change.
  * @param {string} url
- * @param {string} siteHost
+ * @param {SiteIdentity} identity
  */
-function onOwnSite(url, siteHost) {
+function onOwnSite(url, identity) {
   let host;
   try {
     host = new URL(url).host;
   } catch {
     return false;
   }
-  if (hostKey(host) === hostKey(siteHost)) return true;
-  const own = siteLabel(hostKey(siteHost));
-  return own !== null && siteLabel(hostKey(host)) === own;
+  return identity.isSameOrganisation(host);
 }
 
 /**
@@ -195,7 +192,7 @@ const robotsBlocked = {
   run(ctx) {
     return fileResults(
       ctx,
-      (file, use) => file.google !== null && use.content && onOwnSite(file.url, ctx.site.host),
+      (file, use) => file.google !== null && use.content && onOwnSite(file.url, ctx.identity),
       (file, use) => (file.google !== 'disallowed' ? null : {
         observed: { crawler: file.google_agent, robots_host: file.google_host },
         expected: 'robots.txt allows Googlebot and Googlebot-Image to fetch the image',

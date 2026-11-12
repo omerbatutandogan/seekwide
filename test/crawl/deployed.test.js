@@ -4,7 +4,8 @@
 import assert from 'node:assert/strict';
 import { after, describe, it } from 'node:test';
 
-import { deployedOriginOf, localizeRecord, localizeUrls, onDeployedHost, toLocalUrl } from '../../server/src/crawl/deployed.js';
+import { deployedOriginOf, localizeRecord, localizeUrls, toLocalUrl } from '../../server/src/crawl/deployed.js';
+import { siteIdentity } from '../../server/src/util/site-identity.js';
 import { createCrawlManager } from '../../server/src/crawl/manager.js';
 import { safeFetch } from '../../server/src/net/safe-fetch.js';
 import { makePage } from '../helpers/factories.js';
@@ -61,7 +62,8 @@ describe('toLocalUrl', () => {
   });
 });
 
-describe('onDeployedHost', () => {
+describe('SiteIdentity.isDeployed', () => {
+  const onDeployedHost = (/** @type {string} */ url, /** @type {string} */ origin) => siteIdentity({ siteHost: 'localhost:3000', deployedOrigin: origin }).isDeployed(url);
   it('is true for every address of the deployed site: other scheme, other port, www or not, trailing dot', () => {
     for (const url of ['https://www.example.com/a', 'http://www.example.com/a', 'https://example.com/a', 'https://www.example.com:8443/a', 'https://www.example.com./a', 'https://WWW.Example.com/a']) {
       assert.equal(onDeployedHost(url, DEPLOYED), true, url);
@@ -156,6 +158,21 @@ describe('a crawl of a local server whose pages name the deployed site', () => {
       assert.deepEqual(result.robots.sitemaps, [`${DEPLOYED}/sitemap.xml`]);
       assert.equal(result.pages[1].canonicals[0].href, `${DEPLOYED}/about`);
       assert.ok(server.requests.every((request) => request.headers.host === new URL(server.origin).host));
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('with the deployed address: a hidden share menu that shares the deployed page is the site\'s own, a hidden channel is not (code review A4)', async () => {
+    const share = encodeURIComponent(`${DEPLOYED}/post`);
+    const body = `<!doctype html><html lang="en"><head><title>Post</title></head><body><h1>Post</h1><div class="share" style="display:none">
+<a href="https://www.facebook.com/sharer/sharer.php?u=${share}">Facebook</a><a href="https://wa.me/?text=${share}">WhatsApp</a></div>
+<div style="display:none"><a href="https://t.me/casino_bonus?ref=www.example.com">t</a></div></body></html>`;
+    const server = await startServer({ '/robots.txt': { headers: { 'content-type': 'text/plain' }, body: 'User-agent: *\nAllow: /\n' }, '/': { headers: { 'content-type': 'text/html' }, body } });
+    try {
+      const hidden = async (/** @type {object} */ options) => (await run(server.origin, options)).pages[0].security?.hidden_links.map((link) => link.host);
+      assert.deepEqual(await hidden({ deployedUrl: DEPLOYED }), ['t.me']);
+      assert.deepEqual(await hidden({}), ['facebook.com', 'wa.me', 't.me'], 'without the deployed address the menu shares another site');
     } finally {
       await server.close();
     }

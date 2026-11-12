@@ -5,7 +5,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { measureVitals, mayLeaveMachine } from '../../server/src/vitals/measure.js';
+import { measureVitals } from '../../server/src/vitals/measure.js';
+import { isPublicHost as mayLeaveMachine } from '../../server/src/util/site-identity.js';
 import { selectVitalsPages } from '../../server/src/vitals/select.js';
 import { SITE, makeCrawl, makeField, makeLab, makePage } from '../helpers/factories.js';
 

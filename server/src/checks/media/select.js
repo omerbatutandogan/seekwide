@@ -4,6 +4,7 @@
 /** @import { CheckContext, CrawlResult, ImageRecord, PageRecord } from '../../types.js' */
 
 import { LIMITS } from '../../config.js';
+import { crawlIdentity } from '../../util/site-identity.js';
 import { originOf } from '../../util/url.js';
 import { compareText, hasMedia, isRendered } from './helpers.js';
 
@@ -11,16 +12,16 @@ import { compareText, hasMedia, isRendered } from './helpers.js';
  * The http(s) URLs of a page's rendered images, once each, in document order.
  * @param {PageRecord} page
  * @param {string|null} origin  When set, only URLs on this origin.
- * @param {string|null} [skipHost]  When set, no URL on this host.
+ * @param {((host: string) => boolean)|null} [skip]  When set, no URL on a host it is true for.
  * @returns {string[]}
  */
-function imageUrls(page, origin, skipHost = null) {
+function imageUrls(page, origin, skip = null) {
   const urls = new Set();
   for (const image of page.images) {
     const url = image.url;
     if (url === null || !isRendered(image) || !/^https?:/.test(url)) continue;
     if (origin !== null && originOf(url) !== origin) continue;
-    if (skipHost !== null && new URL(url).host === skipHost) continue;
+    if (skip !== null && skip(new URL(url).host)) continue;
     urls.add(url);
   }
   return [...urls];
@@ -39,17 +40,20 @@ function pagesOf(crawl) {
  * are gone through in rounds, each round taking each page's next URL that was
  * not chosen yet, so the first image of every page comes before the second of
  * any. A crawl of a site on this machine gets only images on its own origin,
- * and with `skipHost` no image on that host is chosen.
+ * and with `skipSite` no image on a host of the site's organisation, or under
+ * its name with another ending, linked or not (`SiteIdentity.sharesName`: its
+ * apex, www, subdomains, other ports, acme.de for acme.com) is chosen.
  * @param {CrawlResult} crawl
  * @param {number} [max]
- * @param {string|null} [skipHost]
+ * @param {boolean} [skipSite]
  * @returns {{urls: string[], images: number}}  `images`: distinct image URLs the pages show.
  */
-export function selectImageFiles(crawl, max = LIMITS.maxImageChecks, skipHost = null) {
+export function selectImageFiles(crawl, max = LIMITS.maxImageChecks, skipSite = false) {
   const pages = pagesOf(crawl);
   const origin = crawl.options.local === true ? crawl.site_origin : null;
   const all = new Set(pages.flatMap((page) => imageUrls(page, null)));
-  const lists = pages.map((page) => imageUrls(page, origin, skipHost));
+  const skip = skipSite ? crawlIdentity(crawl).sharesName : null;
+  const lists = pages.map((page) => imageUrls(page, origin, skip));
   const positions = lists.map(() => 0);
   /** @type {Set<string>} */
   const chosen = new Set();

@@ -34,14 +34,19 @@ const MAX_PER_KIND = 4;
 
 /**
  * The list with `entry` added, unless it already holds a concealment that
- * hides for certain or is full.
+ * hides for certain. When full, one that hides for certain takes the place of
+ * any other, and one with an id that of one a control opens, so that wrappers
+ * built to be opened cannot push the hiding of injected content out.
  * @param {readonly Concealment[]} list
  * @param {Concealment} entry
  * @returns {readonly Concealment[]}
  */
 function add(list, entry) {
-  if (list.length >= MAX_PER_KIND || list.some((item) => !item.revealable && item.id === null)) return list;
-  return [...list, entry];
+  if (list.some((item) => !item.revealable && item.id === null)) return list;
+  if (list.length < MAX_PER_KIND) return [...list, entry];
+  if (entry.revealable) return list;
+  const replaced = entry.id === null ? 0 : list.findIndex((item) => item.revealable);
+  return replaced < 0 ? list : list.map((item, i) => (i === replaced ? entry : item));
 }
 
 /** At this many pixels to the left of or above its place, or further, an element is off-screen. */

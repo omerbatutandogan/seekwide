@@ -1,4 +1,4 @@
-// Which crawls may start now: one per site, and a few at most.
+// Which crawls may start now: one per site (`crawlKey`, site-identity.js), and a few at most.
 
 /**
  * Crawls that may run at once. Each crawl paces its own requests, so two crawls
@@ -14,19 +14,4 @@ export const MAX_RUNNING = 3;
  */
 export function busy(message) {
   return Object.assign(new TypeError(message), { busy: /** @type {const} */ (true) });
-}
-
-/**
- * Which site a crawl is of, for the one-crawl-per-site rule: the host name
- * without a leading "www." or a trailing dot, whatever the scheme or port,
- * since one server answers them all; for a site on this machine, the port,
- * since localhost, 127.0.0.1 and [::1] name the same server.
- * @param {string} startUrl
- * @param {boolean} loopback
- * @returns {string}
- */
-export function siteKey(startUrl, loopback) {
-  const url = new URL(startUrl);
-  if (loopback) return `loopback:${url.port || (url.protocol === 'https:' ? '443' : '80')}`;
-  return `host:${url.hostname.toLowerCase().replace(/\.$/, '').replace(/^www\./, '')}`;
 }

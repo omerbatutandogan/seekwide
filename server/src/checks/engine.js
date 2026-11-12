@@ -2,6 +2,7 @@
 
 import { LIMITS, SEVERITIES } from '../config.js';
 import { shortId } from '../util/hash.js';
+import { crawlIdentity } from '../util/site-identity.js';
 import { isRefusedSitemap } from './page-helpers.js';
 import { scoreModules } from './scoring.js';
 
@@ -114,6 +115,7 @@ export function buildContext(crawl, extras = {}) {
       https: crawl.site_origin.startsWith('https://'),
       start_url: crawl.start_url,
     },
+    identity: crawlIdentity(crawl),
     capabilities,
     skipReasons,
     outbound,

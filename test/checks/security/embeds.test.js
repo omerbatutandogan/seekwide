@@ -69,17 +69,26 @@ test(`${RARE} has no unit on a crawl of fewer than 50 pages, and never changes t
   assert.equal(audit(pages).modules.security.score, 100);
 });
 
-test(`${RARE} leaves out the site's own host and its subdomains, and nothing else`, () => {
+test(`${RARE} leaves out the hosts of the site's own organisation, and nothing else`, () => {
   // Modeled on a blog that embeds a page of its organisation's site in another language (a subdomain).
   // The same name under another domain, and another tenant of a shared host, are other sites.
   const pages = [page('/', []), page('/a', [embed('iframe', 'https://it.example.test/widget'), embed('script', 'https://cdn.example.test/x.js'),
     embed('script', 'https://example.xyz/x.js'), embed('script', 'https://odd.test/x.js')]), ...filler(MIN_PAGES_FOR_RARE - 2, [])];
   assert.deepEqual(findingsFor(audit(pages), RARE).map((finding) => /** @type {any} */ (finding.evidence.observed).host).sort(), ['example.xyz', 'odd.test']);
+  // vercel.app is a public suffix (the private section of the Public Suffix List): each customer's host is a site of its own.
   const tenant = (/** @type {string} */ path, /** @type {import('../../../server/src/types.js').EmbedRecord[]} */ embeds) =>
-    makePage({ url: `https://mysite.host.test${path}`, security: makeSecurity({ embeds }) });
-  const shared = [tenant('/', []), tenant('/a', [embed('script', 'https://evil.host.test/x.js')]), ...Array.from({ length: MIN_PAGES_FOR_RARE - 2 }, (_, i) => tenant(`/f${i}`, []))];
-  const crawl = { start_url: 'https://mysite.host.test/', site_origin: 'https://mysite.host.test', site_host: 'mysite.host.test' };
-  assert.deepEqual(findingsFor(audit(shared, crawl), RARE).map((finding) => /** @type {any} */ (finding.evidence.observed).host), ['evil.host.test']);
+    makePage({ url: `https://mysite.vercel.app${path}`, security: makeSecurity({ embeds }) });
+  const shared = [tenant('/', []), tenant('/a', [embed('script', 'https://evil.vercel.app/x.js')]), ...Array.from({ length: MIN_PAGES_FOR_RARE - 2 }, (_, i) => tenant(`/f${i}`, []))];
+  const crawl = { start_url: 'https://mysite.vercel.app/', site_origin: 'https://mysite.vercel.app', site_host: 'mysite.vercel.app' };
+  assert.deepEqual(findingsFor(audit(shared, crawl), RARE).map((finding) => /** @type {any} */ (finding.evidence.observed).host), ['evil.vercel.app']);
+});
+
+test(`${RARE} counts the same name under another ending as the organisation's only when a page links there visibly`, () => {
+  const linked = makePage({ url: `${SITE}/`, security: makeSecurity({ visible_hosts: ['example.xyz'] }) });
+  const pages = [linked, page('/a', [embed('script', 'https://cdn.example.xyz/x.js')]), ...filler(MIN_PAGES_FOR_RARE - 2, [])];
+  assert.deepEqual(findingsFor(audit(pages), RARE), []);
+  const unlinked = [page('/', []), page('/a', [embed('script', 'https://cdn.example.xyz/x.js')]), ...filler(MIN_PAGES_FOR_RARE - 2, [])];
+  assert.deepEqual(findingsFor(audit(unlinked), RARE).map((finding) => /** @type {any} */ (finding.evidence.observed).host), ['cdn.example.xyz']);
 });
 
 test(`${FRAME} and ${RARE} leave out frames and scripts from the deployed site of a local crawl`, () => {

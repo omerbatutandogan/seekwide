@@ -35,6 +35,37 @@ export function unreadableNote(crawl) {
   return `${pages} could not be read: ${reasons.join(', ')}. The checks leave them out, because a refusal says nothing about what visitors or search engines get.`;
 }
 
+/** Plain words for the caps a page record names in `limits_reached`. */
+const LIMIT_WORDS = {
+  tags: 'the document was read up to its 200,000th tag',
+  links: 'the first 5,000 links were kept',
+  list_chars: 'the link, image and hreflang lists reached their size limit',
+  'security.hosts': 'the hidden-link scan followed its first 10,000 linked hosts',
+  'security.hidden_hosts': 'the first 200 hosts of hidden links were kept',
+  'security.visible_hosts': 'the first 1,000 hosts of visible links were kept',
+  'security.embeds': 'the first 200 scripts and frames from other hosts were kept',
+  'security.references': 'the ids that controls name were read up to their limit',
+};
+
+/**
+ * One sentence on the pages where a cap stopped the reading of the page
+ * (`PageRecord.limits_reached`), or null when there are none. Signals past a
+ * cap were not read, so a check can miss something there.
+ * @param {CrawlResult} crawl
+ * @returns {string|null}
+ */
+export function limitsNote(crawl) {
+  const capped = crawl.pages.filter((page) => Array.isArray(page.limits_reached) && page.limits_reached.length > 0);
+  if (capped.length === 0) return null;
+  const counts = countBy(capped.flatMap((page) => /** @type {string[]} */ (page.limits_reached)), (name) => name);
+  const reasons = Object.entries(counts)
+    .sort(([a], [b]) => (a < b ? -1 : 1))
+    .map(([name, count]) => `${LIMIT_WORDS[/** @type {keyof typeof LIMIT_WORDS} */ (name)] ?? `the list of ${name} reached its cap`} on ${count === 1 ? '1 page' : `${count} pages`}`);
+  const pages = capped.length === 1 ? '1 page was' : `${capped.length} pages were`;
+  const examples = capped.slice(0, EXAMPLE_URLS).map((page) => page.url).join(', ');
+  return `${pages} longer than the reader takes in full: ${reasons.join('; ')} (${examples}). What lies past a limit was not checked; a page padded to reach one deserves a look of its own.`;
+}
+
 /** A path segment that names a login or password page, with or without a file extension (`/login.php`, `/Account/Login`). */
 const GATE_PATH = /(?:^|\/)(?:password|log-?in|sign-?in|sign_in|wp-login)(?:\.(?:php|aspx?|html?|jsp))?(?:\/|$)/i;
 /** A start page with no link and fewer words than this holds almost nothing. */
@@ -162,6 +193,8 @@ export function runNotes(crawl, outbound, vitals, repoNotes) {
   }
   const unreadable = unreadableNote(crawl);
   if (unreadable) notes.push(unreadable);
+  const limits = limitsNote(crawl);
+  if (limits) notes.push(limits);
   notes.push(...vitalsNotes(vitals));
   notes.push(...deployedNotes(crawl));
   notes.push(...repoNotes);

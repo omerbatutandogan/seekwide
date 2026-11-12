@@ -47,9 +47,16 @@ test('only rendered images with an http(s) URL on html pages are chosen; a local
   assert.deepEqual(selectImageFiles(crawl), { urls: [`${SITE}/a.jpg`], images: 2 });
 });
 
-test('a host that refused the crawler gets no image request: its images are not chosen', () => {
-  const crawl = makeCrawl({ pages: [mediaPage('/', { images: [shown(`${SITE}/a.jpg`), shown('https://cdn.test/b.jpg')] })] });
-  assert.deepEqual(selectImageFiles(crawl, 50, 'example.test'), { urls: ['https://cdn.test/b.jpg'], images: 2 });
+test('a site that refused the crawler gets no image request on any host of its organisation or under its name (security review F6)', () => {
+  // Before 0.1.1 only the exact host was left out: the apex, the subdomains and another port still got requests.
+  const site = ['https://www.example.test/a.jpg', 'https://example.test/b.jpg', 'https://static.example.test/c.jpg', 'https://www.example.test:8443/d.jpg'];
+  const crawl = makeCrawl({
+    site_host: 'www.example.test', site_origin: 'https://www.example.test',
+    pages: [mediaPage('/', { images: [...site, 'https://cdn.test/e.jpg', 'https://example.xyz/f.jpg'].map(shown) })],
+  });
+  // The same name under another ending may be the same organisation's server, linked or not: it is left alone too.
+  assert.deepEqual(selectImageFiles(crawl, 50, true), { urls: ['https://cdn.test/e.jpg'], images: 6 });
+  assert.deepEqual(selectImageFiles(crawl, 50, false).urls.length, 6);
 });
 
 test('the media checks stay fast on 500 pages of 2,000 images each', () => {

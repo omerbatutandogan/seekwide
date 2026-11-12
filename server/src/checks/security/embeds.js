@@ -1,8 +1,7 @@
 /** @import { CheckDef, CheckResult, EmbedRecord } from '../../types.js' */
 
 import { clip } from '../../util/strings.js';
-import { hostKey } from '../../util/url.js';
-import { VERIFIED, attributeSelector, compareText, deployedSite, securedPages } from './helpers.js';
+import { VERIFIED, attributeSelector, compareText, securedPages } from './helpers.js';
 
 /**
  * Crawled pages with the signals needed before a host used by one page counts
@@ -19,7 +18,7 @@ const hiddenFrame = {
   engine: 'code',
   title: 'Hidden frame from another site',
   description:
-    'Looks for <iframe> elements that load a page from another site and that visitors cannot see: a width or height of 2 pixels or less, or hidden by their own markup or a parent element that is not built to be opened (a dialog, a tab panel, content right after a control that says it opens something, an element a control on the page names). A video or map player hidden by the box around it is a lightbox waiting to be opened and does not count. Google describes injected frames, often sized to zero and hidden with CSS, as a sign of a site hacked with malware. Some tracking tags use a hidden frame too, which is why this is a likely finding.',
+    'Looks for <iframe> elements that load a page from another site and that visitors cannot see: a width or height of 2 pixels or less, or hidden by their own markup or a parent element that no control on the page opens (one a control names by id, content right after a button that says it opens something, a tab panel labelled by its tab, content an Alpine.js component shows with a click). A video or map player hidden by the box around it is a lightbox waiting to be opened and does not count. Google describes injected frames, often sized to zero and hidden with CSS, as a sign of a site hacked with malware. Some tracking tags use a hidden frame too, which is why this is a likely finding.',
   severity: 'high',
   weight: 4,
   impact: 3,
@@ -32,11 +31,10 @@ const hiddenFrame = {
   recommendation:
     "Find the frame in the page source and the template, plugin or tag manager that adds it. If you do not recognise the site it loads, treat the site as hacked: follow Google's help for sites hacked with malware and check Search Console's Security issues report. If it is a tracking tag you use, no change is needed.",
   run(ctx) {
-    const deployed = deployedSite(ctx);
     /** @type {CheckResult[]} */
     const results = [];
     for (const page of securedPages(ctx)) {
-      const frames = page.security.embeds.filter((embed) => embed.tag === 'iframe' && !deployed(embed.url));
+      const frames = page.security.embeds.filter((embed) => embed.tag === 'iframe' && !ctx.identity.isDeployed(embed.url));
       if (frames.length === 0) continue;
       const hidden = frames.filter((frame) => frame.hidden !== null);
       if (hidden.length === 0) {
@@ -82,7 +80,7 @@ const rareHost = {
   engine: 'code',
   title: 'Script or frame from a site no other page uses',
   description:
-    'Lists scripts and frames that a page loads from another site when no other crawled page loads anything from that site, on a crawl of 50 or more pages; the site\'s own host and its subdomains are left out. Google names scripts loaded from an attacker\'s domain as a sign of a hacked site, but a video, map or form embedded on one page is just as rare, so this only marks code worth a look.',
+    'Lists scripts and frames that a page loads from another site when no other crawled page loads anything from that site, on a crawl of 50 or more pages; hosts of the site\'s own organisation (its registered domain, and the same name under another ending when a page links there visibly) are left out. Google names scripts loaded from an attacker\'s domain as a sign of a hacked site, but a video, map or form embedded on one page is just as rare, so this only marks code worth a look.',
   severity: 'info',
   weight: 0,
   impact: 1,
@@ -97,16 +95,12 @@ const rareHost = {
   run(ctx) {
     const pages = securedPages(ctx);
     if (pages.length < MIN_PAGES_FOR_RARE) return [];
-    const deployed = deployedSite(ctx);
-    // The site's own host and its subdomains (it.example.org on example.org). Another domain with the same name, or another
-    // tenant of a shared host such as vercel.app, is not the site's.
-    const own = hostKey(ctx.site.host).replace(/:\d+$/, '');
+    // The organisation's own hosts are left out: its registered domain (cdn.example.org on example.org), the deployed
+    // site of a local crawl, another ending of its name that a visible link names. Another tenant of a shared host
+    // such as vercel.app is another site.
     /** @type {Map<string, number>} */
     const pagesPerHost = new Map();
-    const foreign = (/** @type {EmbedRecord} */ embed) => {
-      const host = hostKey(embed.host).replace(/:\d+$/, '');
-      return !deployed(embed.url) && host !== own && !host.endsWith(`.${own}`);
-    };
+    const foreign = (/** @type {EmbedRecord} */ embed) => !ctx.identity.isSameOrganisation(embed.host);
     const perPage = pages.map((page) => ({ page, hosts: firstPerHost(page.security.embeds.filter(foreign)) }));
     for (const { hosts } of perPage) {
       for (const host of hosts.keys()) pagesPerHost.set(host, (pagesPerHost.get(host) ?? 0) + 1);

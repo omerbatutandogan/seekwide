@@ -177,4 +177,8 @@ export {};
  * @property {VideoRecord[]} [videos]   Every `<video>` element (media module). Absent in records made before it existed.
  * @property {VideoEmbedRecord[]} [video_embeds]  Players of known video platforms in `<iframe>`, `<embed>` or `<object>`.
  * @property {boolean} [video_markup]  An element whose `itemtype` (microdata) or `typeof` (RDFa) names `VideoObject`.
+ * @property {string[]} [limits_reached]  The caps that stopped the reading of this page, when any did: `tags` (the
+ *   document was parsed up to its 200,000th tag), a list at its cap by field name (`links`, `images`, `headings`…),
+ *   `list_chars`, and the security scan's (`security.hosts`, `security.hidden_hosts`, `security.visible_hosts`,
+ *   `security.embeds`, `security.references`). Absent when none did, and in records made before 0.1.1.
  */

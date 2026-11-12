@@ -11,10 +11,11 @@ import { LIMITS } from '../config.js';
 import { sha1Hex } from '../util/hash.js';
 import { collapseWhitespace } from '../util/strings.js';
 import { HTML_NS, SVG_NS, findBaseUrl, isAriaHidden, parsedPart } from './dom.js';
-import { visitElement } from './html-elements.js';
+import { reachedCaps, visitElement } from './html-elements.js';
 import { enterLandmark } from './media.js';
 import { streamedBoundaries } from './react-stream.js';
 import { documentSecurity, emptySecurity } from './security.js';
+import { siteIdentity } from '../util/site-identity.js';
 
 /** Elements whose text is not part of the visible body text. */
 const HIDDEN_TEXT = new Set(['script', 'style', 'noscript', 'template']);
@@ -49,6 +50,7 @@ const SPACE = Symbol('space');
  * @property {VideoRecord[]} videos
  * @property {VideoEmbedRecord[]} video_embeds
  * @property {boolean} video_markup
+ * @property {string[]} [limits_reached]  Set when a cap stopped the reading of the page (`PageRecord.limits_reached`).
  */
 
 /**
@@ -66,7 +68,9 @@ const SPACE = Symbol('space');
  * The streamed boundaries' own hidden elements count as revealed in `security`,
  * and their content is read where the page's script moves it (at the template).
  * @param {string} html
- * @param {{responseUrl: string, siteHost: string, includeSubdomains: boolean, upgradeInsecure?: boolean}} context
+ * A cap that stops the reading (the document's tags, a list, the security
+ * scan's hosts) is named in `limits_reached`.
+ * @param {{responseUrl: string, siteHost: string, includeSubdomains: boolean, deployedOrigin?: string|null, upgradeInsecure?: boolean}} context
  * @returns {HtmlFields}
  */
 export function extractHtml(html, context) {
@@ -147,10 +151,12 @@ export function extractHtml(html, context) {
   out.text_hash = visible === '' ? '' : sha1Hex(visible.toLowerCase());
   out.text_excerpt = visible.slice(0, LIMITS.textExcerptChars);
   const served = replacedText.length === 0 ? visible : collapseWhitespace(`${text.join('')} ${replacedText.join('')}`);
-  out.security = documentSecurity(document, {
-    baseUrl, siteHost: context.siteHost, includeSubdomains: context.includeSubdomains, links: out.links, revealed: streamed.revealed,
-  }, {
+  const identity = siteIdentity({ siteHost: context.siteHost, includeSubdomains: context.includeSubdomains, deployedOrigin: context.deployedOrigin ?? null });
+  const read = documentSecurity(document, { baseUrl, identity, links: out.links, revealed: streamed.revealed }, {
     titles: out.titles, metaDescriptions: out.meta_descriptions, headings: out.headings, visibleText: served,
   });
+  out.security = read.security;
+  const reached = [...(markup.length < html.length ? ['tags'] : []), ...reachedCaps(state), ...read.limits.map((name) => `security.${name}`)];
+  if (reached.length > 0) out.limits_reached = reached;
   return out;
 }

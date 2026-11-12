@@ -87,7 +87,8 @@ export async function runCrawl(params, deps, onProgress) {
   const extract = deployed === null || loopbackOrigin === null ? deps.extract : {
     ...deps.extract,
     extractPage: (input) => {
-      const record = deps.extract.extractPage(input);
+      // The deployed site's address is the site's own, share links that name it too.
+      const record = deps.extract.extractPage({ ...input, deployedOrigin: deployed });
       const local = localizeRecord(record, deployed, loopbackOrigin);
       if (local !== record) localized += 1;
       return local;

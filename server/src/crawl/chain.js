@@ -134,7 +134,7 @@ export function createChainFollower(ctx) {
 
 /**
  * @typedef {Object} Extractor
- * @property {(input: {url: string, result: FetchResult, depth: number|null, discoveredVia: PageRecord['discovered_via'], siteHost: string, includeSubdomains?: boolean}) => PageRecord} extractPage
+ * @property {(input: {url: string, result: FetchResult, depth: number|null, discoveredVia: PageRecord['discovered_via'], siteHost: string, includeSubdomains?: boolean, deployedOrigin?: string|null}) => PageRecord} extractPage
  * @property {(input: {url: string, hops: RedirectHop[], finalUrl: string, finalStatus: number, finalExternal: boolean, fetchError: string|null, depth: number|null, discoveredVia: PageRecord['discovered_via']}) => PageRecord} redirectRecord
  * @property {(input: {url: string, status: number, fetchError: string, depth: number|null, discoveredVia: PageRecord['discovered_via']}) => PageRecord} unreadableRecord
  */

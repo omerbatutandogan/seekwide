@@ -57,24 +57,6 @@ export function toLocalUrl(url, deployedOrigin, localOrigin) {
 }
 
 /**
- * True when `url` is on the host of the deployed site, whatever its scheme or
- * port, with or without "www." and a trailing dot. Used to keep every address
- * of that site out of requests, where `toLocalUrl` needs the exact origin.
- * @param {string} url
- * @param {string} deployedOrigin
- * @returns {boolean}
- */
-export function onDeployedHost(url, deployedOrigin) {
-  /** @param {string} value */
-  const bare = (value) => new URL(value).hostname.toLowerCase().replace(/\.$/, '').replace(/^www\./, '');
-  try {
-    return bare(url) === bare(deployedOrigin);
-  } catch {
-    return false;
-  }
-}
-
-/**
  * A page record whose canonicals and links on the deployed origin name the
  * local server: the canonicals with the record's indexability worked out
  * again, the links as internal links that the crawl follows like any other.

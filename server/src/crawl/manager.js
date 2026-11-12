@@ -9,9 +9,10 @@ import { dataDir as defaultDataDir, LIMITS } from '../config.js';
 import { log } from '../log.js';
 import { classifyAddress } from '../net/ip.js';
 import { safeFetch } from '../net/safe-fetch.js';
+import { crawlKey } from '../util/site-identity.js';
 import { normalizeUrl, originOf } from '../util/url.js';
 import { deployedOriginOf } from './deployed.js';
-import { MAX_RUNNING, busy, siteKey } from './admission.js';
+import { MAX_RUNNING, busy } from './admission.js';
 import { runCrawl } from './run.js';
 import { createCrawlStore } from './store.js';
 
@@ -174,14 +175,14 @@ export function createCrawlManager(deps = {}) {
   /** Origins whose crawl is being started: between the checks in `start` and the job's registration. */
   /** @type {Set<string>} */
   const starting = new Set();
-  /** The site key (`siteKey`) of each job. @type {Map<string, string>} */
+  /** The site key (`crawlKey`) of each job. @type {Map<string, string>} */
   const siteOf = new Map();
 
   /**
    * Check a local start, then create and run the job. The job and its site are
    * stored in the same step, so a call that arrives later finds the site once.
    * @param {ReturnType<typeof validateStart>} input
-   * @param {string} site  `siteKey` of the start URL.
+   * @param {string} site  `crawlKey` of the start URL.
    * @returns {Promise<CrawlJob>}
    */
   const register = async (input, site) => {
@@ -208,7 +209,7 @@ export function createCrawlManager(deps = {}) {
     async start(options) {
       const input = validateStart(options);
       const running = [...jobs.values()].filter((entry) => entry.job.status === 'running').map((entry) => entry.job);
-      const site = siteKey(input.startUrl, input.allowLoopback);
+      const site = crawlKey(input.startUrl, input.allowLoopback);
       const same = running.find((job) => siteOf.get(job.id) === site);
       if (same || starting.has(site)) {
         throw busy(`A crawl of this site is already running${same ? ` (job ${same.id}, ${same.start_url})` : ''}. Seekwide sends one request at a time to a site: wait for it with crawl_status, then start the next one.`);

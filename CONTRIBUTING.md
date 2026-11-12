@@ -63,3 +63,20 @@ node scripts/check-directory-rules.js
 ```bash
 claude plugin validate . --strict --profile directory
 ```
+
+## Updating the Public Suffix List
+
+Which hosts belong to the audited site's organisation depends on a copy of the [Public Suffix List](https://publicsuffix.org/) in `server/data/public-suffixes.txt` (its version is on the file's `VERSION` line). To update it, download the list from the one address its maintainers ask for, regenerate the copy, and run the checks above:
+
+```bash
+curl -fsSL -o /tmp/public_suffix_list.dat https://publicsuffix.org/list/public_suffix_list.dat
+```
+
+```bash
+node scripts/gen-public-suffixes.js /tmp/public_suffix_list.dat
+```
+
+A new copy can change what the checks report, so raise `RULES_VERSION` in `server/src/config.js` and name the list's version in `CHANGELOG.md`. The copy stays under the Mozilla Public License 2.0, as its header says.
+
+Some hosting services give each customer a host of their own but are not on the list, which would make all their customers one site. They are kept in a hand list next to it, `TENANT_DOMAINS` in `server/src/util/public-suffix.js`. Add a domain there only with the service's own page that says each customer gets a host under it, quoted with its address and the date it was read in the comment above the list, and drop one that the Public Suffix List has taken in. The tests in `test/util/public-suffix.test.js` check that two customers of every listed domain are two sites; a change to the hand list also raises `RULES_VERSION`.
+

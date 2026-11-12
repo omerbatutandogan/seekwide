@@ -306,6 +306,21 @@ describe('audit_run', () => {
     );
   });
 
+  it('names the pages where a cap stopped the reading, so a padded page is not taken as checked in full (code review A3)', async () => {
+    const capped = (/** @type {string} */ url, /** @type {string[]} */ limits) => makePage({ url, limits_reached: limits });
+    const { fake } = setup({
+      pages: [...sampleCrawl().pages, capped('https://example.test/big', ['links', 'security.hosts']), capped('https://example.test/huge', ['tags', 'links'])],
+    });
+    const result = await audit(fake).handler({ job_id: 'c-1' });
+    const note = result.notes.find((text) => text.includes('longer than the reader takes in full'));
+    assert.equal(note,
+      '2 pages were longer than the reader takes in full: the first 5,000 links were kept on 2 pages; the hidden-link scan followed its first ' +
+      '10,000 linked hosts on 1 page; the document was read up to its 200,000th tag on 1 page (https://example.test/big, https://example.test/huge). ' +
+      'What lies past a limit was not checked; a page padded to reach one deserves a look of its own.');
+    const plain = await audit(setup({}).fake).handler({ job_id: 'c-1' });
+    assert.equal(plain.notes.some((text) => text.includes('longer than the reader')), false);
+  });
+
   it('gives no score when the crawl was blocked before any HTML page was read', async () => {
     const blocked = { reason: /** @type {const} */ ('bot_challenge'), url: 'https://example.test/', status: 403 };
     const start = makePage({ url: 'https://example.test/', status: 403, final_status: 403, is_html: false, fetch_error: 'bot_challenge', titles: [], indexability: { indexable: false, reasons: ['fetch_error'] } });

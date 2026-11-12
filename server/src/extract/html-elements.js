@@ -10,7 +10,7 @@ import { clip, collapseWhitespace } from '../util/strings.js';
 import { isInternalUrl, normalizeUrl } from '../util/url.js';
 import { MAX_LIST_CHARS, attr, insecureUrl, isAriaHidden, lineOf, textChars, textOf, tokens } from './dom.js';
 import { parseJsonLd } from './jsonld.js';
-import { visitMedia } from './media.js';
+import { MAX_VIDEOS, MAX_VIDEO_EMBEDS, visitMedia } from './media.js';
 
 /** Script types a browser runs as JavaScript. */
 const SCRIPT_TYPES = new Set(['', 'text/javascript', 'module']);
@@ -234,4 +234,25 @@ export function visitElement(node, frame, state) {
   }
   const sourceAttr = SUBRESOURCE_ATTR.get(tag);
   if (sourceAttr) addMixed(state, attr(node, sourceAttr));
+}
+
+/**
+ * The per-page lists that reached their cap, by field name, plus
+ * `list_chars` when the characters held by the link, image and hreflang
+ * lists did (`MAX_LIST_CHARS`). A list at its cap may have had more entries
+ * that were not read.
+ * @param {HtmlState} state  After the walk.
+ * @returns {string[]}
+ */
+export function reachedCaps(state) {
+  const { out } = state;
+  /** @type {[string, unknown[], number][]} */
+  const lists = [
+    ['links', out.links, MAX_LINKS], ['images', out.images, MAX_IMAGES], ['mixed_content', out.mixed_content, MAX_MIXED_CONTENT],
+    ['videos', out.videos, MAX_VIDEOS], ['video_embeds', out.video_embeds, MAX_VIDEO_EMBEDS],
+    ...Object.entries(CAPS).map(([name, max]) => /** @type {[string, unknown[], number]} */ ([name, /** @type {any} */ (out)[name], max])),
+  ];
+  const reached = lists.filter(([, list, max]) => list.length >= max).map(([name]) => name);
+  if (state.listChars >= MAX_LIST_CHARS) reached.push('list_chars');
+  return reached;
 }

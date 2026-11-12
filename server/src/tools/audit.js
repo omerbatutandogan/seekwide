@@ -6,7 +6,6 @@
 
 import { LIMITS, MODULES, RULES_VERSION, SCHEMA_VERSION, SEVERITIES, VERSION } from '../config.js';
 import { buildContext, runChecks } from '../checks/engine.js';
-import { onDeployedHost } from '../crawl/deployed.js';
 import { isUnverifiable } from '../checks/page-helpers.js';
 import { runNotes, skippedChecks, startPage, topGroups } from './audit-summary.js';
 import { MEDIA_ARGUMENTS, collectImageFiles, imageFilesNotes } from './audit-media.js';
@@ -15,6 +14,7 @@ import { JOB_ID_SCHEMA, PROJECT_DIR_SCHEMA, UNTRUSTED_NOTE, countBy, resolveProj
 import { finishedCrawl } from './crawl.js';
 import { VERIFY_FIXES_SCHEMA, fixBase, fixOutput, fixVerification } from './fix.js';
 import { SOURCE_DIR_SCHEMA, auditSources } from './project.js';
+import { crawlIdentity } from '../util/site-identity.js';
 
 const TOP_GROUPS = 10;
 
@@ -33,9 +33,7 @@ export function externalLinkUrls(crawl) {
   const urls = new Set();
   // A local crawl that knows where the project is deployed never has that address contacted: its pages
   // name it, and a request there would say nothing about the project being audited.
-  const deployed = crawl.options.deployed_origin;
-  /** @param {string} url */
-  const onDeployedSite = (url) => Boolean(deployed) && onDeployedHost(url, /** @type {string} */ (deployed));
+  const identity = crawlIdentity(crawl);
   for (const page of crawl.pages) {
     if (page.final_external) urls.add(page.final_url);
     if (page.status !== 200 || !page.is_html) continue;
@@ -43,7 +41,7 @@ export function externalLinkUrls(crawl) {
       if (link.url !== null && !link.internal) urls.add(link.url);
     }
   }
-  return [...urls].filter((url) => !onDeployedSite(url)).sort();
+  return [...urls].filter((url) => !identity.isDeployed(url)).sort();
 }
 
 const SAVE_ATTEMPTS = 3;

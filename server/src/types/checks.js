@@ -4,6 +4,7 @@
 /** @import { LinkRecord, PageRecord } from './page.js' */
 /** @import { VitalsData } from './vitals.js' */
 /** @import { ImageFileResult } from './media.js' */
+/** @import { SiteIdentity } from '../util/site-identity.js' */
 
 export {};
 
@@ -24,6 +25,7 @@ export {};
  * @property {Map<string, InlinkRef[]>} inlinks   Target URL → internal links pointing at it from `htmlPages`.
  * @property {Set<string>} sitemapUrls       URLs listed in the XML sitemaps.
  * @property {{origin: string, host: string, https: boolean, start_url: string}} site
+ * @property {SiteIdentity} identity        Which hosts are the site (util/site-identity.js).
  * @property {Set<string>} capabilities      Which of `CAPABILITIES` this audit provides.
  * @property {Record<string, string>} skipReasons  Why a capability is missing, in the collector's words, when it gave a reason.
  * @property {Map<string, OutboundResult>|null} outbound  External link results, when they were collected.

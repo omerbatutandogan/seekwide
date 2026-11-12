@@ -13,7 +13,7 @@ import { countBy } from './common.js';
 export const IMAGE_FILES_NOT_ASKED = 'Image files were not checked (check_image_files was false), so the checks that need them were skipped.';
 export const IMAGE_FILES_FAILED = 'Image files could not be checked because of an internal error. The rest of the audit is not affected.';
 export const IMAGE_FILES_REFUSED = "Image files were not checked: the site refused the crawler (a bot challenge or rate limiting), so nothing more was requested from it. The checks that need them were skipped.";
-export const SITE_IMAGES_SKIPPED = "The site refused some of the crawler's page requests (a bot challenge or rate limiting), so no image on the site's own host was requested; images on other hosts were checked.";
+export const SITE_IMAGES_SKIPPED = "The site refused some of the crawler's page requests (a bot challenge or rate limiting), so no image on the site's own hosts (its domain and subdomains) was requested; images on other hosts were checked.";
 
 /** Refusals after which nothing more is sent to the site. */
 const REFUSALS = new Set(['bot_challenge', 'rate_limited']);
@@ -50,9 +50,9 @@ export async function collectImageFiles(deps, crawl, { requested, check }) {
   if (!check) return { files: null, summary: null, reason: IMAGE_FILES_NOT_ASKED };
   if (crawl.blocked !== null && REFUSALS.has(crawl.blocked.reason)) return { files: null, summary: null, reason: IMAGE_FILES_REFUSED };
   const local = crawl.options.local === true;
-  // A site that challenged or rate-limited the crawler on some pages gets no image request on its own host.
+  // A site that challenged or rate-limited the crawler on some pages gets no image request on any host of its organisation.
   const refused = crawl.pages.some((page) => REFUSALS.has(page.fetch_error ?? ''));
-  const selection = selectImageFiles(crawl, LIMITS.maxImageChecks, refused ? crawl.site_host : null);
+  const selection = selectImageFiles(crawl, LIMITS.maxImageChecks, refused);
   const { urls, images } = selection;
   const rate = crawl.options.rate_per_sec;
   try {

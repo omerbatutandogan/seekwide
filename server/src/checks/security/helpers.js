@@ -2,8 +2,6 @@
 
 /** @import { CheckContext, PageRecord, PageSecurity, SecurityHeaders } from '../../types.js' */
 
-import { onDeployedHost } from '../../crawl/deployed.js';
-
 /** The date every rule of this module was read against its documentation. */
 export const VERIFIED = '2026-11-12';
 
@@ -40,18 +38,6 @@ export function hasSecurity(page) {
     && typeof security.spam_terms === 'object' && security.spam_terms !== null
     && typeof security.topic_terms === 'object' && security.topic_terms !== null
     && typeof security.scripts === 'object' && security.scripts !== null && validHeaders(security.headers);
-}
-
-/**
- * For a crawl of a local server that was told where the project is deployed,
- * whether a URL is on the deployed site, which is the same site and not another
- * one. Always false for any other crawl.
- * @param {CheckContext} ctx
- * @returns {(url: string) => boolean}
- */
-export function deployedSite(ctx) {
-  const deployed = ctx.crawl.options.deployed_origin;
-  return deployed ? (url) => onDeployedHost(url, deployed) : () => false;
 }
 
 /**

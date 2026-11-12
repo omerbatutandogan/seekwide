@@ -148,56 +148,9 @@ export function normalizeUrl(raw, base) {
   return normalizeEscapes(url.href);
 }
 
-/**
- * Split a `URL.host` value into its name and its port ('' when there is none).
- * @param {string} host  For example "example.com", "localhost:3000" or "[::1]:8080".
- * @returns {{name: string, port: string}}
- */
-function splitHost(host) {
-  const match = /^(.*?)(?::(\d+))?$/.exec(host.toLowerCase());
-  return { name: match?.[1] ?? '', port: match?.[2] ?? '' };
-}
-
-/**
- * Key used to decide whether two URLs belong to the same site: the host in
- * lower case without a leading "www.", plus the port when the URL names one.
- *
- * `URL.host` leaves out the default port of its scheme, so http and https on
- * their default ports share a key, while another port is another site.
- * @param {string} host  A `URL.host` value (a bare host name works too).
- * @returns {string}
- */
-export function hostKey(host) {
-  const { name, port } = splitHost(host);
-  const bare = name.startsWith('www.') ? name.slice(4) : name;
-  return port === '' ? bare : `${bare}:${port}`;
-}
-
-/**
- * True when `url` belongs to the audited site: the same host (ignoring a
- * leading "www.") on the same port. The scheme does not matter, so the http
- * and https versions of a site are one site. A different port is a different
- * service and counts as external.
- * @param {string} url Absolute URL.
- * @param {string} siteHost `URL.host` of the audited site (with its port when not the default).
- * @param {boolean} [includeSubdomains] Treat subdomains of the site, on the same port, as internal.
- * @returns {boolean}
- */
-export function isInternalUrl(url, siteHost, includeSubdomains = false) {
-  let host;
-  try {
-    host = new URL(url).host;
-  } catch {
-    return false;
-  }
-  const key = hostKey(host);
-  const siteKey = hostKey(siteHost);
-  if (key === siteKey) return true;
-  if (!includeSubdomains) return false;
-  const candidate = splitHost(key);
-  const site = splitHost(siteKey);
-  return candidate.port === site.port && candidate.name.endsWith(`.${site.name}`);
-}
+// Whether a host is the audited site is decided in one place, site-identity.js;
+// `hostKey` and `isInternalUrl` are re-exported for the modules that read them here.
+export { hostKey, isInternalUrl } from './site-identity.js';
 
 /**
  * Rough "page template" of a URL: its first path segment plus the number of

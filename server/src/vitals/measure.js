@@ -3,10 +3,8 @@
 // plain words what it got and what it did not. Nothing Google does can make
 // this fail: a refusal or a timeout becomes a reason, not an error.
 
-import net from 'node:net';
-
 import { LIMITS } from '../config.js';
-import { classifyAddress } from '../net/ip.js';
+import { isPublicHost } from '../util/site-identity.js';
 import { queryCrux } from './crux.js';
 import { describeFailure, isServiceFailure } from './google-api.js';
 import { runPagespeed } from './psi.js';
@@ -64,30 +62,7 @@ function whyNotSent(crawl) {
   const local = crawl.options?.local;
   if (local === true) return NOT_PUBLIC;
   if (local !== false) return NOT_KNOWN_PUBLIC;
-  return mayLeaveMachine(crawl.site_origin) ? null : NOT_PUBLIC;
-}
-
-/** Names that only mean something on a local network (RFC 6761, RFC 6762, RFC 8375 and common use). */
-const LOCAL_SUFFIXES = ['.localhost', '.local', '.internal', '.lan', '.localdomain', '.home.arpa', '.intranet', '.corp'];
-
-/**
- * Whether the host of `url` could be a public site: not this machine, not an
- * address that is not public, not a name that only works on a local network,
- * and not a single-label name. One trailing dot is ignored.
- * @param {string} url
- * @returns {boolean}
- */
-export function mayLeaveMachine(url) {
-  let hostname;
-  try {
-    hostname = new URL(url).hostname.toLowerCase();
-  } catch {
-    return false;
-  }
-  const bare = (hostname.startsWith('[') ? hostname.slice(1, -1) : hostname).replace(/\.$/, '');
-  if (net.isIP(bare) !== 0) return classifyAddress(bare) === 'public';
-  if (bare === 'localhost' || !bare.includes('.')) return false;
-  return !LOCAL_SUFFIXES.some((suffix) => bare.endsWith(suffix));
+  return isPublicHost(crawl.site_origin) ? null : NOT_PUBLIC;
 }
 
 /**
@@ -228,7 +203,7 @@ export async function measureVitals(crawl, options = {}) {
   const refusedSite = whyNotSent(crawl);
   if (refusedSite !== null) return unavailableVitals(crawl.site_origin, refusedSite);
   // Each page is checked again, so a crawl file that names local pages under a public origin sends none of them.
-  const selected = selectVitalsPages(crawl, maxPages).filter((page) => mayLeaveMachine(page.url));
+  const selected = selectVitalsPages(crawl, maxPages).filter((page) => isPublicHost(page.url));
   if (selected.length === 0) return unavailableVitals(crawl.site_origin, NO_PAGES);
   // Like a key Google refuses, a key that cannot be sent stops both services; running without it would hide the mistake.
   if (options.apiKeyUnusable === true) return unavailableVitals(crawl.site_origin, KEY_UNUSABLE);

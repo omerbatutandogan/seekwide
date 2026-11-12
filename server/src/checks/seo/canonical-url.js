@@ -5,7 +5,7 @@
 
 import { effectiveCanonicalUrls, isNoindex, isRedirectRecord, isUnverifiable } from '../page-helpers.js';
 import { clip } from '../../util/strings.js';
-import { hostKey, sameCanonicalTarget } from '../../util/url.js';
+import { sameCanonicalTarget } from '../../util/url.js';
 import { MAX_LISTED, SELECTOR, describeRef, effectiveRefs } from './canonical-refs.js';
 import { DOCS, SEO } from './common.js';
 
@@ -152,11 +152,11 @@ const crossHost = {
   doc_ref: DOCS.CANONICAL_TROUBLESHOOTING,
   recommendation: 'If the other host is not the intended original, change the canonical to the URL of this page on your own site.',
   run(ctx) {
-    const siteKey = hostKey(new URL(ctx.site.origin).hostname);
     return ctx.htmlPages
       .filter((page) => effectiveCanonicalUrls(page).length > 0)
       .map((page) => {
-        const foreign = effectiveCanonicalUrls(page).filter((url) => hostKey(new URL(url).hostname) !== siteKey);
+        // Another host name; the scheme, the port, "www." and a trailing dot do not make one.
+        const foreign = effectiveCanonicalUrls(page).filter((url) => !ctx.identity.isSiteHost(url));
         if (foreign.length === 0) return { status: 'pass', url: page.url };
         const ref = effectiveRefs(page).find((canonical) => canonical.url === foreign[0]);
         return {

@@ -80,8 +80,10 @@ function buildRecord(base, fields) {
  * status; a non-HTML response gets empty content fields but its
  * `X-Robots-Tag` and `Link` headers still apply. Strings are clipped and lists
  * capped as REVIEW-FIXES R8 and ARCHITECTURE.md 4.6 describe.
+ * `deployedOrigin`, for a crawl of a local server, is where the project is
+ * deployed: links to it are the site's own (share links that name it too).
  * @param {{url: string, result: FetchResult, depth: number|null, discoveredVia: PageRecord['discovered_via'],
- *          siteHost: string, includeSubdomains?: boolean}} input
+ *          siteHost: string, includeSubdomains?: boolean, deployedOrigin?: string|null}} input
  * @returns {PageRecord}
  */
 export function extractPage(input) {
@@ -102,7 +104,7 @@ export function extractPage(input) {
 
   const content = isHtml && result.body && result.body.length > 0
     ? extractHtml(decodeBody(result.body, contentType).text, {
-      responseUrl, siteHost: input.siteHost, includeSubdomains: input.includeSubdomains ?? false, upgradeInsecure,
+      responseUrl, siteHost: input.siteHost, includeSubdomains: input.includeSubdomains ?? false, deployedOrigin: input.deployedOrigin ?? null, upgradeInsecure,
     })
     : emptyContent();
   const fromHeaders = parseLinkHeaders(headerValues(result, 'link'), responseUrl);

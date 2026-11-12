@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { extractPage } from '../../server/src/extract/page.js';
-import { MAX_EMBEDS, MAX_HIDDEN_HOSTS } from '../../server/src/extract/security.js';
+import { MAX_EMBEDS, MAX_HIDDEN_HOSTS, MAX_TRACKED_HOSTS, MAX_VISIBLE_HOSTS } from '../../server/src/extract/security.js';
+import { LIMITS } from '../../server/src/config.js';
 import { makeFetch, makeInput } from './fetch-result.js';
 
 /** @import { PageSecurity } from '../../server/src/types.js' */
@@ -54,25 +55,46 @@ test('a link whose whole text is one punctuation character is concealed; icons a
   assert.deepEqual(found.visible_hosts, ['icons.test', 'labelled.test', 'titled.test', 'letter.test']);
 });
 
-test('content built to be opened is not hidden: menus, tabs, accordions, pop-ups, dialogs and modals', () => {
+test('content a control on the page opens is not hidden: menus, tabs, accordions, pop-ups, dialogs and modals', () => {
   assert.deepEqual(hiddenHosts(`<body>
 <button aria-controls="faq other">Q</button><div id="faq" hidden><a href="https://a.test/">a</a></div>
 <div id="later" style="display:none"><a href="https://c.test/">c</a></div><span data-bs-target="#later">Show</span>
 <ul><li data-tab="map">Map</li></ul><div id="map" style="display:none"><a href="https://maps.test/">m</a></div>
 <nav x-data><button @click="open=!open">Resources</button><div x-show="open" style="display: none;"><a href="https://docs.test/">d</a></div></nav>
+<div id="app"><a href="#" v-on:click.prevent="menu = true">Menu</a><ul v-show="menu" style="display:none"><li><a href="https://vue.test/">v</a></li></ul></div>
 <button aria-expanded="false">More</button><ul style="display:none"><li><a href="https://more.test/">More</a></li></ul>
+<a href="/lang" aria-haspopup="true">EN</a><ul style="display:none"><li><a href="https://lang.test/">DE</a></li></ul>
 <details><summary>Shipping</summary><div style="display:none"><a href="https://parcel.test/">p</a></div></details>
-<div role="dialog" style="display:none"><a href="https://dialog.test/">x</a></div><div popover><a href="https://pop.test/">p</a></div>
+<button data-bs-toggle="modal" data-bs-target="#modal">Open</button><div id="modal" role="dialog" style="display:none"><a href="https://dialog.test/">x</a></div>
+<button popovertarget="pop">Open</button><div id="pop" popover style="display:none"><a href="https://pop.test/">p</a></div>
 <div id="nobody" style="display:none"><a href="https://d.test/">d</a></div>
 </body>`), ['d.test']);
 });
 
-test('links to the same organisation under another domain, and share links, are not hidden links to another site', () => {
+test('a role or an attribute alone does not make hidden content openable (security review F9)', () => {
+  const link = '<a href="https://cheap-pills.test/buy">buy</a>';
+  const cases = {
+    popover: `<div style="display:none" popover>${link}</div>`,
+    dialog: `<div style="display:none" role="dialog">${link}</div>`,
+    menu: `<div style="display:none" role="menu">${link}</div>`,
+    'aria-modal': `<div style="display:none" aria-modal="true">${link}</div>`,
+    'x-show outside any Alpine.js component, which Alpine never runs': `<button @click="open = !open">x</button><div style="display:none" x-show="open">${link}</div>`,
+    'x-show whose only binding is its own': `<div x-data><div style="display:none" x-show="open" @click="open = true">${link}</div></div>`,
+    'v-show on a page whose only binding is inside it': `<div style="display:none" v-show="open"><a href="#" @click="open = true">x</a>${link}</div>`,
+    'x-cloak': `<div style="display:none" x-cloak>${link}</div>`,
+    'an element with aria-expanded that is no control': `<span aria-expanded="false"></span><div style="position:absolute;left:-9999px">${link}</div>`,
+  };
+  for (const [name, body] of Object.entries(cases)) assert.deepEqual(hiddenHosts(`<body><p>Article</p>${body}</body>`), ['cheap-pills.test'], name);
+});
+
+test('share links are not hidden links to another site; the same name under another ending is left to the check', () => {
+  // Anyone can register <name>.<ending>; only a visible link on some crawled page makes it the organisation's, which the
+  // check knows and one page does not (hidden.test.js).
   assert.deepEqual(hiddenHosts(`<body><div class="lang"><button class="lang-toggle">EN</button><ul class="lang-menu" style="display:none">
 <li><a href="https://example.de/">Deutsch</a></li><li><a href="https://shop.example.co.uk/">UK shop</a></li></ul></div>
 <button class="share-btn">Share</button><div class="share-pop" hidden>
 <a href="https://www.reddit.com/submit?url=https%3A%2F%2Fexample.test%2Fpost">Reddit</a><a href="https://twitter.com/intent/tweet?url=https://www.example.test/post">X</a>
-<a href="https://spam.test/?q=notexample.testing">spam</a></div></body>`), ['spam.test']);
+<a href="https://spam.test/?q=notexample.testing">spam</a></div></body>`), ['example.de', 'shop.example.co.uk', 'spam.test']);
 });
 
 test('on a shared hosting domain only the site\'s own host is its own: another customer, or the service, is another site', () => {
@@ -86,7 +108,9 @@ test('on a shared hosting domain only the site\'s own host is its own: another c
   assert.deepEqual(hiddenOn('vercel.com', 'https://spam-pills.vercel.app/'), ['spam-pills.vercel.app'], 'the service\'s own site does not own its customers');
   assert.deepEqual(hiddenOn('acme.vercel.app', 'https://vercel.com/'), ['vercel.com']);
   assert.deepEqual(hiddenOn('acme.vercel.app', 'https://preview.acme.vercel.app/'), [], 'a subdomain of the customer\'s host is its own');
-  assert.deepEqual(hiddenOn('acme.test', 'https://acme.ru/'), [], 'the same name under another ending stays the same organisation');
+  assert.deepEqual(hiddenOn('acme.test', 'https://shop.acme.test/'), [], 'a host under the site\'s registered domain is its own');
+  assert.deepEqual(hiddenOn('acme.test', 'https://acme.ru/'), ['acme.ru'], 'the same name under another ending is recorded; the check decides');
+  assert.deepEqual(hiddenOn('acme.wordpress.com', 'https://spam.wordpress.com/'), ['spam.wordpress.com'], 'wordpress.com is treated as a public suffix');
 });
 
 test('a plain button, link or id that only happens to match does not open what follows', () => {
@@ -199,6 +223,54 @@ test('hidden hosts and embeds are capped; links to a host already recorded only 
   assert.equal(found.hidden_links.length, MAX_HIDDEN_HOSTS);
   assert.deepEqual(found.hidden_links.slice(0, 4).map((link) => [link.host, link.count]), [['menu0.test', 50], ['menu1.test', 50], ['menu2.test', 50], ['spam.test', 1]]);
   assert.equal(found.embeds.length, MAX_EMBEDS);
+  assert.deepEqual(page(`<body><div hidden>${many}</div>${'<script src="https://c.test/a.js"></script>'.repeat(MAX_EMBEDS + 20)}</body>`).limits_reached,
+    ['security.embeds', 'security.hidden_hosts'], 'the record says which caps the page reached');
+});
+
+test('padding a page past the 5,000 links of its record does not hide a hidden link from the scan (code review A3)', () => {
+  const padding = Array.from({ length: 6000 }, (_, i) => `<a href="/p/${i}">p${i}</a>`).join('');
+  const record = page(`<body>${padding}<div style="display:none"><a href="https://casino-spam.test/x">cheap pills</a></div>
+<a href="https://visible.test/">v</a><a href="https://dot.test/">.</a></body>`);
+  assert.equal(record.links.length, 5000);
+  const hidden = /** @type {PageSecurity} */ (record.security).hidden_links;
+  assert.deepEqual(hidden.map((link) => [link.host, link.index, link.text, link.how]), [
+    ['casino-spam.test', 6000, 'cheap pills', 'display:none'], ['dot.test', 6002, '.', 'one-character link'],
+  ]);
+  assert.deepEqual(/** @type {PageSecurity} */ (record.security).visible_hosts, ['visible.test']);
+  assert.deepEqual(record.limits_reached, ['links']);
+  assert.equal(page('<body><a href="https://a.test/">a</a></body>').limits_reached, undefined, 'no cap reached, no field');
+});
+
+test('the scan caps hosts, not links: padding with other hosts fills the cap and says so', () => {
+  const visible = Array.from({ length: MAX_TRACKED_HOSTS + 10 }, (_, i) => `<a href="https://v${i}.test/">v</a>`).join('');
+  const spam = '<div style="display:none"><a href="https://casino-spam.test/x">pills</a></div>';
+  const afterVisible = page(`<body>${visible}${spam}</body>`);
+  assert.deepEqual(/** @type {PageSecurity} */ (afterVisible.security).hidden_links.map((link) => link.host), ['casino-spam.test'],
+    'visible hosts use their own room');
+  assert.equal(/** @type {PageSecurity} */ (afterVisible.security).visible_hosts.length, MAX_VISIBLE_HOSTS);
+  assert.deepEqual(afterVisible.limits_reached, ['links', 'security.hosts', 'security.visible_hosts']);
+  const hiddenPadding = Array.from({ length: MAX_TRACKED_HOSTS }, (_, i) => `<a href="https://h${i}.test/">h</a>`).join('');
+  const afterHidden = page(`<body><div hidden>${hiddenPadding}</div>${spam}</body>`);
+  assert.equal(/** @type {PageSecurity} */ (afterHidden.security).hidden_links.length, MAX_HIDDEN_HOSTS);
+  assert.deepEqual(afterHidden.limits_reached, ['links', 'security.hidden_hosts', 'security.hosts'], 'a page padded past the cap is named');
+});
+
+test('a 5 MiB page of links to distinct hosts is scanned in seconds of CPU time', () => {
+  const anchor = (/** @type {number} */ i) => `<div style="display:none"><a href="https://h${i}.test/">x</a></div>`;
+  const parts = [];
+  let size = 0;
+  for (let i = 0; size < LIMITS.maxBodyBytes - 200; i += 1) {
+    const part = anchor(i);
+    parts.push(part);
+    size += part.length;
+  }
+  const html = `<body>${parts.join('')}</body>`;
+  assert.ok(html.length <= LIMITS.maxBodyBytes, 'within the body limit');
+  const started = cpuMs();
+  const record = page(html);
+  const elapsed = cpuMs() - started;
+  assert.ok(elapsed < 10_000, `took ${elapsed} ms of CPU time`);
+  assert.ok(record.limits_reached?.includes('security.hosts'));
 });
 
 test('a large page full of hidden elements, styles and spam terms extracts in a few seconds of CPU time', () => {
