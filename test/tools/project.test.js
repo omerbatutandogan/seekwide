@@ -11,6 +11,9 @@ import { makeFinding } from '../helpers/run-factory.js';
 import { HTML_FIXTURE, NEXT_FIXTURE, makeTree } from '../helpers/repo.js';
 import { jobFor, makeDeps, sampleCrawl, toolNamed } from './fakes.js';
 
+/** The static-server command uses `python` on Windows and `python3` elsewhere (see repo/detect.js). */
+const PYTHON = process.platform === 'win32' ? 'python' : 'python3';
+
 const ORIGIN = 'http://localhost:3000';
 
 /** @type {Awaited<ReturnType<typeof makeTree>>} */
@@ -81,7 +84,7 @@ describe('project_detect', () => {
   it('describes a plain HTML project', async () => {
     const result = /** @type {any} */ (await setup({ defaultDir: HTML_FIXTURE }).detect.handler({}));
     assert.deepEqual([result.framework, result.supported], ['html', true]);
-    assert.equal(result.dev_server.command, 'python3 -m http.server 4173 --bind 127.0.0.1');
+    assert.equal(result.dev_server.command, `${PYTHON} -m http.server 4173 --bind 127.0.0.1`);
     assert.equal(result.dev_server.cwd, HTML_FIXTURE);
     assert.deepEqual(result.routes.map((/** @type {{file: string}} */ r) => r.file), ['about.html', 'blog/index.html', 'contact.html', 'index.html', 'services.html']);
   });

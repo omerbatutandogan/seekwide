@@ -7,6 +7,9 @@ import { describe, it } from 'node:test';
 import { detectProject } from '../../server/src/repo/detect.js';
 import { HTML_FIXTURE, NEXT_FIXTURE, makeTree } from '../helpers/repo.js';
 
+/** The static-server command uses `python` on Windows and `python3` elsewhere (see repo/detect.js). */
+const PYTHON = process.platform === 'win32' ? 'python' : 'python3';
+
 const NEXT_PKG = JSON.stringify({ dependencies: { next: '15.0.0', react: '19.0.0' }, scripts: { dev: 'next dev --turbopack' } });
 
 /**
@@ -42,7 +45,7 @@ describe('detectProject: supported projects', () => {
     assert.equal(found.supported, true);
     assert.equal(found.app_dir, null);
     assert.deepEqual(found.dev_server, {
-      command: 'python3 -m http.server 4173 --bind 127.0.0.1', script: null, script_clipped: false, also_runs: [], default_url: 'http://127.0.0.1:4173', package_manager: null, dependencies_installed: null,
+      command: `${PYTHON} -m http.server 4173 --bind 127.0.0.1`, script: null, script_clipped: false, also_runs: [], default_url: 'http://127.0.0.1:4173', package_manager: null, dependencies_installed: null,
     });
   });
 
@@ -164,7 +167,7 @@ describe('detectProject: package.json is data', () => {
   it('ignores fields of the wrong type', async () => {
     const found = await detect({ 'package.json': JSON.stringify({ dependencies: 'next', scripts: ['dev'], devDependencies: null }), 'index.html': '' });
     assert.equal(found.framework, 'html');
-    assert.equal(found.dev_server.command, 'python3 -m http.server 4173 --bind 127.0.0.1');
+    assert.equal(found.dev_server.command, `${PYTHON} -m http.server 4173 --bind 127.0.0.1`);
   });
 
   it('does not follow a package.json, an app folder or an index.html that is a symbolic link', async () => {

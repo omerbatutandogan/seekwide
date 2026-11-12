@@ -14,6 +14,9 @@ import { ToolError } from '../../server/src/mcp/stdio.js';
 import { createTools } from '../../server/src/tools/index.js';
 import { HTML_FIXTURE, startServer, staticRoutes } from '../helpers/repo.js';
 
+/** The static-server command uses `python` on Windows and `python3` elsewhere (see repo/detect.js). */
+const PYTHON = process.platform === 'win32' ? 'python' : 'python3';
+
 /** @import { ToolDef } from '../../server/src/mcp/stdio.js' */
 
 /** @type {Awaited<ReturnType<typeof startServer>>} */
@@ -78,7 +81,7 @@ describe('repo mode on the plain HTML fixture', () => {
   it('project_detect recognizes the project and proposes a server that listens on this machine only', async () => {
     const found = await call('project_detect');
     assert.deepEqual([found.framework, found.supported, found.source_dir], ['html', true, projectDir]);
-    assert.equal(found.dev_server.command, 'python3 -m http.server 4173 --bind 127.0.0.1');
+    assert.equal(found.dev_server.command, `${PYTHON} -m http.server 4173 --bind 127.0.0.1`);
     assert.equal(found.dev_server.cwd, projectDir);
     assert.equal(found.routes_total, 5);
   });

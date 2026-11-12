@@ -1,3 +1,4 @@
+import { once } from 'node:events';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { PassThrough } from 'node:stream';
@@ -57,6 +58,9 @@ describe('tools through the MCP server', () => {
     input.write(`${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { _meta: meta, name: 'audit_run', arguments: { job_id: 'c-1' } } })}\n`);
     input.write(`${JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { _meta: meta, name: 'crawl_start', arguments: { url: 'https://example.test/' } } })}\n`);
     input.end();
+    // The server closes itself once it has read the end of its input; wait for that, so the
+    // two writes are delivered before the server stops reading, whatever Node's stream timing.
+    await once(input, 'end');
     await server.close();
     const responses = output.read().toString('utf8').trim().split('\n').map((line) => JSON.parse(line)).sort((a, b) => a.id - b.id);
     assert.equal(responses[0].result.isError, true);
