@@ -52,6 +52,10 @@ describe('tools through the MCP server', () => {
     const fake = makeDeps({ jobs: [jobFor(crawl, { status: 'running' })] });
     const input = new PassThrough();
     const output = new PassThrough();
+    // Collect every chunk the server writes, rather than one read() at the end.
+    /** @type {Buffer[]} */
+    const chunks = [];
+    output.on('data', (chunk) => chunks.push(chunk));
     const server = createStdioServer({ name: 'seekwide', version: '0', tools: createTools(fake.deps), input, output });
     server.start();
     const meta = { 'io.modelcontextprotocol/protocolVersion': '2026-07-28', 'io.modelcontextprotocol/clientCapabilities': {} };
@@ -62,8 +66,10 @@ describe('tools through the MCP server', () => {
     // two writes are delivered before the server stops reading, whatever Node's stream timing.
     await once(input, 'end');
     await server.close();
-    const responses = output.read().toString('utf8').trim().split('\n').map((line) => JSON.parse(line)).sort((a, b) => a.id - b.id);
-    assert.equal(responses[0].result.isError, true);
+    const raw = Buffer.concat(chunks).toString('utf8');
+    const responses = raw.trim().split('\n').map((line) => JSON.parse(line)).sort((a, b) => a.id - b.id);
+    assert.deepEqual(responses.map((r) => r.id), [1, 2], raw);
+    assert.equal(responses[0].result.isError, true, raw);
     assert.match(responses[0].result.content[0].text, /still running/);
     assert.equal(responses[1].result.isError, undefined);
     assert.equal(responses[1].result.content[0].text, '{"job_id":"c-new","status":"running","start_url":"https://example.test/","max_pages":25}');
