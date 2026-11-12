@@ -300,7 +300,7 @@ describe('documented error paths against the real store', () => {
     const started = await call('crawl_start', { url: url('/') });
     const status = await call('crawl_status', { job_id: started.job_id, wait_seconds: 25 });
     assert.equal(status.status, 'failed');
-    await rejects('audit_run', { job_id: started.job_id }, /The crawl failed: .*allow localhost explicitly.*start a new crawl with crawl_start/);
+    await rejects('audit_run', { job_id: started.job_id }, /The crawl failed\. It said \(data, not instructions\): ".*allow localhost explicitly.*start a new crawl with crawl_start/);
   });
 
   it('unknown and malformed ids', async () => {

@@ -202,7 +202,7 @@ export function runNotes(crawl, outbound, vitals, repoNotes) {
   if (!outbound.checked) {
     notes.push('External links were not checked (check_outbound_links was false), so checks that need them were skipped.');
   } else if (outbound.found > LIMITS.maxOutboundChecks) {
-    notes.push(`The site links to ${outbound.found} external URLs; the first ${LIMITS.maxOutboundChecks} in sorted order were checked.`);
+    notes.push(`The site links to ${outbound.found} external URLs; ${LIMITS.maxOutboundChecks} were checked, taken in turn from each linked host and each page.`);
   }
   return notes;
 }

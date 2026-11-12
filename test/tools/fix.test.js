@@ -153,7 +153,8 @@ describe('fix_plan', () => {
   it('refuses when the folder no longer holds the kind of project the run audited, or the run names a folder outside it', async () => {
     await assert.rejects(plan({ runs: [repoRun({ repo: { ...REPO, framework: 'html', label: 'Plain HTML' } })] }).call(), (error) => error instanceof ToolError && /audited another kind of project than the folder now holds \(Next\.js/.test(error.message) && !error.message.includes('Plain HTML'));
     await assert.rejects(plan({ runs: [repoRun({ repo: { ...REPO, source_dir: '/etc' } })] }).call(), (error) => error instanceof ToolError && /does not say where the web project is/.test(error.message));
-    await assert.rejects(plan({ runs: [repoRun({ repo: { ...REPO, source_dir: '../..' } })] }).call(), (error) => error instanceof ToolError && /Pass the folder that holds the web project/.test(error.message));
+    // A stored folder is named by its field, never quoted: a repository chooses it.
+    await assert.rejects(plan({ runs: [repoRun({ repo: { ...REPO, source_dir: '../..' } })] }).call(), (error) => error instanceof ToolError && /names a source folder \(repo\.source_dir\) that is missing, not a folder, or outside the project\. Audit the project again/.test(error.message) && !error.message.includes('..'));
   });
 
   it('turns an unknown run into advice', async () => {

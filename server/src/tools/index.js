@@ -50,11 +50,11 @@ import { runTools } from './runs.js';
  * @property {(base: Run, current: Run) => Comparison} compareRuns
  * @property {(run: Run, options: object) => string} renderMarkdown
  * @property {(run: Run, options: object) => string} renderHtml
- * @property {(urls: string[], options?: {maxLinks?: number, concurrency?: number}) => Promise<Map<string, OutboundResult>>} checkExternalLinks
- * @property {(crawl: CrawlResult, options: {maxPages: number}) => Promise<VitalsData>} measureVitals
- * @property {(urls: string[], options?: Parameters<typeof checkImageFiles>[1]) => Promise<Map<string, ImageFileResult>>} checkImageFiles
+ * @property {(urls: string[], options?: {maxLinks?: number, concurrency?: number, signal?: AbortSignal}) => Promise<Map<string, OutboundResult>>} checkExternalLinks
+ * @property {(crawl: CrawlResult, options: {maxPages: number, signal?: AbortSignal}) => Promise<VitalsData>} measureVitals
  *   Core Web Vitals of a crawl. The Google API key is bound into this function where the server is
  *   wired, so no tool ever holds it.
+ * @property {(urls: string[], options?: Parameters<typeof checkImageFiles>[1]) => Promise<Map<string, ImageFileResult>>} checkImageFiles
  * @property {(projectDir: string, sourceDir?: string) => Promise<ProjectSources>} loadProjectSources
  *   Repo mode: what kind of web project a folder holds and which file answers a URL. Reads file names and
  *   package.json as data; throws `RepoError` for a folder that is missing or outside the project.

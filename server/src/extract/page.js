@@ -79,7 +79,7 @@ function buildRecord(base, fields) {
  * carries. Otherwise HTML is extracted for every HTML response whatever its
  * status; a non-HTML response gets empty content fields but its
  * `X-Robots-Tag` and `Link` headers still apply. Strings are clipped and lists
- * capped as REVIEW-FIXES R8 and ARCHITECTURE.md 4.6 describe.
+ * capped as ARCHITECTURE.md 4.6 describes.
  * `deployedOrigin`, for a crawl of a local server, is where the project is
  * deployed: links to it are the site's own (share links that name it too).
  * @param {{url: string, result: FetchResult, depth: number|null, discoveredVia: PageRecord['discovered_via'],

@@ -68,8 +68,9 @@ test('a stored count that is not a count is ignored by the report and refused by
   assert.equal(report.scores.find((score) => score.module === 'security_headers')?.counted, null);
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'seekwide-count-'));
   t.after(() => fs.rm(dir, { recursive: true, force: true }));
-  await saveRun(dir, runWith(/** @type {any} */ ({ passed: '1', of: 3 }), { run_id: 'r1' }));
-  await assert.rejects(loadRun(dir, 'r1'), /modules\.security_headers\.count/);
+  // Refused when saved, so that no saved run is one the store will not read back.
+  await assert.rejects(saveRun(dir, runWith(/** @type {any} */ ({ passed: '1', of: 3 }), { run_id: 'r1' })), /modules\.security_headers\.count/);
+  await assert.rejects(loadRun(dir, 'r1'), { code: 'RUN_NOT_FOUND' });
 });
 
 test('the run index and the comparison of two runs carry the counts', async (t) => {

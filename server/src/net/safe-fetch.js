@@ -8,13 +8,13 @@ import https from 'node:https';
 import { LIMITS, USER_AGENT } from '../config.js';
 import { readBody } from './body.js';
 import { FetchFailure, pinnedLookup, resolveAndCheck, toFailure } from './connect.js';
+import { REDIRECT_STATUSES } from './polite.js';
 
 export { pinnedLookup };
 
 /** @import { FetchResult, RedirectHop } from '../types.js' */
 /** @import { CheckedAddress } from './connect.js' */
 
-const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 const DEFAULT_ACCEPT = 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.5';
 /** Errors that keep the status of the last redirect; every other error means status 0. */
 const KEEPS_STATUS = new Set(['too_many_redirects', 'redirect_loop']);

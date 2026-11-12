@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { ToolError } from '../../server/src/mcp/stdio.js';
+import { InputError } from '../../server/src/util/errors.js';
 import { createTools } from '../../server/src/tools/index.js';
 import { settingValue, withStoreErrors } from '../../server/src/tools/common.js';
 import { makeDeps, sampleCrawl, jobFor, toolNamed } from './fakes.js';
@@ -74,14 +75,22 @@ describe('store contract handling in the tools', () => {
     assert.equal(fake.calls.checkExternalLinks, undefined);
   });
 
-  it('report_render turns a renderer TypeError into a ToolError', async () => {
+  it('report_render turns a renderer InputError into a ToolError, and leaves a bug\'s TypeError to the generic message', async () => {
     const fake = makeDeps({ runs: [/** @type {any} */ ({ run_id: 'r1', findings: [] })] });
     fake.deps.renderHtml = () => {
-      throw new TypeError('recommendations[0] needs a non-empty title and detail.');
+      throw new InputError('recommendations[0] needs a non-empty title and detail.');
     };
     await assert.rejects(
       toolNamed(createTools(fake.deps), 'report_render').handler({ formats: ['html'], project_dir: '/tmp' }),
       (error) => error instanceof ToolError && /html report could not be rendered: recommendations\[0\]/.test(error.message),
+    );
+    fake.deps.renderHtml = () => {
+      const run = /** @type {any} */ (undefined);
+      return run.findings.length;
+    };
+    await assert.rejects(
+      toolNamed(createTools(fake.deps), 'report_render').handler({ formats: ['html'], project_dir: '/tmp' }),
+      (error) => error instanceof TypeError && !(error instanceof ToolError),
     );
   });
 });

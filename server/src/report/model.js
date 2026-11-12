@@ -3,6 +3,7 @@
 
 import { countText } from '../checks/scoring.js';
 import { SEVERITIES } from '../config.js';
+import { InputError } from '../util/errors.js';
 import { clip, collapseWhitespace } from '../util/strings.js';
 import { methodSections, reportTitle } from './copy.js';
 import { changeList, groupByCheck, viewFinding, withLimits } from './findings.js';
@@ -28,8 +29,10 @@ function formatDate(iso) {
 }
 
 /**
- * Check and normalize the options. Throws `TypeError` for a value that cannot
- * be rendered faithfully, so a caller mistake is never hidden in a report.
+ * Check and normalize the options. Throws `InputError` for text of the caller's
+ * that cannot be rendered faithfully (a recommendation without a title or
+ * detail), so a caller mistake is never hidden in a report, and `TypeError` for
+ * an option of the wrong type, which the tool never passes.
  * @param {Run} run
  * @param {object} options
  */
@@ -59,7 +62,7 @@ function readOptions(run, options) {
       const entry = obj(item);
       const title = text(entry.title);
       const detail = str(entry.detail).trim();
-      if (!title || !detail) throw new TypeError(`recommendations[${index}] needs a non-empty title and detail.`);
+      if (!title || !detail) throw new InputError(`recommendations[${index}] needs a non-empty title and detail.`);
       return { title, detail };
     }),
   };

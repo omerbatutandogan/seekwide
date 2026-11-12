@@ -2,56 +2,30 @@
 
 import { randomBytes } from 'node:crypto';
 import dns from 'node:dns';
-import net from 'node:net';
 import path from 'node:path';
 
-import { dataDir as defaultDataDir, LIMITS } from '../config.js';
+import { dataDir as defaultDataDir } from '../config.js';
 import { log } from '../log.js';
-import { classifyAddress } from '../net/ip.js';
+import { SHARED_HOST_GATES, sleep as wait } from '../net/polite.js';
+import { SHARED_ROBOTS } from '../net/robots-cache.js';
 import { safeFetch } from '../net/safe-fetch.js';
 import { crawlKey } from '../util/site-identity.js';
-import { normalizeUrl, originOf } from '../util/url.js';
-import { deployedOriginOf } from './deployed.js';
+import { originOf } from '../util/url.js';
 import { MAX_RUNNING, busy } from './admission.js';
 import { runCrawl } from './run.js';
+import { checkLocalStart, validateStart } from './start-input.js';
 import { createCrawlStore } from './store.js';
 
 /** @import { CrawlJob, CrawlResult, VitalsData } from '../types.js' */
 /** @import { StoredVitals } from './store.js' */
 /** @import { Extractor } from './chain.js' */
+/** @import { HostGates } from '../net/polite.js' */
+/** @import { RobotsCache } from '../net/robots-cache.js' */
 
 const ID_PATTERN = /^[A-Za-z0-9_-]{1,100}$/;
 const RESULTS_IN_MEMORY = 5;
 
-/** @typedef {(hostname: string, options: {all: true}) => Promise<{address: string, family: number}[]>} Lookup */
-
-/**
- * `allowLoopback` is honoured only for a host whose every address is loopback.
- * @param {string} startUrl
- * @param {Lookup} lookup
- * @returns {Promise<void>}
- */
-async function checkLocalStart(startUrl, lookup) {
-  const { hostname } = new URL(startUrl);
-  const bare = hostname.startsWith('[') ? hostname.slice(1, -1) : hostname;
-  let addresses;
-  if (net.isIP(bare) !== 0) {
-    addresses = [bare];
-  } else {
-    try {
-      addresses = (await lookup(bare, { all: true })).map((entry) => entry.address);
-    } catch (error) {
-      throw new TypeError(`allowLoopback is only for a site on this machine, and ${bare} could not be resolved (${String(/** @type {any} */ (error)?.code ?? error)}).`);
-    }
-  }
-  const outside = addresses.filter((address) => classifyAddress(address) !== 'loopback');
-  if (addresses.length === 0 || outside.length > 0) {
-    throw new TypeError(`allowLoopback is only for a site on this machine, but ${bare} resolves to ${outside.join(', ') || 'no address'}, which is not a loopback address. Leave allowLoopback off for this site.`);
-  }
-}
-
-/** @param {number} ms */
-const realSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+/** @typedef {import('./start-input.js').Lookup} Lookup */
 
 /**
  * @param {Date} date
@@ -63,40 +37,9 @@ function defaultId(date) {
 }
 
 /**
- * @param {unknown} options
- * @returns {{startUrl: string, maxPages: number, ratePerSec: number, includeSubdomains: boolean, allowLoopback: boolean, deployedOrigin: string|null}}
- */
-function validateStart(options) {
-  if (options === null || typeof options !== 'object') throw new TypeError('crawl start options must be an object with a url');
-  const { url, maxPages = LIMITS.maxPagesDefault, ratePerSec = LIMITS.ratePerSecDefault } = /** @type {any} */ (options);
-  const { includeSubdomains = false, allowLoopback = false, deployedUrl } = /** @type {any} */ (options);
-  const startUrl = typeof url === 'string' ? normalizeUrl(url) : null;
-  if (startUrl === null) {
-    throw new TypeError(`"${String(url)}" is not an http or https URL. Pass a full URL such as https://example.com/.`);
-  }
-  if (!Number.isInteger(maxPages) || maxPages < 1 || maxPages > LIMITS.maxPagesHardCap) {
-    throw new TypeError(`maxPages must be a whole number from 1 to ${LIMITS.maxPagesHardCap}.`);
-  }
-  if (typeof ratePerSec !== 'number' || !Number.isFinite(ratePerSec) || ratePerSec <= 0 || ratePerSec > LIMITS.ratePerSecMax) {
-    throw new TypeError(`ratePerSec must be a number above 0 and at most ${LIMITS.ratePerSecMax}.`);
-  }
-  if (typeof includeSubdomains !== 'boolean') throw new TypeError('includeSubdomains must be true or false.');
-  if (typeof allowLoopback !== 'boolean') throw new TypeError('allowLoopback must be true or false.');
-  /** @type {string|null} */
-  let deployedOrigin = null;
-  if (deployedUrl !== undefined && deployedUrl !== null && deployedUrl !== '') {
-    if (!allowLoopback) throw new TypeError('deployedUrl is for a crawl of a site on this machine (allowLoopback). A deployed site is crawled at its own address.');
-    deployedOrigin = deployedOriginOf(deployedUrl);
-    // Naming the local server itself changes nothing.
-    if (deployedOrigin === originOf(startUrl)) deployedOrigin = null;
-  }
-  return { startUrl, maxPages, ratePerSec, includeSubdomains, allowLoopback, deployedOrigin };
-}
-
-/**
  * Create a crawl manager.
  *
- * Guarantees: `start` validates its input (rejecting with `TypeError`),
+ * Guarantees: `start` validates its input (rejecting with `InputError` for a value the caller passed),
  * honours `allowLoopback` only for a start host whose every address is
  * loopback and then limits loopback to the start origin, accepts `deployedUrl`
  * only together with it (and never requests that address), resolves with a
@@ -111,10 +54,15 @@ function validateStart(options) {
  * crawl was deleted to keep them.
  *
  * @param {{dataDir?: string, fetch?: typeof safeFetch, extract?: Extractor, lookup?: Lookup,
- *          now?: () => Date, sleep?: (ms: number) => Promise<void>, idFactory?: () => string, maxStoredChars?: number}} [deps]
+ *          now?: () => Date, sleep?: (ms: number) => Promise<void>, idFactory?: () => string, maxStoredChars?: number,
+ *          hosts?: HostGates, robotsCache?: RobotsCache}} [deps]  `hosts` and `robotsCache` default to the ones the
+ *   whole process shares (net/polite.js, net/robots-cache.js).
  */
 export function createCrawlManager(deps = {}) {
-  const { dataDir = defaultDataDir(), fetch = safeFetch, now = () => new Date(), sleep = realSleep, idFactory } = deps;
+  const {
+    dataDir = defaultDataDir(), fetch = safeFetch, now = () => new Date(), sleep = (ms) => wait(ms), idFactory,
+    hosts = SHARED_HOST_GATES, robotsCache = SHARED_ROBOTS,
+  } = deps;
   const lookup = deps.lookup ?? /** @type {Lookup} */ ((hostname, options) => dns.promises.lookup(hostname, options));
   const store = createCrawlStore(path.join(dataDir, 'crawls'));
 
@@ -148,7 +96,7 @@ export function createCrawlManager(deps = {}) {
       const { allowLoopback, ...rest } = input;
       const outcome = await runCrawl(
         { id: job.id, startedAt: job.started_at, ...rest, loopbackOrigin: allowLoopback ? originOf(input.startUrl) : null },
-        { fetch, extract, now, sleep, ...(deps.maxStoredChars === undefined ? {} : { maxStoredChars: deps.maxStoredChars }) },
+        { fetch, extract, now, sleep, hosts, robotsCache, ...(deps.maxStoredChars === undefined ? {} : { maxStoredChars: deps.maxStoredChars }) },
         (progress) => Object.assign(job, progress),
       );
       if (outcome.status === 'failed') {

@@ -9,7 +9,7 @@ import { originOf } from '../util/url.js';
 export const MAX_DISALLOWED_LINKS = 2000;
 /** Most link targets `disallowedLinks` asks robots.txt about; a large file of wildcard rules makes each question cost. */
 export const MAX_DISALLOWED_ASKED = 5000;
-/** @import { Robots } from './requests.js' */
+/** @import { Robots } from '../net/robots-cache.js' */
 /** @import { createFrontier } from './frontier.js' */
 
 /**

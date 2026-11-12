@@ -1,10 +1,11 @@
 /** @import { Run, RunIndexEntry } from '../types.js' */
 
 import { storeError } from './errors.js';
-import { STORE_LIMITS, readStoreFile, toJsonFile, writeFileAtomic } from './fs-util.js';
+import { STORE_LIMITS, readStoreFile, writeFileAtomic } from './fs-util.js';
 import { assertRunId, assertStoreDirs, ensureProject, ensureRunDir, projectPaths } from './project.js';
-import { entryFromRun, isRunShape, readIndex, serialize, writeIndex } from './run-index.js';
-import { storedRunProblem } from './run-validate.js';
+import { parseStoredRun, serializeRun } from './run-file.js';
+import { entryFromRun, readIndex, serialize, writeIndex } from './run-index.js';
+import { isRunShape } from './run-validate.js';
 
 /**
  * Run id for an audit started at `date`: "2026-11-11T14-03-22Z", then
@@ -27,8 +28,14 @@ export function newRunId(date, existingIds = []) {
 
 /**
  * Store a run at `<projectDir>/.seekwide/runs/<run_id>/findings.json` and add it
- * to the index. Both files are written atomically. A run is history, so an id
- * that is already in the index is refused with `RUN_EXISTS`; pick a new one with `newRunId`.
+ * at the end of the index. Both files are written atomically. A run is history,
+ * so an id that is already in the index is refused with `RUN_EXISTS`; pick a new
+ * one with `newRunId`.
+ *
+ * The run is checked with the rules `loadRun` applies before anything is
+ * written (`serializeRun`): a run whose values do not have the stored form is
+ * refused with `RUN_INVALID`, and one larger than `STORE_LIMITS.runBytes` with
+ * `RUN_TOO_LARGE`. So every run this function saves can be loaded.
  * @param {string} projectDir
  * @param {Run} run
  * @returns {Promise<{runId: string, runDir: string, findingsFile: string, entry: RunIndexEntry}>}
@@ -38,6 +45,7 @@ export async function saveRun(projectDir, run) {
   if (!isRunShape(run)) {
     throw new TypeError('saveRun needs a Run with a valid run_id, created_at, start_url, crawl, modules, checks and findings.');
   }
+  const text = serializeRun(run);
   const paths = await ensureProject(projectDir);
   const runDir = paths.runDir(run.run_id);
   const findingsFile = paths.findingsFile(run.run_id);
@@ -49,7 +57,7 @@ export async function saveRun(projectDir, run) {
       throw storeError('RUN_EXISTS', `Run ${run.run_id} is already stored. Runs are never overwritten; use a new run id.`);
     }
     await ensureRunDir(paths, run.run_id);
-    await writeFileAtomic(findingsFile, toJsonFile(run));
+    await writeFileAtomic(findingsFile, text);
     await writeIndex(paths, [...runs, entry]);
   });
   return { runId: run.run_id, runDir, findingsFile, entry };
@@ -70,9 +78,10 @@ function describeKnown(runs) {
  * 'previous' the one before it. Throws `RUN_NOT_FOUND` when there is no such
  * run, `INVALID_RUN_ID` for an id that is not a safe file name, `UNSAFE_STORE`
  * when a folder or file on the way is a symbolic link, `STORE_FILE_TOO_LARGE`
- * for a file larger than any run the plugin writes, and `RUN_CORRUPT` when the
- * stored file is damaged or a value the tools rely on does not have the form
- * the plugin writes (`storedRunProblem`).
+ * for a file larger than `STORE_LIMITS.runBytes` (which `saveRun` never writes,
+ * but version 0.1.0 could), and `RUN_CORRUPT` when the stored file is damaged
+ * or a value the tools rely on does not have the form the plugin writes
+ * (`parseStoredRun`). Runs in the stored form of any version are read.
  * @param {string} projectDir
  * @param {string} ref
  * @returns {Promise<Run>}
@@ -100,22 +109,19 @@ export async function loadRun(projectDir, ref) {
   try {
     text = await readStoreFile(paths.findingsFile(runId), STORE_LIMITS.runBytes, paths.projectDir);
   } catch (error) {
-    if (/** @type {NodeJS.ErrnoException} */ (error).code !== 'ENOENT') throw error;
+    const code = /** @type {NodeJS.ErrnoException} */ (error).code;
+    if (code === 'STORE_FILE_TOO_LARGE') {
+      throw storeError(
+        'STORE_FILE_TOO_LARGE',
+        `Run ${runId} was not read: ${/** @type {Error} */ (error).message} This version of the plugin never saves a run that large; ` +
+          'Seekwide 0.1.0 could, for a large site, and the file may also have been written by hand.',
+      );
+    }
+    if (code !== 'ENOENT') throw error;
     throw storeError('RUN_NOT_FOUND', `Run ${runId} was not found in ${paths.root}. ${describeKnown(await readIndex(paths))}`);
   }
-  let run;
-  try {
-    run = JSON.parse(text);
-  } catch {
-    throw storeError('RUN_CORRUPT', `Run ${runId} is damaged: its findings.json is not valid JSON. Run the audit again.`);
-  }
-  if (!isRunShape(run) || run.run_id !== runId) {
-    throw storeError('RUN_CORRUPT', `Run ${runId} is damaged: its findings.json does not describe this run. Run the audit again.`);
-  }
-  const problem = storedRunProblem(/** @type {Record<string, unknown>} */ (/** @type {unknown} */ (run)));
-  if (problem !== null) {
-    throw storeError('RUN_CORRUPT', `Run ${runId} is damaged: ${problem} in its findings.json does not have the form the plugin writes. Run the audit again.`);
-  }
+  const { run, problem } = parseStoredRun(text, runId);
+  if (run === null) throw storeError('RUN_CORRUPT', `Run ${runId} is damaged: ${problem}. Run the audit again.`);
   return run;
 }
 

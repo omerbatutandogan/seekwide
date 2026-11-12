@@ -3,7 +3,7 @@
 // sends today. The server writes nothing; the model edits the file after the
 // user approved the diff.
 //
-// Scope (PLAN 4.4): a missing or duplicate title and meta description, a
+// Scope (ARCHITECTURE.md 4.13): a missing or duplicate title and meta description, a
 // missing canonical, missing Open Graph tags, a missing sitemap (with the
 // robots.txt line that names it). Anything else is counted, not planned.
 // The plans of page and sitemap fixes are in fix-page.js and fix-sitemap.js.

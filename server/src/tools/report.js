@@ -4,6 +4,7 @@
 /** @import { ToolDeps } from './index.js' */
 
 import { ToolError } from '../mcp/stdio.js';
+import { InputError } from '../util/errors.js';
 import { writeFileAtomic } from '../store/fs-util.js';
 import { ensureRunDir } from '../store/project.js';
 import { PROJECT_DIR_SCHEMA, loadBaseRun, resolveProjectDir, runRefSchema, settingValue, withStoreErrors } from './common.js';
@@ -100,7 +101,7 @@ export function reportTools(deps) {
           try {
             content = format === 'markdown' ? deps.renderMarkdown(run, options) : deps.renderHtml(run, options);
           } catch (error) {
-            if (!(error instanceof TypeError)) throw error;
+            if (!(error instanceof InputError)) throw error;
             throw new ToolError(`The ${format} report could not be rendered: ${error.message} Fix the arguments and call report_render again.`);
           }
           const file = await withStoreErrors(() => paths.reportFile(run.run_id, FILE_FORMATS[format]));

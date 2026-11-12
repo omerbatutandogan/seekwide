@@ -45,7 +45,7 @@ export function createStdioServer(options) {
   /** Version negotiated by a legacy `initialize`; null until one arrives. */
   /** @type {string|null} */
   let legacyVersion = null;
-  /** @type {Map<string, {cancelled: boolean}>} */
+  /** @type {Map<string, {cancelled: boolean, controller: AbortController}>} */
   const inFlight = new Map();
   /** @type {Set<Promise<void>>} */
   const pending = new Set();
@@ -81,9 +81,10 @@ export function createStdioServer(options) {
   /**
    * @param {string} method
    * @param {unknown} params
+   * @param {AbortSignal} signal  Fires when the client cancels the request.
    * @returns {Promise<Record<string, unknown>>}
    */
-  async function dispatch(method, params) {
+  async function dispatch(method, params, signal) {
     if (method === 'initialize') return initialize(params);
     if (!KNOWN_METHODS.has(method)) throw new RpcError(ERROR.METHOD_NOT_FOUND, `Method not found: ${method}`);
 
@@ -104,7 +105,7 @@ export function createStdioServer(options) {
       body = { tools: tools.list(era) };
       cacheable = true;
     } else {
-      body = await tools.call(params);
+      body = await tools.call(params, signal);
     }
     if (era.kind === 'legacy') return body;
     return {
@@ -119,7 +120,11 @@ export function createStdioServer(options) {
   function handleNotification(message) {
     if (message.method === 'notifications/cancelled' && isPlainObject(message.params) && isValidId(message.params.requestId)) {
       const state = inFlight.get(idKey(message.params.requestId));
-      if (state) state.cancelled = true;
+      if (state) {
+        state.cancelled = true;
+        // The handler is told too, so that it stops its requests instead of finishing unseen.
+        state.controller.abort(new Error('The client cancelled the request.'));
+      }
       return;
     }
     log.debug('notification', { method: String(message.method) });
@@ -148,12 +153,12 @@ export function createStdioServer(options) {
     }
     if (id === undefined) return errorResponse(undefined, ERROR.INVALID_REQUEST, 'Invalid Request: "id" must be a string or an integer.');
 
-    const state = { cancelled: false };
+    const state = { cancelled: false, controller: new AbortController() };
     inFlight.set(idKey(id), state);
     /** @type {Record<string, unknown>} */
     let response;
     try {
-      response = { jsonrpc: '2.0', id, result: await dispatch(message.method, message.params) };
+      response = { jsonrpc: '2.0', id, result: await dispatch(message.method, message.params, state.controller.signal) };
     } catch (error) {
       if (error instanceof RpcError) {
         response = errorResponse(id, error.code, error.message, error.data);

@@ -101,7 +101,7 @@ describe('report_render', () => {
   it('accepts a profile logo only inside the project folder; arguments and settings may point anywhere', async () => {
     const outsideLogo = path.join(outside, 'logo.png');
     const fromProfile = setup({ profile: { report: { logo_path: outsideLogo } } });
-    await assert.rejects(fromProfile.render({ formats: ['html'] }), /named by the project profile is outside the project folder/);
+    await assert.rejects(fromProfile.render({ formats: ['html'] }), /The logo that report\.logo_path in the project profile names is outside the project folder\. .*Fix or remove report\.logo_path/);
     const viaSymlink = setup({ profile: { report: { logo_path: 'link.png' } } });
     await assert.rejects(viaSymlink.render({ formats: ['html'] }), /a symbolic link is on the way to it/);
     const viaDots = setup({ profile: { report: { logo_path: '../elsewhere/logo.png' } } });

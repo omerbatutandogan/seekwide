@@ -1,13 +1,12 @@
 // The http:// probe: does the site send plain-http visitors to https?
 
 import { LIMITS } from '../config.js';
-import { isInternalUrl, normalizeUrl, originOf } from '../util/url.js';
+import { followRedirects } from '../net/polite.js';
+import { isInternalUrl, originOf } from '../util/url.js';
 import { refusalOf } from './chain.js';
 
-/** @import { FetchResult, HttpProbe } from '../types.js' */
+/** @import { FetchResult, HttpProbe, RedirectHop } from '../types.js' */
 /** @import { safeFetch } from '../net/safe-fetch.js' */
-
-const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 /**
  * Request the http:// home page and follow its redirects by hand while they
@@ -28,23 +27,26 @@ const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
  * @returns {Promise<HttpProbe|null>}
  */
 export async function probeHttp(probeUrl, { fetch, robotsFor, siteHost, includeSubdomains }) {
-  let current = probeUrl;
-  const seen = new Set([probeUrl]);
-  for (let hops = 0; ; hops += 1) {
-    const robots = await robotsFor(/** @type {string} */ (originOf(current)));
-    if (robots.summary.status === 'unreachable' || !robots.isAllowed(current)) return null;
-    const result = await fetch(current, { maxRedirects: 0, maxBytes: 1024 });
-    if (result.error !== null) return null;
-    const target = REDIRECT_STATUSES.has(result.status) ? normalizeUrl(result.headers.location ?? '', current) : null;
-    if (target === null && refusalOf(result) !== null) return null;
-    if (target !== null && seen.has(target)) return { url: probeUrl, status: result.status, final_url: target, enforced: false };
-    const stop = target === null || !target.startsWith('http:') || hops + 1 >= LIMITS.maxRedirects ||
-      !isInternalUrl(target, siteHost, includeSubdomains);
-    if (stop) {
-      const finalUrl = target ?? current;
-      return { url: probeUrl, status: result.status, final_url: finalUrl, enforced: finalUrl.startsWith('https:') };
-    }
-    seen.add(target);
-    current = target;
-  }
+  /** Where the probe stops without a request: off http:// or off the site. @param {string} target */
+  const leaves = (target) => !target.startsWith('http:') || !isInternalUrl(target, siteHost, includeSubdomains);
+  /** @param {number} status @param {string} finalUrl @returns {HttpProbe} */
+  const answer = (status, finalUrl) => ({ url: probeUrl, status, final_url: finalUrl, enforced: finalUrl.startsWith('https:') });
+  /** @type {import('../net/polite.js').RedirectOutcome<'leaves'|'refused'>} */
+  const chain = await followRedirects(probeUrl, {
+    // The probe stops at the redirect that reaches the limit, without requesting its target.
+    maxHops: LIMITS.maxRedirects - 1,
+    request: (current) => fetch(current, { maxRedirects: 0, maxBytes: 1024 }),
+    before: async (current, hop) => {
+      if (hop > 0 && leaves(current)) return 'leaves';
+      const robots = await robotsFor(/** @type {string} */ (originOf(current)));
+      return robots.summary.status === 'unreachable' || !robots.isAllowed(current) ? 'refused' : undefined;
+    },
+  });
+  if (chain.kind === 'stopped') return chain.value === 'refused' ? null : answer(/** @type {RedirectHop} */ (chain.hops.at(-1)).status, chain.url);
+  if (chain.kind === 'unsent') return null;
+  const { result } = chain;
+  if (result.error !== null) return null;
+  if (chain.kind === 'loop') return { url: probeUrl, status: result.status, final_url: /** @type {string} */ (chain.target), enforced: false };
+  if (chain.kind === 'too_many') return answer(result.status, /** @type {string} */ (chain.target));
+  return refusalOf(result) !== null ? null : answer(result.status, chain.url);
 }

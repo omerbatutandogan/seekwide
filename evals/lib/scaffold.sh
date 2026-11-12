@@ -113,7 +113,8 @@ next_ts_project() {
 }
 
 # Start `next dev` for this folder on port 47320, the address of the saved run,
-# with the dependencies evals/setup.sh installed. Whatever next dev writes into
+# with the dependencies evals/setup.sh installed. It listens on 127.0.0.1 only
+# (its default is every interface), and localhost reaches it there. Whatever next dev writes into
 # the project (Next.js 16.4 may write AGENTS.md) is committed, so the tree is
 # clean when Claude starts.
 start_next_dev() {
@@ -124,7 +125,7 @@ start_next_dev() {
   port_free 47320
   cp -cR "$deps/next-ts/node_modules" . 2>/dev/null || cp -R "$deps/next-ts/node_modules" .
   NEXT_TELEMETRY_DISABLED=1 nohup node "$lib_dir/timed.mjs" "$SERVER_SECONDS" "$TMPDIR/next-dev.log" \
-    node node_modules/next/dist/bin/next dev -p 47320 >/dev/null 2>&1 &
+    node node_modules/next/dist/bin/next dev -H 127.0.0.1 -p 47320 >/dev/null 2>&1 &
   remember 47320 "$!"
   for _ in $(seq 1 90); do
     curl -fs -o /dev/null http://localhost:47320/ && break

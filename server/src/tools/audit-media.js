@@ -42,10 +42,11 @@ export const MEDIA_ARGUMENTS = Object.freeze({
  * files give when they are skipped.
  * @param {ToolDeps} deps
  * @param {CrawlResult} crawl
- * @param {{requested: boolean, check: boolean}} options
+ * @param {{requested: boolean, check: boolean, signal?: AbortSignal}} options  `signal` fires when the audit is
+ *   cancelled: no image request starts after that, and the call rejects.
  * @returns {Promise<ImageFilesCollected>}
  */
-export async function collectImageFiles(deps, crawl, { requested, check }) {
+export async function collectImageFiles(deps, crawl, { requested, check, signal }) {
   if (!requested) return { files: null, summary: null, reason: undefined };
   if (!check) return { files: null, summary: null, reason: IMAGE_FILES_NOT_ASKED };
   if (crawl.blocked !== null && REFUSALS.has(crawl.blocked.reason)) return { files: null, summary: null, reason: IMAGE_FILES_REFUSED };
@@ -62,11 +63,13 @@ export async function collectImageFiles(deps, crawl, { requested, check }) {
       perHostDelayMs: Number.isFinite(rate) && rate > 0 ? 1000 / rate : 1000 / LIMITS.ratePerSecDefault,
       onlyOrigin: local ? crawl.site_origin : null,
       fetchOptions: local ? { allowLoopback: crawl.site_origin } : {},
+      ...(signal ? { signal } : {}),
     });
     /** @type {ImageFilesSummary} */
     const summary = { images, selected: urls.length, outcomes: countBy([...files.values()], (file) => file.outcome), local, ...(refused ? { site_skipped: true } : {}) };
     return { files, summary, reason: undefined };
   } catch (error) {
+    if (signal?.aborted) throw error;
     log.error('image file check failed', { message: error instanceof Error ? error.message : String(error) });
     return { files: null, summary: null, reason: IMAGE_FILES_FAILED };
   }

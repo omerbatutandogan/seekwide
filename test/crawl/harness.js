@@ -5,6 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 
 import { createCrawlManager } from '../../server/src/crawl/manager.js';
+import { createHostGates } from '../../server/src/net/polite.js';
+import { createRobotsCache } from '../../server/src/net/robots-cache.js';
 import { fakeExtract } from './fake-records.js';
 
 export const NOW = new Date('2026-11-11T14:03:22Z');
@@ -26,7 +28,8 @@ export async function removeTempDirs() {
 let counter = 0;
 
 /**
- * Build a manager with test dependencies. `sleeps` records every requested wait.
+ * Build a manager with test dependencies. `sleeps` records every requested wait. The manager has host gates
+ * and a robots.txt cache of its own, so no other test's requests change its waits.
  * @param {Parameters<typeof createCrawlManager>[0]} [deps]
  */
 export async function testManager(deps = {}) {
@@ -40,6 +43,8 @@ export async function testManager(deps = {}) {
       sleeps.push(ms);
     },
     idFactory: () => `c-test-${(counter += 1)}`,
+    hosts: createHostGates(),
+    robotsCache: createRobotsCache(),
     ...deps,
   });
   return { manager, sleeps };

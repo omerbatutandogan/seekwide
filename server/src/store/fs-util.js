@@ -92,7 +92,7 @@ export async function readStoreFile(file, maxBytes, projectDir) {
     const stat = await handle.stat();
     if (!stat.isFile()) throw unsafe(where, 'not a regular file');
     if (stat.size > maxBytes) {
-      throw storeError('STORE_FILE_TOO_LARGE', `${where} is ${Math.round(stat.size / 1024)} KB, more than the ${Math.round(maxBytes / 1024)} KB the plugin ever writes there, so it was not read.`);
+      throw storeError('STORE_FILE_TOO_LARGE', `${where} is ${Math.round(stat.size / 1024)} KB, more than the ${Math.round(maxBytes / 1024)} KB the plugin reads there, so it was not read.`);
     }
     return await handle.readFile('utf8');
   } finally {

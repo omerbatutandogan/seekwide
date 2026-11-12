@@ -4,6 +4,8 @@ The unit and integration tests prove what the plugin's server does. They cannot 
 
 It costs tokens and is not part of CI. Run it after a change to a skill, a reference file or a tool description.
 
+**Review a pull request's changes under `evals/` before you run the suite.** Each case's `scaffold.sh` runs as a bash script on your machine, outside the eval sandbox, and the recorded transcripts in `evals/fixtures/recorded/` are replayed as history into a session that may use Bash, Edit and Write. A change there can run anything with your permissions, so read it as you would read a script someone sends you.
+
 ## The cases
 
 | Case | Turn | What it checks |
@@ -43,7 +45,7 @@ One run of all eight took about four minutes and cost 1.14 US dollars on 2026-11
 
 ## How the suite works around the eval sandbox
 
-- **No command Claude runs may listen on a port.** The sandbox refuses `bind()` with "Operation not permitted" (tried on 2026-11-12 with Claude Code 2.1.322). A case that needs a server therefore starts it in its scaffold, which runs outside the sandbox: `lib/serve-static.mjs` for the HTML project, `next dev` for the Next.js one. Each stops by itself after 15 minutes (`SERVER_SECONDS`). In the basic cases the project's `dev` script (`fixtures/html-dev/dev-server.mjs`) only prints the address of that server and keeps running, so the flow Claude follows is the real one: ask, start the command in the background, read the address from its output, crawl, audit, stop it. In `fix-applies-after-yes` the user says the server is already running, which the skill handles by starting nothing.
+- **No command Claude runs may listen on a port.** The sandbox refuses `bind()` with "Operation not permitted" (tried on 2026-11-12 with Claude Code 2.1.322). A case that needs a server therefore starts it in its scaffold, which runs outside the sandbox: `lib/serve-static.mjs` for the HTML project, `next dev` for the Next.js one. Each stops by itself after 25 minutes (`SERVER_SECONDS`, 1500 seconds, longer than the longest case timeout) and listens on 127.0.0.1 only. In the basic cases the project's `dev` script (`fixtures/html-dev/dev-server.mjs`) only prints the address of that server and keeps running, so the flow Claude follows is the real one: ask, start the command in the background, read the address from its output, crawl, audit, stop it. In `fix-applies-after-yes` the user says the server is already running, which the skill handles by starting nothing.
 - **There is no simulated user.** A second turn is a case whose `history_file` is the recorded first turn and whose prompt is the answer. The recordings are in `fixtures/recorded/`, made from real runs of the first-turn cases. A recording names the workspace and plugin folder of the run it came from, so they are kept as placeholders, and the scaffold writes the case's `history.jsonl` with the paths of the current run.
 - **No grader runs a command after the case.** Whether the server was stopped is graded from the calls: `TaskStop` was called, and after an audit or crawl had started (`tool_order` compares the first call of each, so it cannot tell a stop between two audits from one after the last). Whether a file was edited is graded from its content after the run (`target: {source: file}`), and whether nothing was written from the absence of Edit, Write and the shell commands that write files.
 - **A shell command is matched in its JSON form**, where a quote is `\"`, so the patterns read the command as escaped JSON text and are not stopped by a quoted path.

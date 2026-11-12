@@ -21,7 +21,9 @@ import { selectVitalsPages } from './select.js';
  * @property {typeof runPagespeed} [runPagespeed]
  * @property {typeof queryCrux} [queryCrux]
  * @property {() => number} [now]     Clock in milliseconds, for the time budget.
- * @property {number} [deadlineMs]    No new request to either service starts after this much time.
+ * @property {number} [deadlineMs]    No new request to either service starts after this much time,
+ *   or after `signal` fired (the audit that asked was cancelled).
+ * @property {AbortSignal} [signal]
  * @property {number} [concurrency]   PageSpeed Insights tests running at once when a key is set.
  */
 
@@ -222,7 +224,7 @@ export async function measureVitals(crawl, options = {}) {
   const crash = { thrown: false, error: undefined };
   /** @type {RunState} */
   const run = {
-    expired: () => now() - started >= deadlineMs,
+    expired: () => options.signal?.aborted === true || now() - started >= deadlineMs,
     crashed: () => crash.thrown,
     fail: (error) => {
       if (!crash.thrown) Object.assign(crash, { thrown: true, error });

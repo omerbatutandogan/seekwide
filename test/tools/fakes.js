@@ -5,6 +5,7 @@
 import path from 'node:path';
 import { attachSources, loadProjectSources } from '../../server/src/repo/sources.js';
 import { assertRunId, projectPaths } from '../../server/src/store/project.js';
+import { InputError } from '../../server/src/util/errors.js';
 import { makeCrawl, makeLink, makePage, makeVitals } from '../helpers/factories.js';
 
 // Built with path.resolve, so that it is the absolute path the tools return on Windows too (D:\projects\site).
@@ -124,8 +125,9 @@ export function makeDeps(seed = {}) {
       /** @param {{url: string, maxPages?: number, includeSubdomains?: boolean, allowLoopback?: boolean, deployedUrl?: string}} options */
       start(options) {
         record('start', [options]);
-        if (options.url.includes('async-reject')) return Promise.reject(new TypeError('allowLoopback needs a loopback start host.'));
-        if (options.url.includes('reject')) throw new TypeError('maxPages is out of range.');
+        if (options.url.includes('async-reject')) return Promise.reject(new InputError('allowLoopback needs a loopback start host.'));
+        if (options.url.includes('bug')) throw new TypeError('Cannot read properties of undefined (reading \'host\')');
+        if (options.url.includes('reject')) throw new InputError('maxPages is out of range.');
         const job = { ...jobFor(makeCrawl({ id: 'c-new', start_url: options.url })), status: /** @type {const} */ ('running'), max_pages: options.maxPages ?? 25 };
         jobs.set(job.id, job);
         return job;
@@ -243,7 +245,10 @@ export function makeDeps(seed = {}) {
     },
     /** @param {CrawlResult} crawl @param {{maxPages: number}} options */
     async measureVitals(crawl, options) {
-      record('measureVitals', [crawl.id, options]);
+      // The signal that stops a measurement is checked by tests of its own; the calls keep the other options.
+      const { signal, ...rest } = options;
+      if (!(signal instanceof AbortSignal)) throw new TypeError('measureVitals needs a signal');
+      record('measureVitals', [crawl.id, rest]);
       if (seed.vitals instanceof Error) throw seed.vitals;
       return seed.vitals ?? makeVitals();
     },

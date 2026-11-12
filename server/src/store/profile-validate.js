@@ -1,3 +1,4 @@
+import { hasPlainHost } from '../util/plain-host.js';
 import { normalizeUrl } from '../util/url.js';
 import { clip, collapseWhitespace, stripHidden } from '../util/strings.js';
 
@@ -150,6 +151,7 @@ export function normalizeProfile(input) {
 
   const siteUrl = typeof input.site_url === 'string' && input.site_url.length <= 2048 ? normalizeUrl(input.site_url) : null;
   if (siteUrl === null) errors.push({ field: 'site_url', message: 'must be an http or https URL such as "https://example.com"' });
+  else if (!hasPlainHost(siteUrl)) errors.push({ field: 'site_url', message: 'must have a host name of letters, digits, hyphens and dots (an international name in its xn-- form), or an IP address' });
   profile.site_url = siteUrl;
 
   if (!isPlainObject(input.brand)) {

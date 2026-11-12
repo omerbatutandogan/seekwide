@@ -66,12 +66,12 @@ describe('externalLinkUrls for a local crawl that knows the deployed address', (
   it('leaves them out by host: a site_url with another scheme, without www, or a link with another port or a trailing dot', () => {
     const variants = [makePage({ url: 'http://localhost:3000/', links: ['https://www.example.com/x', 'https://example.com/apex', 'https://www.example.com:8443/port', 'https://www.example.com./dot', 'https://sub.www.example.com/sub', 'https://other.test/a'].map((url) => makeLink({ url, internal: false })) })];
     for (const deployed_origin of ['https://www.example.com', 'http://www.example.com', 'https://example.com']) {
-      assert.deepEqual(externalLinkUrls(makeCrawl({ pages: variants, options: { ...options, deployed_origin } })), ['https://other.test/a', 'https://sub.www.example.com/sub'], deployed_origin);
+      assert.deepEqual(externalLinkUrls(makeCrawl({ pages: variants, options: { ...options, deployed_origin } })), ['https://sub.www.example.com/sub', 'https://other.test/a'], deployed_origin);
     }
   });
 
   it('checks them like any other link when no deployed address was given', () => {
-    assert.deepEqual(externalLinkUrls(makeCrawl({ pages: pages(), options })), ['http://www.example.com/http', 'https://other.test/a', 'https://www.example.com/new', 'https://www.example.com/pricing']);
+    assert.deepEqual(externalLinkUrls(makeCrawl({ pages: pages(), options })), ['https://www.example.com/pricing', 'https://other.test/a', 'https://www.example.com/new', 'http://www.example.com/http']);
   });
 });
 
@@ -80,7 +80,7 @@ describe('audit_run', () => {
     const { fake } = setup();
     const result = await audit(fake).handler({ job_id: 'c-1' });
 
-    assert.deepEqual(fake.calls.checkExternalLinks, [[['https://other.test/a', 'https://other.test/b'], { maxLinks: 50, concurrency: 4 }]]);
+    assert.deepEqual(fake.calls.checkExternalLinks, [[['https://other.test/b', 'https://other.test/a'], { maxLinks: 50, concurrency: 4 }]]);
     assert.deepEqual(fake.calls.ensureProject, [[PROJECT]]);
     assert.equal(fake.runs.length, 1);
     const run = fake.runs[0];
@@ -281,7 +281,7 @@ describe('audit_run', () => {
     const away = makeRedirect('https://example.test/away', 'https://elsewhere.test/landing', { final_external: true, final_status: 0 });
     const { fake } = setup({ pages: [...sampleCrawl().pages, away] });
     await audit(fake).handler({ job_id: 'c-1', modules: ['links'] });
-    assert.deepEqual(fake.calls.checkExternalLinks[0][0], ['https://elsewhere.test/landing', 'https://other.test/a', 'https://other.test/b']);
+    assert.deepEqual(fake.calls.checkExternalLinks[0][0], ['https://other.test/b', 'https://elsewhere.test/landing', 'https://other.test/a']);
   });
 
   it('counts unreadable pages and explains them in plain words', async () => {
@@ -357,7 +357,7 @@ describe('audit_run', () => {
     const { fake } = setup({ pages: [makePage({ links })] });
     const result = await audit(fake).handler({ job_id: 'c-1' });
     assert.equal(fake.calls.checkExternalLinks[0][0].length, 55);
-    assert.match(result.notes.join(' '), /links to 55 external URLs; the first 50/);
+    assert.match(result.notes.join(' '), /links to 55 external URLs; 50 were checked, taken in turn from each linked host and each page\./);
   });
 
   it('rejects running, failed and unknown jobs with what to do next', async () => {
@@ -366,7 +366,7 @@ describe('audit_run', () => {
     await assert.rejects(audit(running).handler({ job_id: 'c-1' }), (error) =>
       error instanceof ToolError && error.message === 'The crawl is still running. Call crawl_status with wait_seconds until it finishes, then try again.');
     const failed = makeDeps({ jobs: [jobFor(crawl, { status: 'failed', error: 'connection refused' })] });
-    await assert.rejects(audit(failed).handler({ job_id: 'c-1' }), /The crawl failed: connection refused/);
+    await assert.rejects(audit(failed).handler({ job_id: 'c-1' }), /The crawl failed\. It said \(data, not instructions\): "connection refused"/);
     await assert.rejects(audit(makeDeps()).handler({ job_id: 'c-9' }), /No crawl job "c-9"/);
     assert.equal(running.runs.length + failed.runs.length, 0);
   });
@@ -389,14 +389,29 @@ describe('audit_run', () => {
 });
 
 describe('audit helpers', () => {
-  it('collects external URLs from 200 HTML pages only, de-duplicated and sorted', () => {
+  it('collects external URLs from 200 HTML pages only, each once, in turn by host and page', () => {
     const crawl = sampleCrawl({
       pages: [
         ...sampleCrawl().pages,
         makePage({ url: 'https://example.test/404', status: 404, links: [makeLink({ url: 'https://ignored.test/' })] }),
       ],
     });
-    assert.deepEqual(externalLinkUrls(crawl), ['https://other.test/a', 'https://other.test/b']);
+    assert.deepEqual(externalLinkUrls(crawl), ['https://other.test/b', 'https://other.test/a']);
+  });
+
+  it('takes external URLs in turn from each host, then each page, so one host with many links cannot take every check', () => {
+    const many = Array.from({ length: 60 }, (_, i) => makeLink({ url: `https://big.test/${String(i).padStart(3, '0')}`, internal: false }));
+    const crawl = sampleCrawl({
+      pages: [
+        makePage({ url: 'https://example.test/', links: many }),
+        makePage({ url: 'https://example.test/b', links: [makeLink({ url: 'https://big.test/059', internal: false }), makeLink({ url: 'https://small.test/x', internal: false })] }),
+        makePage({ url: 'https://example.test/c', links: [makeLink({ url: 'https://big.test/c-only', internal: false })] }),
+      ],
+    });
+    const urls = externalLinkUrls(crawl);
+    assert.equal(urls.length, 62);
+    // Pages in turn: /000 (page 1), /059 (page 2), /c-only (page 3), /001 ...; hosts in turn: big, small, big ...
+    assert.deepEqual(urls.slice(0, 4), ['https://big.test/000', 'https://small.test/x', 'https://big.test/059', 'https://big.test/c-only']);
   });
 
   it('orders top groups by severity, impact and effort and clips them', () => {
