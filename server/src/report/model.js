@@ -3,7 +3,7 @@
 
 import { MODULES, SEVERITIES } from '../config.js';
 import { clip, collapseWhitespace } from '../util/strings.js';
-import { ROBOTS_STATUS, TITLE, methodSections } from './copy.js';
+import { ROBOTS_STATUS, methodSections, reportTitle } from './copy.js';
 import { changeList, groupByCheck, viewFinding, withLimits } from './findings.js';
 import { viewFixes } from './fixes.js';
 import { describeBlock, describeUnreadable, factualSummary, moduleLabel, plural } from './facts.js';
@@ -245,7 +245,7 @@ export function buildReport(run, options = {}) {
     });
 
   return {
-    title: TITLE,
+    title: reportTitle(run.modules_requested),
     host,
     startUrl: str(run.start_url),
     runId: str(run.run_id),
@@ -274,7 +274,10 @@ export function buildReport(run, options = {}) {
       .map((check) => ({ id: str(check.id), status: check.status === 'error' ? 'error' : 'skipped', reason: text(check.skip_reason, 'No reason recorded.') }))
       .sort((a, b) => compareText(a.id, b.id)),
     comparison: opts.comparison ? viewComparison(opts.comparison) : null,
-    method: methodSections({ pluginVersion: text(run.plugin_version, 'unknown'), rulesVersion: text(run.rules_version, 'unknown'), vitals: vitals !== null, repo: REPO_FRAMEWORKS.includes(str(obj(run.repo).framework)) }),
+    method: methodSections({
+      pluginVersion: text(run.plugin_version, 'unknown'), rulesVersion: text(run.rules_version, 'unknown'), vitals: vitals !== null,
+      repo: REPO_FRAMEWORKS.includes(str(obj(run.repo).framework)), security: Array.isArray(run.modules_requested) && run.modules_requested.includes('security'),
+    }),
     pluginVersion: text(run.plugin_version, 'unknown'),
     rulesVersion: text(run.rules_version, 'unknown'),
   };

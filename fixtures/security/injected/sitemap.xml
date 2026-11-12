@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>{origin}/</loc></url>
+  <url><loc>{origin}/about.html</loc></url>
+  <url><loc>{origin}/menu.html</loc></url>
+  <url><loc>{origin}/blog.html</loc></url>
+  <url><loc>{origin}/contact.html</loc></url>
+  <url><loc>{origin}/ja/</loc></url>
+  <url><loc>{origin}/promo.html</loc></url>
+  <url><loc>{origin}/tokyo-sale.html</loc></url>
+</urlset>

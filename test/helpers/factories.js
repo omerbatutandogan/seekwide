@@ -2,7 +2,7 @@
 // Each builder returns a valid object with sensible defaults; pass only the
 // fields a test cares about.
 
-/** @import { CrawlResult, FieldRecord, LabMetrics, LinkRecord, ImageRecord, PageRecord, VitalsData } from '../../server/src/types.js' */
+/** @import { CrawlResult, FieldRecord, LabMetrics, LinkRecord, ImageRecord, PageRecord, PageSecurity, SecurityHeaders, VitalsData } from '../../server/src/types.js' */
 
 const SITE = 'https://example.test';
 
@@ -39,6 +39,35 @@ export function makeImage(overrides = {}) {
     has_srcset: false,
     line: null,
     ...overrides,
+  };
+}
+
+/**
+ * Security headers that pass every header check.
+ * @param {Partial<SecurityHeaders>} [overrides]
+ * @returns {SecurityHeaders}
+ */
+export function makeSecurityHeaders(overrides = {}) {
+  return {
+    hsts_max_age: 31_536_000,
+    nosniff: true,
+    csp: 'header',
+    frame_ancestors: ["'self'"],
+    x_frame_options: [],
+    referrer_policy: 'strict-origin-when-cross-origin',
+    ...overrides,
+  };
+}
+
+/**
+ * The security signals of a clean English page: nothing hidden, nothing
+ * loaded from another host, no spam terms, Latin text, every header set.
+ * @param {Partial<PageSecurity>} [overrides]
+ * @returns {PageSecurity}
+ */
+export function makeSecurity(overrides = {}) {
+  return {
+    hidden_links: [], visible_hosts: [], embeds: [], spam_terms: {}, topic_terms: {}, scripts: { latin: 1200 }, headers: makeSecurityHeaders(), ...overrides,
   };
 }
 
@@ -83,6 +112,7 @@ export function makePage(overrides = {}) {
     text_hash: `hash-of-${url}`,
     text_excerpt: `Body text of ${url}`,
     indexability: { indexable: true, reasons: [] },
+    security: makeSecurity(),
     ...overrides,
   };
 }

@@ -4,7 +4,7 @@ Notable changes to Seekwide. Versions follow [semantic versioning](https://semve
 
 ## 0.1.0-alpha.1 (unreleased)
 
-First working version. Rule set 0.1.2.
+First working version. Rule set 0.1.3.
 
 Rule set 0.1.1 differs from 0.1.0, which only unreleased builds used, in two ways: a module score is 99 at most when a scored check has a failure, and the `aria-label` of an element inside a link (an SVG logo, an icon, an image) counts as the link's text.
 
@@ -27,3 +27,7 @@ Rule set 0.1.1 differs from 0.1.0, which only unreleased builds used, in two way
 - The re-audit after fixes: `verify_fixes` on `audit_run` says what became of each fixed finding (closed, still open, replaced by another finding of the same kind, or not verified because the check did not look at the page again), stores it in the new run, and both report formats show it in a "Fixes verified in this run" section.
 - `site_url` on `crawl_start`, for a crawl of a local server: the address the project is deployed at. Canonical links, robots.txt `Sitemap:` lines and sitemap entries on that address are read as the same path on the local server, so a project that names its deployed URL is no longer audited as a site whose every page points elsewhere. A crawl of a local server now sends no request to any other address, also when its robots.txt or sitemap redirects away, and links to the deployed site are left out of the external link check. When the address matches nothing the pages name, the audit says so and names the address they use. The audit commands pass it in repo mode when it is known.
 - Fixtures: a small Next.js App Router project and a plain HTML site, both with deliberate problems, under `fixtures/`.
+- A `security` module and its command, `/seekwide:security`: ten scripted checks for signs, visible from outside, that a site was hacked or misused, and for the security headers of its start page. Links that the page's own markup hides from visitors or that sit on one punctuation character, to sites no visible link goes to; pharmaceutical, gambling and counterfeit spam terms on a site whose start page is about something else; pages in a writing system the site does not use; hidden frames from other sites; scripts and frames from a site no other page uses (informational); Strict-Transport-Security, `X-Content-Type-Options: nosniff`, clickjacking protection, Content-Security-Policy (informational) and a referrer policy that sends full addresses (informational). The module reads only the pages the crawl fetches and sends no request of its own. The header checks need the deployed site and are skipped for a server on this machine (a new capability, `live_site`). `/seekwide:all` runs the module; `/seekwide:basic` does not. Rule set 0.1.3 differs from 0.1.2 in these ten checks only.
+- Page records carry the module's signals (`security`), read while a page is extracted. Records of crawls made before this version have none and are not units of the security checks.
+- A report that includes the security module is titled after its modules (for example "SEO, link and security audit") and says in its method what the module can and cannot see from outside.
+- Fixtures for the security module: a clean copy and a hacked copy of a small site, under `fixtures/security/`.

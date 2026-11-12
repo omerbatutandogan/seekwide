@@ -10,6 +10,8 @@ import { decodeBody, isHtmlResponse, mediaTypeOf } from './decode.js';
 import { headerValues, parseLinkHeaders, parseXRobots, selectHeaders } from './headers.js';
 import { CAPS, extractHtml, upgradesInsecureRequests } from './html.js';
 import { indexabilityOf } from './indexability.js';
+import { securityHeaders } from './security-headers.js';
+import { emptySecurity } from './security.js';
 
 /**
  * @typedef {Object} RecordBase
@@ -23,7 +25,7 @@ function emptyContent() {
   return {
     html_lang: null, titles: [], meta_descriptions: [], meta_robots: [], canonicals: [], hreflang: [],
     headings: [], viewport: null, og: {}, twitter: {}, links: [], images: [], jsonld: [], mixed_content: [],
-    word_count: 0, text_hash: '', text_excerpt: '',
+    word_count: 0, text_hash: '', text_excerpt: '', security: emptySecurity(),
   };
 }
 
@@ -114,6 +116,11 @@ export function extractPage(input) {
     x_robots: parseXRobots(headerValues(result, 'x-robots-tag')),
     canonicals: [...content.canonicals, ...fromHeaders.canonicals].slice(0, CAPS.canonicals),
     hreflang: [...content.hreflang, ...fromHeaders.hreflang].slice(0, CAPS.hreflang),
+    // The document's own CSP and referrer meta tags, combined with the response headers.
+    security: {
+      ...content.security,
+      headers: securityHeaders(result, { metaCsp: content.security.headers.csp === 'meta', metaReferrer: content.security.headers.referrer_policy }),
+    },
   });
 }
 

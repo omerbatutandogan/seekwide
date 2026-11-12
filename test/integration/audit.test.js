@@ -202,22 +202,31 @@ test('findings carry evidence, a recommendation and a documentation link', () =>
   assert.equal(new Set(audit.findings.map((finding) => finding.id)).size, audit.findings.length, 'finding ids are unique');
 });
 
-test('scores and coverage are reported for both modules', () => {
-  const { seo, links } = audit.modules;
-  for (const module of [seo, links]) {
+test('scores and coverage are reported for every module', () => {
+  const { seo, links, security } = audit.modules;
+  for (const module of [seo, links, security]) {
     assert.ok(module.score !== null && module.score >= 0 && module.score <= 100);
   }
   // Neither Core Web Vitals nor external links were collected in this test, so
-  // exactly the checks that need them are skipped, and coverage shows it.
+  // exactly the checks that need them are skipped, and coverage shows it. The
+  // site runs on this machine, so the header checks, which need the deployed
+  // site, are skipped as well.
   const skipped = audit.checks.filter((stat) => stat.status !== 'run');
   assert.deepEqual(skipped.map((stat) => stat.id), [
     'links.outbound.broken',
+    'security.headers.csp_missing', 'security.headers.framing_missing', 'security.headers.hsts_missing',
+    'security.headers.nosniff_missing', 'security.headers.referrer_leaky',
     'seo.cwv.field_cls', 'seo.cwv.field_inp', 'seo.cwv.field_lcp', 'seo.cwv.lab_cls', 'seo.cwv.lab_lcp', 'seo.cwv.lab_tbt',
   ]);
   assert.equal(seo.checks_skipped, 6);
   assert.equal(seo.checks_total, 47);
   assert.equal(seo.coverage, 0.87);
   assert.equal(links.checks_skipped, 1);
+  assert.equal(security.checks_total, 10);
+  assert.equal(security.checks_skipped, 5);
+  assert.match(skipped.find((stat) => stat.id === 'security.headers.hsts_missing')?.skip_reason ?? '', /server on this machine/);
+  // An ordinary site with SEO and link problems has no sign of a hack.
+  assert.deepEqual(audit.findings.filter((finding) => finding.module === 'security').map((finding) => finding.check_id), []);
   assert.ok(audit.checks.every((stat) => stat.status !== 'error'), 'no check may crash');
 });
 

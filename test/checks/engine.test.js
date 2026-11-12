@@ -49,11 +49,19 @@ test('buildContext indexes pages, inlinks and capabilities', () => {
   assert.equal(ctx.inlinks.get(`${SITE}/a`)?.length, 2);
   assert.equal(ctx.inlinks.has('https://other.test/x'), false);
   assert.equal(ctx.sitemapUrls.has(`${SITE}/a`), true);
-  assert.deepEqual([...ctx.capabilities].sort(), ['full_crawl', 'robots', 'sitemap']);
+  assert.deepEqual([...ctx.capabilities].sort(), ['full_crawl', 'live_site', 'robots', 'sitemap']);
   assert.deepEqual(ctx.site, { origin: SITE, host: 'example.test', https: true, start_url: `${SITE}/` });
   assert.equal(ctx.outbound, null);
   assert.equal(ctx.vitals, null);
   assert.deepEqual(ctx.skipReasons, {});
+});
+
+test('buildContext provides live_site unless the crawl was of a site on this machine', () => {
+  assert.equal(buildContext(makeCrawl()).capabilities.has('live_site'), true);
+  const local = makeCrawl({ options: { max_pages: 25, rate_per_sec: 1, include_subdomains: false, local: true } });
+  assert.equal(buildContext(local).capabilities.has('live_site'), false);
+  const old = makeCrawl({ options: { max_pages: 25, rate_per_sec: 1, include_subdomains: false } });
+  assert.equal(buildContext(old).capabilities.has('live_site'), true, 'a crawl that does not record local is not treated as one');
 });
 
 test('buildContext adds lab_data and field_data only for the sources that answered, and keeps the reason of the others', () => {

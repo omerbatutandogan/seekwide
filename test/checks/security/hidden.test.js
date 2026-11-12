@@ -1,0 +1,89 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+
+import { SITE, makeLink, makePage, makeSecurity } from '../../helpers/factories.js';
+import { audit, findingsFor, statFor } from './support.js';
+
+/** @import { HiddenLinkRecord } from '../../../server/src/types.js' */
+
+const ID = 'security.hidden.external_link';
+
+/**
+ * @param {number} index
+ * @param {string} url
+ * @param {Partial<HiddenLinkRecord>} [overrides]
+ * @returns {HiddenLinkRecord}
+ */
+const hiddenAt = (index, url, overrides = {}) => ({
+  index, url, host: new URL(url).host.replace(/^www\./, ''), text: 'cheap pills', how: 'display:none', element: 'div[style="display:none"]',
+  element_line: 40, line: 41, count: 1, ...overrides,
+});
+
+test(`${ID} fails a page with a hidden link to a site that no visible link goes to`, () => {
+  const spam = 'https://spam.test/pills';
+  const home = makePage({
+    url: `${SITE}/`,
+    links: [makeLink({ url: `${SITE}/about` }), makeLink({ url: spam, href: `${spam}?ref=1`, internal: false, text: 'cheap pills', line: 41 })],
+    security: makeSecurity({
+      hidden_links: [hiddenAt(1, spam, { how: 'off-screen', element: 'div[style="position:absolute;left:-9999px"]', count: 3 })],
+    }),
+  });
+  const about = makePage({ url: `${SITE}/about` });
+  const result = audit([home, about]);
+  const stat = statFor(result, ID);
+  assert.deepEqual([stat.applicable, stat.failed], [2, 1]);
+  const [finding] = findingsFor(result, ID);
+  assert.equal(finding.url, `${SITE}/`);
+  assert.equal(finding.selector, `a[href="${spam}?ref=1"]`, 'the raw href of the link');
+  assert.equal(finding.line, 41);
+  assert.equal(finding.severity, 'high');
+  assert.equal(finding.confidence, 'likely');
+  assert.deepEqual(finding.evidence.observed, {
+    hidden_links: 3, hosts: ['spam.test'], first: { url: spam, text: 'cheap pills', how: 'off-screen', element: 'div[style="position:absolute;left:-9999px"]' },
+  });
+  assert.match(finding.evidence.detail ?? '', /^3 links to another site .* off-screen, set on div\[style="position:absolute;left:-9999px"\] at line 40\.$/);
+});
+
+test(`${ID} passes a hidden link to a site that a visible link on any crawled page also goes to`, () => {
+  const social = 'https://www.instagram.com/shop';
+  const home = makePage({ url: `${SITE}/`, security: makeSecurity({ hidden_links: [hiddenAt(0, social)] }) });
+  const footer = makePage({ url: `${SITE}/contact`, security: makeSecurity({ visible_hosts: ['instagram.com'] }) });
+  const result = audit([home, footer]);
+  assert.deepEqual(findingsFor(result, ID), []);
+  assert.equal(statFor(result, ID).applicable, 2);
+});
+
+test(`${ID} describes a link on one character and lists every hidden site`, () => {
+  const page = makePage({
+    url: `${SITE}/`,
+    security: makeSecurity({
+      hidden_links: [
+        hiddenAt(0, 'https://farm.test/x', { text: '-', how: 'one-character link', element: null, element_line: null }),
+        hiddenAt(3, 'https://b.test/', { count: 2 }),
+      ],
+    }),
+  });
+  const [finding] = findingsFor(audit([page]), ID);
+  assert.deepEqual(/** @type {any} */ (finding.evidence.observed).hosts, ['b.test', 'farm.test']);
+  assert.match(finding.evidence.detail ?? '', /^3 links to 2 other sites .* its text is one character \("-"\)\.$/);
+  assert.equal(finding.selector, 'a[href="https://farm.test/x"]', 'the URL when the record has no link at that index');
+});
+
+test(`${ID} leaves out links to the deployed site of a local crawl`, () => {
+  const page = makePage({ url: 'http://localhost:3000/', security: makeSecurity({ hidden_links: [hiddenAt(0, 'https://www.acme.com/pricing')] }) });
+  const crawl = {
+    start_url: 'http://localhost:3000/', site_origin: 'http://localhost:3000', site_host: 'localhost:3000',
+    options: { max_pages: 25, rate_per_sec: 1, include_subdomains: false, local: true, deployed_origin: 'https://acme.com' },
+  };
+  assert.deepEqual(findingsFor(audit([page], crawl), ID), []);
+  assert.equal(findingsFor(audit([page], { ...crawl, options: { ...crawl.options, deployed_origin: undefined } }), ID).length, 1);
+});
+
+test(`${ID} has no unit on a page without signals, with damaged signals, or that is not an html page`, () => {
+  const old = makePage({ url: `${SITE}/old`, security: undefined });
+  const damaged = makePage({ url: `${SITE}/damaged`, security: /** @type {any} */ ({ ...makeSecurity(), headers: {} }) });
+  const broken = makePage({ url: `${SITE}/gone`, status: 404, security: makeSecurity({ hidden_links: [hiddenAt(0, 'https://spam.test/')] }) });
+  const result = audit([makePage(), old, damaged, broken]);
+  assert.equal(statFor(result, ID).applicable, 1);
+  assert.ok(result.checks.every((stat) => stat.status !== 'error'), 'no check fails on a damaged record');
+});

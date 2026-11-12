@@ -16,7 +16,7 @@ import { RULES_VERSION } from '../server/src/config.js';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TARGET = path.join(ROOT, 'docs', 'checks.md');
 
-const MODULE_TITLES = { seo: 'SEO', links: 'Links' };
+const MODULE_TITLES = { seo: 'SEO', links: 'Links', security: 'Security' };
 const NEEDS_TEXT = {
   full_crawl: 'a complete crawl',
   sitemap: 'an XML sitemap',
@@ -24,6 +24,7 @@ const NEEDS_TEXT = {
   outbound: 'external link checks',
   lab_data: 'lab data from PageSpeed Insights',
   field_data: 'field data from the Chrome UX Report (needs a Google API key)',
+  live_site: 'the deployed site (not a server on this machine)',
 };
 
 /** @param {string} value */

@@ -70,6 +70,6 @@ Search engines and AI search products still rest on the same foundation: pages t
 
 ## What this version covers
 
-Two modules: `seo` (crawling, indexing, canonicals, sitemaps, redirects, HTTPS, titles, descriptions, headings, duplicate content, structured data syntax, Core Web Vitals) and `links` (internal, outbound, anchors, orphans).
+Three modules: `seo` (crawling, indexing, canonicals, sitemaps, redirects, HTTPS, titles, descriptions, headings, duplicate content, structured data syntax, Core Web Vitals), `links` (internal, outbound, anchors, orphans) and `security` (signs of a hacked site that can be seen from outside: hidden links and frames, spam terms, pages in another writing system, scripts from sites no other page uses, and the security headers of the start page). A clean security result is not proof of a clean site: many hacks show their spam only to Google's crawler, and this crawler never pretends to be Google.
 
 Not in this version: images and video, AI search visibility, local SEO, international targeting, and fixes applied to code. The report marks the layers it has no data for instead of leaving them out.

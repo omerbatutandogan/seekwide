@@ -11,6 +11,7 @@ const SKIP_REASONS = {
   outbound: 'Needs external link checks. They were not run.',
   lab_data: 'Needs lab data from PageSpeed Insights. It was not collected.',
   field_data: 'Needs field data from the Chrome UX Report. It was not collected.',
+  live_site: 'Needs the deployed site: this crawl was of a server on this machine, whose response headers say nothing about the live site.',
 };
 
 /**
@@ -48,6 +49,7 @@ export function buildContext(crawl, extras = {}) {
   if (crawl.sitemap.urls.length > 0) capabilities.add('sitemap');
   if (crawl.robots.status === 'ok') capabilities.add('robots');
   if (outbound !== null) capabilities.add('outbound');
+  if (crawl.options.local !== true) capabilities.add('live_site');
 
   // Core Web Vitals come from outside services that can refuse or have nothing
   // to say; the collector's own reason is what a skipped check reports.

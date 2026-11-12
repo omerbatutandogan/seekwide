@@ -199,8 +199,9 @@ export function auditTools(deps) {
       name: 'audit_run',
       title: 'Run the audit',
       description:
-        'Run the SEO and link checks on a finished crawl, save the run under <project>/.seekwide/runs/ and return ' +
+        'Run the SEO, link and security checks on a finished crawl, save the run under <project>/.seekwide/runs/ and return ' +
         'scores, totals, the top problems and notes on coverage. Accepts crawls that are done or blocked. ' +
+        'The security module only reads the crawled pages and sends no request of its own. ' +
         'External links are checked only when the links module runs. With the seo module, Core Web Vitals are measured ' +
         'for a few pages through Google (PageSpeed Insights and the Chrome UX Report), which can take a minute; ' +
         'when Google refuses or does not answer, those checks are skipped and the audit still completes. ' +

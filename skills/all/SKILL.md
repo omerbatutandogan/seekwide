@@ -1,6 +1,6 @@
 ---
 name: all
-description: Full site audit with every Seekwide module that is installed (currently SEO, including Core Web Vitals, and links). Crawls up to 200 pages politely, runs all scripted checks, scores each module and writes one report with evidence.
+description: Full site audit with every Seekwide module that is installed (currently SEO including Core Web Vitals, links, and security signs of a hacked site). Crawls up to 200 pages politely, runs all scripted checks, scores each module and writes one report with evidence.
 when_to_use: Use when the user asks for a full or complete audit of a site, wants everything checked, or is preparing a report for a client. Use the basic skill for a quick look.
 argument-hint: "[url] [--repo] [--pages N] [--compare] [--no-cwv]"
 allowed-tools: mcp__plugin_seekwide_seekwide__project_detect, mcp__plugin_seekwide_seekwide__crawl_start, mcp__plugin_seekwide_seekwide__crawl_status, mcp__plugin_seekwide_seekwide__audit_run, mcp__plugin_seekwide_seekwide__findings_query, mcp__plugin_seekwide_seekwide__page_get, mcp__plugin_seekwide_seekwide__report_render, mcp__plugin_seekwide_seekwide__runs_list, mcp__plugin_seekwide_seekwide__profile_get
@@ -18,7 +18,7 @@ Arguments: `$ARGUMENTS`
 - `--compare`: also show what changed since the previous audit of this project.
 - `--no-cwv`: do not measure Core Web Vitals, so that nothing is sent to Google.
 
-This version ships two modules, `seo` (which includes Core Web Vitals) and `links`. Say so if the user expects more: AI search visibility, images, local SEO and the other planned modules are not in this version, and the report marks those layers as having no data.
+This version ships three modules, `seo` (which includes Core Web Vitals), `links` and `security` (signs of a hacked site and the security headers of the start page). Say so if the user expects more: AI search visibility, images, local SEO and the other planned modules are not in this version, and the report marks those layers as having no data.
 
 ## How the work is split
 
@@ -76,6 +76,10 @@ How to read the result:
 - The plugin's server gets the key when it starts. If the result still says no key is set after the user saved one, their session was opened before the key was saved; a new session will have it.
 - Field data that is missing although a key is set means the site or page has too few visits from Chrome users. That says nothing about its speed.
 
+## Security findings
+
+The `security` module reads the same pages and sends no request of its own. Its findings, except the headers, are `likely`: signs worth checking, never proof. Never tell the user that the site *is* hacked; say what was found and where, and point to Search Console's Security issues report and Google's help for hacked sites (https://web.dev/articles/hacked). A clean result is not proof of a clean site either, because many hacks show their spam only to Google's crawler. Security headers protect visitors and are not Google ranking factors. In repo mode the header checks are skipped, because a local server's headers say nothing about the deployed site. `${CLAUDE_PLUGIN_ROOT}/skills/security/SKILL.md` explains each check.
+
 ## When the crawl is blocked
 
 - `robots_unreachable`: robots.txt answered with a server error. Search engines stop crawling a site in that state, so this is the first thing to fix.
@@ -91,7 +95,7 @@ Then:
 
 - **Scores** per module, each with its coverage. Explain coverage when it is below 100%: some checks could not run, and the reason is in the result. A module without a score has `score: null` and a `note` that says why; give that reason instead of a number.
 - **Core Web Vitals**: the measured pages and their values, field data first, each marked good, needs improvement or poor. When a source gave nothing, give its `reason` in a sentence.
-- **What to fix first**: up to seven items across both modules, with problems that block indexing first. For each: the problem, how many pages it affects with one example URL, why it matters in a clause, and the fix. Findings with `confidence: likely` are worth checking by hand; say so.
+- **What to fix first**: up to seven items across the modules, with signs of a hack and problems that block indexing first. For each: the problem, how many pages it affects with one example URL, why it matters in a clause, and the fix. Findings with `confidence: likely` are worth checking by hand; say so.
 - **Suggestions** of your own, under their own heading.
 - **Report files**: the paths `report_render` returned. The HTML file is the one to send to a client; it prints cleanly to PDF from a browser. The run is saved in `.seekwide/` in the current folder, which comes with its own `.gitignore`, so the user does not need to add anything to keep it out of git.
 - **Source files** (repo mode only): say that the local dev server was audited, name the file of each fix (`source.file`, with `source.line` when there is one), and pass on what `notes` says about the mapping.

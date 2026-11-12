@@ -1,16 +1,17 @@
 # Seekwide
 
-Site audits for Claude Code that you can re-run and trust. Seekwide crawls a site politely, runs scripted SEO, link and Core Web Vitals checks with evidence for every finding, scores the result the same way every time, and writes a report you can send to a client.
+Site audits for Claude Code that you can re-run and trust. Seekwide crawls a site politely, runs scripted SEO, link, Core Web Vitals and security checks with evidence for every finding, scores the result the same way every time, and writes a report you can send to a client.
 
-> **Status: alpha (0.1.0-alpha.1).** Two modules work today, `seo` and `links`, plus metadata fixes for a project in its own folder. The roadmap further down lists what is planned and not built yet.
+> **Status: alpha (0.1.0-alpha.1).** Three modules work today, `seo`, `links` and `security`, plus metadata fixes for a project in its own folder. The roadmap further down lists what is planned and not built yet.
 
 ## What it does today
 
 - **Crawls like a well-behaved bot.** It obeys robots.txt for every page, sitemap and redirect step it requests, identifies itself, sends about one request per second, stays on the site you named, and stops when a site challenges it.
-- **Runs 57 scripted checks** (48 scored, 9 informational): robots.txt, indexing, canonicals, sitemaps, redirects, HTTPS, titles, meta descriptions, headings, duplicate content, structured data syntax, Core Web Vitals, broken and redirected links, links search engines cannot follow, anchor text, orphan pages and broken external links. The full list is in [docs/checks.md](docs/checks.md).
+- **Runs 67 scripted checks** (55 scored, 12 informational): robots.txt, indexing, canonicals, sitemaps, redirects, HTTPS, titles, meta descriptions, headings, duplicate content, structured data syntax, Core Web Vitals, broken and redirected links, links search engines cannot follow, anchor text, orphan pages, broken external links, signs of a hacked site and security headers. The full list is in [docs/checks.md](docs/checks.md).
 - **Measures Core Web Vitals** for the pages that matter most: the start page, then one page from each of the largest groups of similar pages (three pages with `/seekwide:basic`, five with `/seekwide:seo` and `/seekwide:all`). Real-user values (LCP, INP and CLS at the 75th percentile) come from the Chrome UX Report, lab values (LCP, CLS and Total Blocking Time) from PageSpeed Insights. The report names the pages it measured and shows every value, good ones included. This needs a Google API key; see [Core Web Vitals](#core-web-vitals).
 - **Scores the same data the same way, every time.** Checks are code, not model judgment, so the same data always gets the same findings, ids and scores, and two audits can be compared finding by finding. What can differ between two audits of an unchanged site is what is fetched or measured at audit time: the answers of external sites, Google's lab test, the real-user data (a 28-day window that moves every day), and whether Google answered at all. A comparison says so when a lab finding changed or a check ran in only one of the two audits.
 - **Shows its evidence.** Each finding has the URL, what was observed, what was expected, a confidence label, and a link to the documentation the rule is based on.
+- **Looks for signs that a site was hacked**, from outside and from the pages it crawls anyway: links and frames that the page's own markup hides from visitors, pharmaceutical, gambling and counterfeit spam on a site that is not about those, pages in a writing system the site does not use, and scripts from sites no other page uses. It also checks the security headers of the start page. See [Security signals](#security-signals).
 - **Names the source file** when you audit a project in its own folder (repo mode). For a Next.js App Router project or a plain HTML site, the audit runs against the project's local server and each finding says which file it comes from: `app/about/page.tsx` for the route `/about`, or `services.html:17` for a broken link on line 17. See [Auditing a project in its folder](#auditing-a-project-in-its-folder).
 - **Fixes what it found, and checks the fix.** For a project audited in its folder, `/seekwide:fix` proposes changes for metadata findings (a missing or duplicate title or meta description, a missing canonical, missing Open Graph tags, a missing sitemap) in the file each one comes from. Every change is shown as a diff and written only after you say yes; nothing is committed. A second audit then says, finding by finding, whether it is closed, still open, replaced by another finding, or could not be verified. See [Fixing findings](#fixing-findings).
 - **Writes a report** as Markdown and as one self-contained HTML file, with an optional agency name and logo. The HTML prints cleanly to PDF.
@@ -23,6 +24,7 @@ Site audits for Claude Code that you can re-run and trust. Seekwide crawls a sit
 - It does not get around firewalls, CAPTCHAs or robots.txt. When a site blocks it, it says so and stops. Pages the site refuses to serve to the crawler are counted and left out of the checks; they are never reported as errors of the site.
 - It does not measure Core Web Vitals of every page. A lab test takes many seconds and Google limits how many can be run, so a few pages stand for the rest.
 - It does not change your code by itself. The plugin's own server never writes into a project. With `/seekwide:fix`, Claude edits files with its normal tools, after showing you each diff and getting your yes, and it never commits. Only metadata fixes exist; images, links and content are not touched.
+- It does not look for cloaking or sneaky redirects, and it does not test a site's defences. Finding cloaking needs a request that pretends to be Google, which this crawler never sends, so a clean security result is not proof of a clean site.
 - It has no image, AI search or local SEO modules yet.
 
 ## Requirements
@@ -57,6 +59,7 @@ Claude Code installs the plugin's two small dependencies (`parse5` and `robots-p
 | `/seekwide:basic [url]` | Quick SEO and link audit | 25 |
 | `/seekwide:seo [url]` | Technical and on-page SEO audit, with suggested titles and descriptions | 100 |
 | `/seekwide:links [url]` | Link audit, including external links | 100 |
+| `/seekwide:security [url]` | Signs that the site was hacked or misused, and the security headers of its start page | 100 |
 | `/seekwide:all [url]` | Every installed module in one report | 200 |
 | `/seekwide:fix [run-id]` | Fix metadata findings of an audit of the project in this folder, with your approval for each change, then audit again to verify | The first audit's |
 | `/seekwide:report [run-id]` | Rebuild a report, brand it, or compare two audits | — |
@@ -151,6 +154,28 @@ The plugin's server gets the key when it starts. A Claude Code session that was 
 
 Field data exists only for sites and pages with enough visits from Chrome users. A small site often has none, and that says nothing about its speed.
 
+## Security signals
+
+Google can warn searchers about a hacked site or show its pages lower. A hack is usually built so that the owner does not notice it, so the `security` module looks for what an owner does not see:
+
+| Check | What it reports | Confidence |
+|---|---|---|
+| Hidden link to another site | Links that the page's own markup hides (`display:none`, the `hidden` attribute, `visibility:hidden`, a font size of 1 pixel or less, a box moved 1000 pixels or more off its place, a box of 2 pixels or less that clips its content) or that sit on a single punctuation character, to sites that no visible link on the crawled pages goes to | likely |
+| Spam terms the site is not about | Two or more matches of pharmaceutical, gambling or counterfeit-goods spam terms in a page's text and link addresses, when the start page's title, description and headings are about something else | likely |
+| Page in a writing system the site does not use | A large part of a page in, say, Japanese or Cyrillic on a site that hardly uses it, when the page's `lang` does not declare that language | likely |
+| Hidden frame from another site | An `<iframe>` of 2 pixels or less, or hidden by its markup, that loads another site | likely |
+| Script or frame from a site no other page uses | Code worth a look; a video or map on one page shows up here too | info |
+| Security headers of the start page | Strict-Transport-Security, `X-Content-Type-Options: nosniff`, clickjacking protection (`frame-ancestors` or X-Frame-Options), Content-Security-Policy, and a referrer policy that sends full addresses to other sites | confirmed |
+
+What to know:
+
+- **It sends nothing new.** The module reads the pages the crawl fetched anyway, with the same user agent and robots.txt rules. It requests no path the site does not link to or list (no `/wp-admin/`, `/.env` or `/.git/`), tries nothing against the site, and never pretends to be Google or a browser.
+- **A clean result is not proof of a clean site.** Many hacks show their spam only to Google's crawler or to visitors who arrive from a Google search. Search Console's Security issues report is where Google says what it found.
+- **Content a visitor opens is not hidden.** Google allows tabs, accordions, menus and pop-ups, so an element built to be opened does not count: a dialog, menu, tab panel or popover, content right after a control marked with `aria-expanded`, or an element whose `id` a control on the page names (`aria-controls`, `data-bs-target`, a link to `#its-id`). A link to a site that is linked visibly on any crawled page does not count either, and neither does a link to the same organisation's other domains (acme.de from acme.com) or a share link. Not read: style sheets, classes and scripts; `opacity: 0`, which animated pages use for content they fade in; and white text on a white background, which needs rendering. A menu or slider that a script opens without any of these marks can still be reported, which is why the finding is `likely` and shows the element.
+- **Security headers are not Google ranking factors.** They protect visitors. Google's page experience documentation lists HTTPS but no security header, and Google has said that the HSTS header does not affect Search. They are checked on the start page and only for a deployed site: the headers of a server on your own machine say nothing about the live one.
+- **Findings are signs, not verdicts.** Every signal except the headers can have a legitimate exception, so it is `likely`, and each finding shows the element, the terms or the frame it is about.
+- **Not checked yet:** outdated WordPress core, plugins and themes. A plugin's version cannot be read reliably from a page, and the vulnerability databases that allow use by agencies need an account of each user's own. Admin accounts, file integrity and backups cannot be seen from outside; the report lists them as things to check by hand.
+
 ## Files it writes
 
 Run audits from the folder that belongs to the site. An agency keeps one folder per client.
@@ -181,6 +206,8 @@ Seekwide has no telemetry and no backend. This is everything it sends or fetches
 | Google Chrome UX Report API (`chromeuxreport.googleapis.com`) | The origin of the site and the URLs of the same pages, one request each (4 with `/seekwide:basic`, 6 with `/seekwide:seo` and `/seekwide:all`, never more than 11), with your Google API key | The same audits, and only when a Google API key is set |
 | Anthropic | Tool results that Claude reads during the session: scores, findings, Core Web Vitals values, and short page excerpts when Claude drafts a suggestion | Every audit, as part of your Claude Code session |
 
+The `security` module adds nothing to this table: it reads the pages the crawl already fetched.
+
 Nothing else leaves your machine. What Claude reads is covered by the terms of your Claude account. If you audit a client's site, the findings and page excerpts become part of your Claude session.
 
 The Google API key is sent to those two Google APIs only, in a request header and never in a URL. It is not written to `.seekwide/`, to the crawl cache or to a log. The tools that Claude calls are not given the key and return nothing that contains it, so Claude never sees it. A site on your own machine or on a private network address is never named to Google.
@@ -207,10 +234,12 @@ A project profile (`/seekwide:setup`) overrides them for one client.
 
 Planned, in this order, and not built yet:
 
-1. Security signals that can be measured from outside: hidden text and links, scripts and frames from unknown hosts, pages that do not belong to the site, missing security headers. It will not pretend to be a search engine's crawler to look for cloaking.
-2. Images and video, including alt text written from the image, and fixes for images and internal links.
-3. Answer and AI search readiness, entity checks against Wikidata, E-E-A-T, international, local, programmatic pages, conversion.
-4. Search Console and Bing Webmaster Tools data, backlinks, measured AI visibility, app stores and social search.
+1. Images and video, including alt text written from the image, and fixes for images and internal links.
+2. Answer and AI search readiness, entity checks against Wikidata, E-E-A-T, international, local, programmatic pages, conversion.
+3. Search Console and Bing Webmaster Tools data, backlinks, measured AI visibility, app stores and social search.
+4. WordPress core and plugin vulnerabilities, using Wordfence Intelligence with your own key.
+
+Seekwide will never pretend to be a search engine's crawler to look for cloaking.
 
 ## Development
 
