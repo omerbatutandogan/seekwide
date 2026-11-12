@@ -34,6 +34,54 @@ export {};
  * @property {string|null} loading
  * @property {boolean} has_srcset
  * @property {number|null} line
+ * @property {boolean} [aria_hidden]   The element, or an element around it, has `aria-hidden="true"`. This field and those below
+ *   come with the media module (rule set 0.1.6); records made before have none of them.
+ * @property {string|null} [role]      First token of `role`, lower-cased; null when absent.
+ * @property {boolean} [named]         A non-empty `aria-label`, `aria-labelledby` or `title`: a text alternative other than `alt`
+ *   (WCAG F65), or a script framework's binding that sets `alt` when the page renders (`:alt`, `v-bind:alt`, `x-bind:alt`, `[alt]`).
+ * @property {boolean} [hidden]        Hidden by its own markup: the `hidden` attribute (not `until-found`) or `display: none` inline.
+ * @property {boolean} [pixel]         A tracking pixel or spacer: a `width` or `height`, as an attribute or an inline style in px, of 1 or less.
+ * @property {boolean} [style_sized]   Its inline style reserves its box: `aspect-ratio`, both `width` and `height` other than `auto`,
+ *   or `position: absolute` or `fixed`.
+ * @property {boolean} [class_sized] A utility class gives it an aspect ratio or both sizes (`aspect-video`, `size-full`, `w-40 h-12`).
+ * @property {boolean} [chrome]        It is in the page's frame, not its content: navigation, a complementary block, or the
+ *   page's own header or footer (`<nav>`, `<aside>`, a `<header>` or `<footer>` outside any sectioning element, or their roles).
+ * @property {string|null} [fetchpriority]  `fetchpriority`, trimmed and lower-cased; null when absent.
+ * @property {boolean} [preloaded]     A `<link rel="preload" as="image">` before it names its `src` or a URL of its `srcset`.
+ * @property {boolean} [figure_caption]  It is the only content of a `<figure>` with a non-empty `<figcaption>`, alone or in up to
+ *   three wrappers that hold nothing else (a link, a `<picture>` with its sources, a span or div).
+ * @property {boolean} [picture_sources]  It is inside a `<picture>` with one or more `<source srcset>`.
+ * @property {boolean} [modern_source]  It is inside a `<picture>` with a `<source type="image/avif">` or `type="image/webp"`.
+ */
+
+/**
+ * One `<video>` element (media module).
+ * @typedef {Object} VideoRecord
+ * @property {string|null} url         Normalized URL of `src`, else of the first `<source src>`; null when neither gives one.
+ * @property {boolean} muted
+ * @property {boolean} autoplay
+ * @property {boolean} controls
+ * @property {boolean} aria_hidden
+ * @property {boolean} hidden          Hidden by its own markup, as for images.
+ * @property {string[]} tracks         `kind` of each `<track>` child as browsers read it: `subtitles` when missing, `metadata` when unknown.
+ * @property {number|null} line
+ */
+
+/**
+ * An embedded player of a known video platform (media module).
+ * @typedef {Object} VideoEmbedRecord
+ * @property {'iframe'|'embed'|'object'} tag
+ * @property {string} url
+ * @property {string} platform        'youtube', 'vimeo', 'wistia', 'dailymotion', 'brightcove', 'jwplayer', 'loom', 'vidyard' or 'tiktok'.
+ * @property {number|null} line
+ */
+
+/**
+ * Which of Google's required properties a JSON-LD `VideoObject` has.
+ * @typedef {Object} VideoObjectSummary
+ * @property {boolean} name
+ * @property {boolean} thumbnail_url
+ * @property {boolean} upload_date
  */
 
 /**
@@ -69,6 +117,7 @@ export {};
  * @property {string[]} types         `@type` values found at the top level and in `@graph`.
  * @property {string|null} error      Parser message when `valid` is false.
  * @property {number|null} line
+ * @property {VideoObjectSummary[]} [videos]  Every `VideoObject` in the block, anywhere in it, in document order (media module).
  */
 
 /**
@@ -125,4 +174,7 @@ export {};
  * @property {string} text_excerpt      First 2000 characters of the visible body text.
  * @property {Indexability} indexability
  * @property {PageSecurity} [security]  Signals for the security module. Absent in records made before it existed.
+ * @property {VideoRecord[]} [videos]   Every `<video>` element (media module). Absent in records made before it existed.
+ * @property {VideoEmbedRecord[]} [video_embeds]  Players of known video platforms in `<iframe>`, `<embed>` or `<object>`.
+ * @property {boolean} [video_markup]  An element whose `itemtype` (microdata) or `typeof` (RDFa) names `VideoObject`.
  */

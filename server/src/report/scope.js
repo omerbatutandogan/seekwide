@@ -57,6 +57,27 @@ function viewRepo(run, findings) {
 }
 
 /**
+ * The scope row on image files, or null when the run did not check them.
+ * @param {Run} run
+ * @returns {{label: string, value: string, code?: boolean}|null}
+ */
+function viewImageFiles(run) {
+  if (run.image_files === null || typeof run.image_files !== 'object' || Array.isArray(run.image_files)) return null;
+  const files = obj(run.image_files);
+  const images = Math.max(0, Math.floor(num(files.images)));
+  const selected = Math.min(images, Math.max(0, Math.floor(num(files.selected))));
+  if (images === 0) return { label: 'Image files', value: 'The crawled pages show no image file to check.' };
+  const outcomes = obj(files.outcomes);
+  const answered = Math.min(selected, Math.max(0, Math.floor(num(outcomes.ok))) + Math.max(0, Math.floor(num(outcomes.broken))));
+  const local = files.local === true ? ' Only images on the address of this site on your machine were requested.' : '';
+  const skipped = files.site_skipped === true ? " The site refused some of the crawler's page requests, so no image on its own host was requested." : '';
+  return {
+    label: 'Image files',
+    value: `${selected} of ${plural(images, 'distinct image')} chosen to check (robots.txt first, then a HEAD request each); ${answered} answered.${local}${skipped}`,
+  };
+}
+
+/**
  * @param {Run} run
  * @param {{host: string, blocked: ReturnType<typeof viewBlock>}} derived
  */
@@ -67,6 +88,7 @@ export function viewScope(run, { host, blocked }) {
   const robots = str(crawl.robots_status);
   const unreadable = unreadablePages(run);
   const repo = viewRepo(run, Array.isArray(run.findings) ? run.findings.length : 0);
+  const imageFiles = viewImageFiles(run);
   const modules = Array.isArray(run.modules_requested) ? orderModules(run.modules_requested.filter((m) => typeof m === 'string')).map(moduleLabel) : [];
   return [
     { label: 'Pages crawled', value: `${pages} of ${plural(num(crawl.max_pages), 'page')} allowed (${num(crawl.html_pages)} HTML, ${num(crawl.indexable_pages)} indexable)` },
@@ -84,6 +106,7 @@ export function viewScope(run, { host, blocked }) {
     { label: 'Sitemap', value: sitemapUrls > 0 ? `${plural(sitemapUrls, 'URL')} listed in XML sitemaps.` : 'No URLs found in XML sitemaps.' },
     { label: 'Modules', value: modules.length > 0 ? modules.join(', ') : 'None recorded.' },
     ...(repo ? [repo] : []),
+    ...(imageFiles ? [imageFiles] : []),
     { label: 'User agent', value: text(crawl.user_agent, 'Not recorded.'), code: true },
   ];
 }

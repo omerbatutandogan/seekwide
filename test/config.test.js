@@ -37,7 +37,7 @@ test('the Core Web Vitals budget is small and bounded', () => {
   assert.equal(LIMITS.vitalsPagesMax, 10);
   assert.ok(LIMITS.vitalsPagesDefault <= LIMITS.vitalsPagesMax);
   assert.ok(LIMITS.psiConcurrency >= 1 && LIMITS.psiConcurrency <= LIMITS.vitalsPagesMax);
-  assert.deepEqual([...CAPABILITIES], ['full_crawl', 'sitemap', 'robots', 'outbound', 'lab_data', 'field_data', 'live_site']);
+  assert.deepEqual([...CAPABILITIES], ['full_crawl', 'sitemap', 'robots', 'outbound', 'lab_data', 'field_data', 'live_site', 'image_files']);
 });
 
 test('the tools get the two report settings from the environment and nothing else, the Google API key least of all', () => {

@@ -207,13 +207,14 @@ test('scores and coverage are reported for every module', () => {
   for (const module of [seo, links, security]) {
     assert.ok(module.score !== null && module.score >= 0 && module.score <= 100);
   }
-  // Neither Core Web Vitals nor external links were collected in this test, so
+  // Neither Core Web Vitals, external links nor image files were collected in this test, so
   // exactly the checks that need them are skipped, and coverage shows it. The
   // site runs on this machine, so the header checks, which need the deployed
   // site, are skipped as well.
   const skipped = audit.checks.filter((stat) => stat.status !== 'run');
   assert.deepEqual(skipped.map((stat) => stat.id), [
     'links.outbound.broken',
+    'media.image.broken', 'media.image.large_file', 'media.image.legacy_format', 'media.image.robots_blocked',
     'security.headers.csp_missing', 'security.headers.framing_missing', 'security.headers.hsts_missing',
     'security.headers.nosniff_missing', 'security.headers.referrer_leaky',
     'seo.cwv.field_cls', 'seo.cwv.field_inp', 'seo.cwv.field_lcp', 'seo.cwv.lab_cls', 'seo.cwv.lab_lcp', 'seo.cwv.lab_tbt',

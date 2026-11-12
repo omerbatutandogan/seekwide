@@ -113,6 +113,9 @@ export function makePage(overrides = {}) {
     text_excerpt: `Body text of ${url}`,
     indexability: { indexable: true, reasons: [] },
     security: makeSecurity(),
+    videos: [],
+    video_embeds: [],
+    video_markup: false,
     ...overrides,
   };
 }

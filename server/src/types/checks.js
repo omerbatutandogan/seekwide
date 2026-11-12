@@ -3,6 +3,7 @@
 /** @import { CrawlResult, OutboundResult } from './crawl.js' */
 /** @import { LinkRecord, PageRecord } from './page.js' */
 /** @import { VitalsData } from './vitals.js' */
+/** @import { ImageFileResult } from './media.js' */
 
 export {};
 
@@ -27,6 +28,7 @@ export {};
  * @property {Record<string, string>} skipReasons  Why a capability is missing, in the collector's words, when it gave a reason.
  * @property {Map<string, OutboundResult>|null} outbound  External link results, when they were collected.
  * @property {VitalsData|null} vitals         Core Web Vitals, when they were measured.
+ * @property {Map<string, ImageFileResult>|null} imageFiles  Image files checked for the media module, by URL, when they were checked.
  * @property {(url: string) => PageRecord|undefined} resolve  Record at the end of a URL's redirect chain, if crawled.
  */
 
@@ -48,7 +50,7 @@ export {};
 /**
  * @typedef {Object} CheckDef
  * @property {string} id               `<module>.<area>.<problem>`, lower-case, for example "seo.title.missing".
- * @property {'seo'|'links'|'security'} module
+ * @property {'seo'|'links'|'security'|'media'} module
  * @property {'code'} engine           Every scripted check is 'code'. Model judgments are never checks.
  * @property {string} title            Short name of the problem, sentence case, no trailing period.
  * @property {string} description      What the check looks at and why it matters, one or two sentences.

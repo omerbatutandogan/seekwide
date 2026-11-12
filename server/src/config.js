@@ -10,7 +10,7 @@ const pkg = JSON.parse(readFileSync(path.join(PLUGIN_ROOT, 'package.json'), 'utf
 export const VERSION = /** @type {string} */ (pkg.version);
 
 /** Version of the rule set. Bump it whenever a check changes what it reports. */
-export const RULES_VERSION = '0.1.5';
+export const RULES_VERSION = '0.1.6';
 
 /** Version of the JSON written under `.seekwide/`. */
 export const SCHEMA_VERSION = 1;
@@ -53,9 +53,14 @@ export const LIMITS = Object.freeze({
   psiMaxBodyBytes: 16 * 1024 * 1024,
   // No new PageSpeed Insights test starts once this much time has passed.
   vitalsDeadlineMs: 90_000,
+  // Image files (media module): each one costs a request or two, so only a few distinct images are checked.
+  maxImageChecks: 50,
+  imageCheckConcurrency: 4,
+  // No new image request starts once this much time has passed.
+  imageCheckDeadlineMs: 90_000,
 });
 
-export const MODULES = Object.freeze(['seo', 'links', 'security']);
+export const MODULES = Object.freeze(['seo', 'links', 'security', 'media']);
 
 /**
  * Scores a module's checks can count toward instead of the module's own, with
@@ -69,11 +74,11 @@ export const SEVERITIES = Object.freeze(['critical', 'high', 'medium', 'low', 'i
 
 /**
  * Things a check may require before it can run. The engine skips checks whose requirements are not met.
- * The crawl provides the first three, the external link check `outbound`, and the Core Web Vitals
- * measurement `lab_data` and `field_data`. `live_site` is provided for a crawl of a site that is not on
+ * The crawl provides the first three, the external link check `outbound`, the check of image files
+ * (media module) `image_files`, and the Core Web Vitals measurement `lab_data` and `field_data`. `live_site` is provided for a crawl of a site that is not on
  * this machine: the response headers of a local development server say nothing about the deployed site.
  */
-export const CAPABILITIES = Object.freeze(['full_crawl', 'sitemap', 'robots', 'outbound', 'lab_data', 'field_data', 'live_site']);
+export const CAPABILITIES = Object.freeze(['full_crawl', 'sitemap', 'robots', 'outbound', 'lab_data', 'field_data', 'live_site', 'image_files']);
 
 /** An API key is sent in a request header, so it must be printable ASCII without spaces. */
 const API_KEY_PATTERN = /^[\x21-\x7E]{1,256}$/;

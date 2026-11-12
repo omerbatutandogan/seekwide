@@ -3,6 +3,7 @@
 /** @import { CrawlBlock } from './crawl.js' */
 /** @import { CheckStat, Finding, ModuleScore } from './checks.js' */
 /** @import { VitalsData } from './vitals.js' */
+/** @import { ImageFilesSummary } from './media.js' */
 
 export {};
 
@@ -70,6 +71,8 @@ export {};
  *   the audit was not given a source folder; absent in runs stored before it existed.
  * @property {FixVerification|null} [fixes]  A re-audit after fixes: what became of each fixed finding of an earlier
  *   run. Null when the audit was not asked to verify fixes; absent in runs stored before it existed.
+ * @property {ImageFilesSummary|null} [image_files]  The media module's check of image files: how many images the pages show
+ *   and how many were checked. Null when it was not run; absent in runs stored before it existed.
  */
 
 /**

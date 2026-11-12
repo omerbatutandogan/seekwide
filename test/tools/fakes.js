@@ -1,6 +1,6 @@
 // In-memory fakes for the dependencies of createTools, for unit tests.
 
-/** @import { CheckDef, CrawlJob, CrawlResult, Run, VitalsData } from '../../server/src/types.js' */
+/** @import { CheckDef, CrawlJob, CrawlResult, ImageFileResult, Run, VitalsData } from '../../server/src/types.js' */
 
 import path from 'node:path';
 import { attachSources, loadProjectSources } from '../../server/src/repo/sources.js';
@@ -103,7 +103,8 @@ function codedError(message, code) {
  * Fake dependencies with call logs. `jobs` and `results` seed the crawl manager.
  * @param {{jobs?: CrawlJob[], results?: CrawlResult[], runs?: Run[], profile?: object|null, env?: NodeJS.ProcessEnv,
  *          projectDir?: string, outbound?: (url: string) => 'ok'|'broken'|'unverifiable',
- *          vitals?: VitalsData|Error}} [seed]  `vitals`: what the measurement returns, or the error it throws.
+ *          vitals?: VitalsData|Error, imageFile?: (url: string) => ImageFileResult}} [seed]  `vitals`: what the measurement returns,
+ *   or the error it throws. `imageFile`: what the check of an image file finds; by default a small WebP that Google may fetch.
  */
 export function makeDeps(seed = {}) {
   const calls = /** @type {Record<string, unknown[][]>} */ ({});
@@ -231,6 +232,14 @@ export function makeDeps(seed = {}) {
       record('checkExternalLinks', [urls, options]);
       const outcome = seed.outbound ?? (() => 'ok');
       return new Map(urls.map((url) => [url, { url, status: outcome(url) === 'broken' ? 404 : 200, outcome: outcome(url), reason: null, final_url: url }]));
+    },
+    /** @param {string[]} urls @param {object} options */
+    async checkImageFiles(urls, options) {
+      record('checkImageFiles', [urls, options]);
+      return new Map(urls.map((url) => [url, seed.imageFile?.(url) ?? {
+        url, outcome: 'ok', status: 200, reason: null, final_url: null, content_type: 'image/webp', bytes: 10_000, vary: null,
+        modern_accepted: true, google: 'allowed', google_agent: null, google_host: null,
+      }]));
     },
     /** @param {CrawlResult} crawl @param {{maxPages: number}} options */
     async measureVitals(crawl, options) {

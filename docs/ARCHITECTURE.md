@@ -16,7 +16,7 @@ MCP server (server/src/index.js)
    ├─ crawl_start / crawl_status ──► crawl/  ──► net/ (safe-fetch, robots, sitemap)
    │                                   └──────► extract/ (HTML → PageRecord)
    ├─ project_detect ──► repo/ (what kind of project the folder holds, which file answers a URL)
-   ├─ audit_run ──► net/link-check, vitals/ (PageSpeed Insights, Chrome UX Report) ──► checks/ (engine + seo + links) ──► repo/ (source files, repo mode; fix verification) ──► store/
+   ├─ audit_run ──► net/link-check, net/image-check, vitals/ (PageSpeed Insights, Chrome UX Report) ──► checks/ (engine + seo + links + security + media) ──► repo/ (source files, repo mode; fix verification) ──► store/
    ├─ fix_plan ──► store/ (a saved run) ──► repo/ (which fix applies, in which file)
    ├─ findings_query, page_get, runs_list, runs_compare, profile_get, profile_set ──► store/
    └─ report_render ──► report/ (Markdown, HTML)
@@ -26,7 +26,7 @@ In repo mode the same flow runs against the project's own local server: `project
 
 `/seekwide:fix` builds on that (4.13): `fix_plan` says which findings of a repo-mode run a metadata fix exists for and where it belongs, Claude writes each change after the user approved its diff, and a second `audit_run` with `verify_fixes` says what became of each fixed finding. The server plans and verifies; it never writes into a project.
 
-Not in this milestone: fixes other than metadata, and every module other than `seo`, `links` and `security` (4.14).
+Not in this milestone: fixes other than metadata, and every module other than `seo`, `links`, `security` (4.14) and `media` (4.15).
 
 ## 2. Principles that shape the code
 
@@ -47,12 +47,13 @@ server/src/
   config.js  types.js (+ types/)  log.js   shared
   util/{url,hash,strings}.js            shared
   checks/{engine,scoring,validate,registry,page-helpers}.js   shared
-  net/        safe-fetch.js connect.js ip.js robots.js robots-match.js sitemap.js link-check.js
+  net/        safe-fetch.js connect.js ip.js robots.js robots-match.js sitemap.js link-check.js image-check.js
   crawl/      manager.js admission.js run.js requests.js records.js chain.js probe.js frontier.js challenge.js deployed.js
   extract/    page.js indexability.js (+ helpers)
   checks/seo/     index.js + one file per area
   checks/links/   index.js + one file per area
   checks/security/  index.js + one file per area (4.14)
+  checks/media/     index.js + one file per area, select.js (which image files are checked) (4.15)
   vitals/     measure.js select.js psi.js crux.js google-api.js thresholds.js
   repo/       scan.js detect.js next-routes.js html-routes.js html-lines.js sources.js fixes.js fix-common.js fix-page.js fix-sitemap.js fix-texts.js verify.js
   store/      project.js runs.js run-validate.js profile.js compare.js
@@ -120,6 +121,7 @@ export async function loadRobots(siteOrigin, options)
 - 4xx except 429 → `'missing'`; everything is allowed.
 - 429, 5xx, any other status, or a network error → `'unreachable'`; `isAllowed` returns false for every URL on that origin.
 - `isAllowed(url)` evaluates the rules for `productToken` (default `PRODUCT_TOKEN`). A URL on another origin is not governed by this file and returns true.
+- `allowsAgents(url, agents)` answers the same for another crawler given its product tokens, most specific first: the group of the first token that has one, else `*` (Google applies only the most specific matching group; Googlebot-Image answers to `Googlebot-Image` and `Googlebot`). A missing file allows everything and one that could not be read allows nothing on its origin, as for `isAllowed`.
 - `disallows_all`: both `<origin>/` and `<origin>/seekwide-probe-path` are disallowed for a user agent that has no group of its own. `disallows_all_googlebot`: the same for `Googlebot`.
 - `sitemaps` are normalized with `normalizeUrl` and de-duplicated in file order.
 
@@ -394,7 +396,7 @@ export class ToolError extends Error {}
 | `crawl_start` | `url` (required), `max_pages` 1–500 (default 25), `include_subdomains` (false), `allow_localhost` (false; accepted only when the start host is a loopback address), `site_url` (only with `allow_localhost`: the address the project is deployed at, 4.5) | `{job_id, status, start_url, max_pages}` |
 | `crawl_status` | `job_id`, `wait_seconds` 0–25 (default 0) | job snapshot; when finished also `summary: {pages, html_pages, by_status, robots_status, sitemap_urls, truncated, blocked}`, with `time_limit_reached: true` when the crawl stopped at its time limit and `site_url` when it was told the deployed address |
 | `project_detect` | `project_dir`, `source_dir` (defaults to the project folder) | `{project_dir, source_dir, framework, label, supported, message, app_dir, dev_server, routes_total, routes, routes_truncated}` |
-| `audit_run` | `job_id`, `modules` (default all), `check_outbound_links` (true), `check_core_web_vitals` (true), `core_web_vitals_pages` 1–10 (default 3), `project_dir`, `source_dir` (repo mode), `verify_fixes: {base_run_id, finding_ids ≤ 200}` (a re-audit after fixes) | `{run_id, project_dir, files, crawl, modules, totals, top, core_web_vitals, repo, fix_verification, skipped_checks, notes}` |
+| `audit_run` | `job_id`, `modules` (default all), `check_outbound_links` (true), `check_core_web_vitals` (true), `check_image_files` (true), `core_web_vitals_pages` 1–10 (default 3), `project_dir`, `source_dir` (repo mode), `verify_fixes: {base_run_id, finding_ids ≤ 200}` (a re-audit after fixes) | `{run_id, project_dir, files, crawl, modules, totals, top, core_web_vitals, repo, fix_verification, skipped_checks, notes}` |
 | `fix_plan` | `run_id` ('last'), `project_dir`, `site_url`, `check_id`, `limit` 1–200 (50), `offset` | `{run_id, project_dir, source_dir, framework, audited, max_pages, modules, site_url, fixable_total, returned, next_offset, fixes, not_fixable, not_fixable_total, out_of_scope, in_scope_checks, notes}`; `limit` and `offset` page `fixes` only |
 | `findings_query` | `run_id` ('last'), `project_dir`, `module`, `severity`, `check_id`, `url_contains`, `limit` 1–200 (50), `offset` | `{run_id, total, returned, findings}` |
 | `page_get` | `job_id`, `url` | selected `PageRecord` fields and counts |
@@ -580,6 +582,30 @@ export function securityHeaders(result, documentSays)            // → Security
 - **The header checks need `live_site`**, a capability `buildContext` adds unless `crawl.options.local` is `true`: a development server's headers say nothing about the deployed site. They read the start page only (`ctx.resolve(start_url)`).
 - **Wording.** Findings are signs, never verdicts: every check except the headers is `likely`, and the skill, the report and the README say that a clean result is not proof of a clean site, because many hacks show their spam only to Google's crawler.
 - **Report.** When `run.modules_requested` includes `security`, the title names the modules (`reportTitle`) and the method adds what the module looks at and a checklist of what an outside audit cannot see (admin accounts, file integrity, backups, updates, Search Console's reports).
+
+### 4.15 The media module: `extract/media.js`, `extract/media-image.js`, `net/image-check.js`, `checks/media/`
+
+Images and video: text alternatives, the space an image takes, lazy loading, the image files, captions and video structured data. The rules and their sources are in `CHECKS-SPEC.md`; the pages were read on 2026-11-12.
+
+```js
+// extract/media.js, extract/media-image.js                      pure
+export function visitMedia(node, frame, state, maxImages)        // images, videos, video player embeds, image preloads, VideoObject markup
+export function enterLandmark(node, parent)                      // → {chrome, sectioned} for the walk's frame
+export function imageRecord(node, frame, state)                  // → ImageRecord
+export function srcsetUrls(value), styleDeclarations(style), videoPlatform(url)
+
+// checks/media/select.js                                        pure
+export function selectImageFiles(crawl, max)                     // → {urls, images}
+export function fileUses(ctx)                                    // image URL → the pages that show it
+
+// net/image-check.js
+export async function checkImageFiles(urls, options)             // → Map<string, ImageFileResult>
+```
+
+- **Read during extraction.** `visitElement` calls `visitMedia` for every element. It builds the image record (`imageRecord`, with the fields the exceptions need: other text alternatives and framework `alt` bindings, `aria-hidden`, role, hiding by the element's own markup, a tracking pixel, a sizing inline style or utility class, whether it is in the page's frame, the priority hint, whether a `<link rel="preload" as="image">` earlier in the document names it, a captioned figure, `<picture>` sources), the `<video>` records with the kind of each track, the players of known video platforms, and whether microdata or RDFa names a `VideoObject`. `parseJsonLd` adds each `VideoObject` of a block, found at any depth, with which required properties it has. Inline styles, classes and `srcset` values are read up to 4,000 characters, comments removed by scanning; videos (200), player embeds (100) and preloads (50) are capped per page and count toward the page's list budget (4.6). The walk carries `chrome` and `sectioned` in its frame (`enterLandmark`), so whether an image is in the page's frame costs nothing per image. A `<picture>` is read once for all its images (at most 20 sources; `state.pictures`), and candidate URLs are normalized only when the page has an image preload: a review of 2026-11-12 found that reading the picture again for each image took 29 seconds of CPU on one page of 5,000 sources and 2,000 images, now 0.3. A record made before the module has no `videos` and is not a unit of its checks (`hasMedia`).
+- **The image files are collected before the checks run**, like external links and Core Web Vitals (2, principle 1). `audit_run` with the `media` module and `check_image_files` (default true) chooses up to `LIMITS.maxImageChecks` URLs (`selectImageFiles`: rounds over the html pages in crawl order) and hands them to `deps.checkImageFiles` once the external link check has finished (each has its own pacing, so running them together could send a host that serves both a link and an image two requests at once), at the same time as Core Web Vitals. Nothing is requested when the crawl was stopped by a bot challenge or rate limiting, and no image on the site's own host when some pages were refused that way. `buildContext` adds `ctx.imageFiles` and the capability `image_files`; without them the four file checks are skipped with the collector's reason (not asked, or an internal error, which is logged and never fails the audit). The run stores `image_files` (how many images the pages show, how many were chosen, the count per outcome, whether only the local address was reached); the notes and the report's scope say the same.
+- **`checkImageFiles`** reads the robots.txt of each origin once (4.2) before any request to it, and evaluates Googlebot's and Googlebot-Image's access from it with `allowsAgents` (the group of the most specific token that has one, else `*`). It sends `HEAD` with `Accept: image/avif,image/webp,…`, and one `GET` with `Range: bytes=0-0` and at most 1 KiB read when the `HEAD` fails, answers 400 or above, or gives no size. Redirects are followed by hand, at most 5, each step after its own robots.txt. Requests to one host are sequential at the crawl's rate, slower when the host's robots.txt asks (crawl-delay, capped); up to 4 hosts at once; no request starts after `LIMITS.imageCheckDeadlineMs`. With `onlyOrigin` (a local crawl), nothing on another origin is requested, robots.txt and its redirects included, and loopback is allowed for exactly that origin through `safeFetch`'s `allowLoopback`.
+- **Report.** When `run.modules_requested` includes `media`, the title names the modules, the scope has a row on image files, and the method says what was requested and what is not measured.
 
 ## 5. Coding rules
 

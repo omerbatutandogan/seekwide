@@ -16,7 +16,7 @@ import { RULES_VERSION } from '../server/src/config.js';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TARGET = path.join(ROOT, 'docs', 'checks.md');
 
-const MODULE_TITLES = { seo: 'SEO', links: 'Links', security: 'Security' };
+const MODULE_TITLES = { seo: 'SEO', links: 'Links', security: 'Security', media: 'Media' };
 const NEEDS_TEXT = {
   full_crawl: 'a complete crawl',
   sitemap: 'an XML sitemap',
@@ -25,10 +25,11 @@ const NEEDS_TEXT = {
   lab_data: 'lab data from PageSpeed Insights',
   field_data: 'field data from the Chrome UX Report (needs a Google API key)',
   live_site: 'the deployed site (not a server on this machine)',
+  image_files: 'the check of image files (requests to the image hosts)',
 };
 
 /** @param {string} value */
-const cell = (value) => value.replace(/\|/g, '\\|').replace(/\s+/g, ' ').trim();
+const cell = (value) => value.replace(/\|/g, '\\|').replace(/</g, '&lt;').replace(/\s+/g, ' ').trim();
 
 function render() {
   const checks = allChecks();
@@ -41,7 +42,7 @@ function render() {
     '',
     '- **Severity** orders the fixes. **Info** checks are rules of thumb: they are reported but never change a score.',
     '- **Confidence** is `confirmed` for a measured fact and `likely` for a strong signal that can have a legitimate exception.',
-    '- **Needs** lists what the audit must provide: something from the crawl, the external link check, or the Core Web Vitals measurement by Google. A check that cannot run is reported as skipped, with the reason, and lowers the coverage figure instead of the score.',
+    '- **Needs** lists what the audit must provide: something from the crawl, the external link check, the check of image files, or the Core Web Vitals measurement by Google. A check that cannot run is reported as skipped, with the reason, and lowers the coverage figure instead of the score.',
     '',
   ];
 

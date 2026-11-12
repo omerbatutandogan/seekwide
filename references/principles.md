@@ -9,7 +9,7 @@ Read this when a user asks how scores are built, what a label means, or why the 
 
 ## Scores
 
-Each module (SEO, links) gets a score from 0 to 100.
+Each module (SEO, links, security, media) gets a score from 0 to 100.
 
 - Every check looks at a set of units, such as pages or links, and each unit passes or fails.
 - A check's pass rate is passed units divided by all its units.
@@ -72,6 +72,6 @@ Search engines and AI search products still rest on the same foundation: pages t
 
 ## What this version covers
 
-Three modules: `seo` (crawling, indexing, canonicals, sitemaps, redirects, HTTPS, titles, descriptions, headings, duplicate content, structured data syntax, Core Web Vitals), `links` (internal, outbound, anchors, orphans) and `security` (signs of a hacked site that can be seen from outside: hidden links and frames, spam terms, pages in another writing system, scripts from sites no other page uses, and the security headers of the start page). A clean security result is not proof of a clean site: many hacks show their spam only to Google's crawler, and this crawler never pretends to be Google.
+Four modules: `seo` (crawling, indexing, canonicals, sitemaps, redirects, HTTPS, titles, descriptions, headings, duplicate content, structured data syntax, Core Web Vitals), `links` (internal, outbound, anchors, orphans), `security` (signs of a hacked site that can be seen from outside: hidden links and frames, spam terms, pages in another writing system, scripts from sites no other page uses, and the security headers of the start page) and `media` (alt text, image sizes, lazy loading, broken images, image formats and file sizes, images robots.txt keeps from Google, video captions and video structured data; up to 50 image files are checked with a HEAD request each, never downloaded whole). A clean security result is not proof of a clean site: many hacks show their spam only to Google's crawler, and this crawler never pretends to be Google.
 
 Not in this version: images and video, AI search visibility, local SEO, international targeting, and fixes applied to code. The report marks the layers it has no data for instead of leaving them out.

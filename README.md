@@ -1,17 +1,18 @@
 # Seekwide
 
-Site audits for Claude Code that you can re-run and trust. Seekwide crawls a site politely, runs scripted SEO, link, Core Web Vitals and security checks with evidence for every finding, scores the result the same way every time, and writes a report you can send to a client.
+Site audits for Claude Code that you can re-run and trust. Seekwide crawls a site politely, runs scripted SEO, link, Core Web Vitals, security, image and video checks with evidence for every finding, scores the result the same way every time, and writes a report you can send to a client.
 
-> **Status: alpha (0.1.0-alpha.1).** Three modules work today, `seo`, `links` and `security`, plus metadata fixes for a project in its own folder. The roadmap further down lists what is planned and not built yet.
+> **Status: alpha (0.1.0-alpha.1).** Four modules work today, `seo`, `links`, `security` and `media`, plus metadata fixes for a project in its own folder. The roadmap further down lists what is planned and not built yet.
 
 ## What it does today
 
 - **Crawls like a well-behaved bot.** It obeys robots.txt for every page, sitemap and redirect step it requests, identifies itself, sends about one request per second, stays on the site you named, and stops when a site challenges it.
-- **Runs 67 scripted checks** (55 scored, 12 informational): robots.txt, indexing, canonicals, sitemaps, redirects, HTTPS, titles, meta descriptions, headings, duplicate content, structured data syntax, Core Web Vitals, broken and redirected links, links search engines cannot follow, anchor text, orphan pages, broken external links, signs of a hacked site and security headers. The full list is in [docs/checks.md](docs/checks.md).
+- **Runs 77 scripted checks** (62 scored, 15 informational): robots.txt, indexing, canonicals, sitemaps, redirects, HTTPS, titles, meta descriptions, headings, duplicate content, structured data syntax, Core Web Vitals, broken and redirected links, links search engines cannot follow, anchor text, orphan pages, broken external links, signs of a hacked site, security headers, alt text, image sizes and formats, broken images, images robots.txt keeps from Google, video captions and video structured data. The full list is in [docs/checks.md](docs/checks.md).
 - **Measures Core Web Vitals** for the pages that matter most: the start page, then one page from each of the largest groups of similar pages (three pages with `/seekwide:basic`, five with `/seekwide:seo` and `/seekwide:all`). Real-user values (LCP, INP and CLS at the 75th percentile) come from the Chrome UX Report, lab values (LCP, CLS and Total Blocking Time) from PageSpeed Insights. The report names the pages it measured and shows every value, good ones included. This needs a Google API key; see [Core Web Vitals](#core-web-vitals).
 - **Scores the same data the same way, every time.** Checks are code, not model judgment, so the same data always gets the same findings, ids and scores, and two audits can be compared finding by finding. What can differ between two audits of an unchanged site is what is fetched or measured at audit time: the answers of external sites, Google's lab test, the real-user data (a 28-day window that moves every day), and whether Google answered at all. A comparison says so when a lab finding changed or a check ran in only one of the two audits.
 - **Shows its evidence.** Each finding has the URL, what was observed, what was expected, a confidence label, and a link to the documentation the rule is based on.
 - **Looks for signs that a site was hacked**, from outside and from the pages it crawls anyway: links and frames that the page's own markup hides from visitors, pharmaceutical, gambling and counterfeit spam on a site that is not about those, pages in a writing system the site does not use, and scripts from sites no other page uses. It also checks the security headers of the start page. See [Security signals](#security-signals).
+- **Checks images and videos**: alt text that is missing or is only a file name, images without the size that keeps a page from jumping as it loads, a main image that is lazy-loaded, and, for up to 50 image files per audit, broken files, JPEG and PNG where WebP or AVIF would serve, very large files, and images that robots.txt keeps from Google. For video: captions and `VideoObject` structured data. See [Images and video](#images-and-video).
 - **Names the source file** when you audit a project in its own folder (repo mode). For a Next.js App Router project or a plain HTML site, the audit runs against the project's local server and each finding says which file it comes from: `app/about/page.tsx` for the route `/about`, or `services.html:17` for a broken link on line 17. See [Auditing a project in its folder](#auditing-a-project-in-its-folder).
 - **Fixes what it found, and checks the fix.** For a project audited in its folder, `/seekwide:fix` proposes changes for metadata findings (a missing or duplicate title or meta description, a missing canonical, missing Open Graph tags, a missing sitemap) in the file each one comes from. Every change is shown as a diff and written only after you say yes; nothing is committed. A second audit then says, finding by finding, whether it is closed, still open, replaced by another finding, or could not be verified. See [Fixing findings](#fixing-findings).
 - **Writes a report** as Markdown and as one self-contained HTML file, with an optional agency name and logo. The HTML prints cleanly to PDF.
@@ -25,7 +26,7 @@ Site audits for Claude Code that you can re-run and trust. Seekwide crawls a sit
 - It does not measure Core Web Vitals of every page. A lab test takes many seconds and Google limits how many can be run, so a few pages stand for the rest.
 - It does not change your code by itself. The plugin's own server never writes into a project. With `/seekwide:fix`, Claude edits files with its normal tools, after showing you each diff and getting your yes, and it never commits. Only metadata fixes exist; images, links and content are not touched.
 - It does not look for cloaking or sneaky redirects, and it does not test a site's defences. Finding cloaking needs a request that pretends to be Google, which this crawler never sends, so a clean security result is not proof of a clean site.
-- It has no image, AI search or local SEO modules yet.
+- It does not look at images themselves: it cannot tell whether alt text describes a picture, and it does not write alt text or convert images. It has no AI search or local SEO modules yet.
 
 ## Requirements
 
@@ -66,6 +67,7 @@ When Claude Code installs the plugin from a marketplace it fetches, such as this
 | `/seekwide:seo [url]` | Technical and on-page SEO audit, with suggested titles and descriptions | 100 |
 | `/seekwide:links [url]` | Link audit, including external links | 100 |
 | `/seekwide:security [url]` | Signs that the site was hacked or misused, and the security headers of its start page | 100 |
+| `/seekwide:media [url]` | Images and video: alt text, sizes, formats, broken files, robots.txt for Google, captions and video structured data | 100 |
 | `/seekwide:all [url]` | Every installed module in one report | 200 |
 | `/seekwide:fix [run-id]` | Fix metadata findings of an audit of the project in this folder, with your approval for each change, then audit again to verify | The first audit's |
 | `/seekwide:report [run-id]` | Rebuild a report, brand it, or compare two audits | — |
@@ -188,6 +190,31 @@ What to know:
 - **Findings are signs, not verdicts.** Every signal except the headers can have a legitimate exception, so it is `likely`, and each finding shows the element, the terms or the frame it is about.
 - **Not checked yet:** outdated WordPress core, plugins and themes. A plugin's version cannot be read reliably from a page, and the vulnerability databases that allow use by agencies need an account of each user's own. Admin accounts, file integrity and backups cannot be seen from outside; the report lists them as things to check by hand.
 
+## Images and video
+
+The `media` module checks what search engines and visitors get from a site's images and videos:
+
+| Check | What it reports | Confidence |
+|---|---|---|
+| Image without alt text | An `<img>` with no `alt` attribute and no other text alternative (`aria-label`, `aria-labelledby`, `title`). `alt=""` marks a decorative image and is never reported | confirmed |
+| Alt text that is a file name or a placeholder | `alt="IMG_0423"`, `alt="chart.jpg"`, `alt="image"`, `alt="0001"`: text that WCAG lists as no alternative | confirmed |
+| Image without width and height | A content image (not in the navigation, header, footer or sidebar) with no size in its markup, inline style or utility classes, so the page can jump when it arrives. A style sheet often reserves the space, which the crawler does not read, so it does not change the score | info |
+| Main image is lazy-loaded | An image the page marks as its most important one (`fetchpriority="high"` or a preload) that also has `loading="lazy"` | confirmed |
+| Broken image | The file answers 404 or 410 | confirmed |
+| JPEG, PNG or BMP instead of WebP or AVIF | A file of 32 KiB or more that comes back in a legacy format although the request accepted WebP and AVIF, from a server that does not say it picks the format per browser | likely |
+| Image file over 500 KiB | A rule of thumb; it does not change the score | info |
+| Image blocked for Google by robots.txt | A content image on the site's own domain that the robots.txt of its host keeps from Googlebot or Googlebot-Image | likely |
+| Video without captions | A `<video>` that may have sound and has no `<track kind="captions">`. Whether it has speech cannot be told from the page | info |
+| VideoObject missing a required property | `name`, `thumbnailUrl` or `uploadDate` | confirmed |
+
+What to know:
+
+- **Image files are checked with a few small requests.** Up to 50 per audit, taken page by page, after the external links are checked. The robots.txt of each host the images are on is read first and obeyed; then each file gets a `HEAD` request that says WebP and AVIF are accepted, as a browser's would, and a `GET` that reads at most 1 KiB when the `HEAD` says too little. No image is downloaded whole, and every request carries the crawler's own user agent. A tracking pixel is never requested, and a site that challenged or rate-limited the crawler gets no image request.
+- **It is the image host's robots.txt that counts.** Google reads the robots.txt of the host that serves an image, so an image on a CDN is governed by the CDN's file, not the site's.
+- **Some findings need a second look.** A style sheet can reserve an image's size, which the crawler does not read. A server can choose the image format by the browser it sees rather than by what the request accepts, and this crawler never claims to be a browser; files whose server says so are left out. Captions can be part of the picture or loaded by a player script. Those findings are `likely` or informational.
+- **Measured on real sites.** Before release the module was run on 19 real sites and a sample of its findings was judged by hand; the rules that were often wrong or not worth acting on were narrowed, made informational or removed (a check for pages with a video and no `VideoObject` was removed, because which page is a watch page cannot be told from its markup).
+- **Not measured:** what an image shows (so whether alt text fits it), images and videos that scripts add, images in CSS backgrounds, and images much larger than the box they are shown in, which needs layout. Fixes for images come later.
+
 ## Files it writes
 
 Run audits from the folder that belongs to the site. An agency keeps one folder per client.
@@ -214,11 +241,12 @@ Seekwide has no telemetry and no backend. This is everything it sends or fetches
 |---|---|---|
 | The site you audit | HTTP requests for pages, `robots.txt` and XML sitemaps, and, for a file that one of its redirects leads to, a `HEAD` request (then a `GET` that reads at most 16 KB when the HEAD fails or answers with an error status), with the user agent `seekwide/<version> (+https://github.com/omerbatutandogan/seekwide)`. If the start URL redirects to another host, that host becomes the site. | Every audit |
 | Sites the audited site links to | The `robots.txt` of each site, then a `HEAD` request for the link, and a `GET` when the HEAD fails or answers with an error status. At most 50 links are checked, each through at most 5 redirects. A redirect step gets the same requests, and only when the robots.txt of the site it leads to allows it. This also covers the destination of a redirect that leaves the audited site. | Audits that include the `links` module |
+| Hosts that serve the audited pages' images (the site itself, or a CDN) | The `robots.txt` of each host, then for each image a `HEAD` request that says AVIF and WebP are accepted, and a `GET` for its first byte (`Range: bytes=0-0`, reading at most 1 KiB) when the HEAD fails, answers with an error status or gives no size. At most 50 images per audit, each through at most 5 redirects, one request per host at the crawl's rate (one a second by default; slower when the host's robots.txt asks), after the external link check and never at the same time, and nothing new after 90 seconds. A tracking pixel and video files are never requested. | Audits that include the `media` module, except when the site challenged or rate-limited the crawler (then nothing on its own host). For a site on your own machine only images on its own address are requested |
 | Google PageSpeed Insights API (`pagespeedonline.googleapis.com`) | The URL of each page whose Core Web Vitals are measured: 3 pages with `/seekwide:basic`, 5 with `/seekwide:seo` and `/seekwide:all`, never more than 10. One request per page, with your Google API key when one is set. Google then loads those pages itself to test them. | Audits that include the `seo` module, unless you pass `--no-cwv`, the site is on your own machine, or the Google API key that is set cannot be used. Once per crawl: another audit of the same crawl reuses the numbers |
 | Google Chrome UX Report API (`chromeuxreport.googleapis.com`) | The origin of the site and the URLs of the same pages, one request each (4 with `/seekwide:basic`, 6 with `/seekwide:seo` and `/seekwide:all`, never more than 11), with your Google API key | The same audits, and only when a Google API key is set |
 | Anthropic | Tool results that Claude reads during the session: scores, findings, Core Web Vitals values, and short page excerpts when Claude drafts a suggestion | Every audit, as part of your Claude Code session |
 
-The `security` module adds nothing to this table: it reads the pages the crawl already fetched.
+The `security` module adds nothing to this table: it reads the pages the crawl already fetched. The `media` module adds the row on image hosts.
 
 Nothing else leaves your machine. What Claude reads is covered by the terms of your Claude account. If you audit a client's site, the findings and page excerpts become part of your Claude session.
 
@@ -246,7 +274,7 @@ A project profile (`/seekwide:setup`) overrides them for one client.
 
 Planned, in this order, and not built yet:
 
-1. Images and video, including alt text written from the image, and fixes for images and internal links.
+1. Alt text written from the image itself, and fixes for images and internal links.
 2. Answer and AI search readiness, entity checks against Wikidata, E-E-A-T, international, local, programmatic pages, conversion.
 3. Search Console and Bing Webmaster Tools data, backlinks, measured AI visibility, app stores and social search.
 4. WordPress core and plugin vulnerabilities, using Wordfence Intelligence with your own key.

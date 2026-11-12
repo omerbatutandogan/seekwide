@@ -4,7 +4,7 @@ import robotsParser from 'robots-parser';
 
 import { PRODUCT_TOKEN } from '../config.js';
 import { normalizeUrl, originOf } from '../util/url.js';
-import { compiledGroup, decidingRule, rulePath } from './robots-match.js';
+import { compiledGroup, compiledGroupFor, decidingRule, rulePath } from './robots-match.js';
 import { safeFetch } from './safe-fetch.js';
 
 /** @import { RobotsSummary } from '../types.js' */
@@ -37,6 +37,47 @@ function rulesFor(parser, agent) {
 }
 
 /**
+ * The product tokens the file names in its `User-agent` lines, lower-cased,
+ * with what follows a `/` dropped, as robots-parser reads them. robots-parser
+ * keeps no group for a token whose group has no rule at all; RFC 9309 gives
+ * such a crawler no restriction.
+ * @param {string} text
+ * @returns {Set<string>}
+ */
+function namedAgents(text) {
+  /** @type {Set<string>} */
+  const names = new Set();
+  for (const line of text.split('\n')) {
+    const colon = line.indexOf(':');
+    if (colon === -1 || line.slice(0, colon).trim().toLowerCase() !== 'user-agent') continue;
+    const value = line.slice(colon + 1).split('#', 1)[0].trim().toLowerCase();
+    names.add(value.split('/', 1)[0].trim());
+  }
+  return names;
+}
+
+/**
+ * A function that says whether a crawler with several product tokens (most
+ * specific first) may fetch a URL of the file's origin. A token the file
+ * names in a group without rules is allowed everything.
+ * @param {RobotsRules} parser
+ * @param {string[]} agents
+ * @param {Set<string>} named  Tokens the file's `User-agent` lines name (`namedAgents`).
+ * @returns {(url: string) => boolean}
+ */
+function rulesForTokens(parser, agents, named) {
+  const groups = /** @type {{_rules?: Record<string, unknown>}} */ (/** @type {unknown} */ (parser))._rules ?? {};
+  for (const agent of agents) {
+    const key = agent.toLowerCase().split('/', 1)[0].trim();
+    if (Object.hasOwn(groups, key)) break;
+    if (named.has(key)) return () => true;
+  }
+  const group = compiledGroupFor(parser, agents);
+  if (group === null) return (url) => parser.isAllowed(url, agents[0]) !== false;
+  return (url) => decidingRule(group, rulePath(url))?.allow ?? true;
+}
+
+/**
  * @param {(url: string) => boolean} allows
  * @param {string} origin
  * @returns {boolean}
@@ -62,10 +103,14 @@ function disallowsAll(allows, origin) {
  * `refusedRedirect` is the address a redirect led to when that request was
  * refused as an address that may not be contacted (`blocked_address`), so a
  * caller can say why the file could not be read; null otherwise.
+ * `allowsAgents(url, agents)` answers the same question for another crawler,
+ * given its product tokens most specific first (`["Googlebot-Image",
+ * "Googlebot"]`): the group of the first token that has one, else `*`.
  *
  * @param {string} siteOrigin  for example "https://example.com"
  * @param {{fetch?: typeof safeFetch, fetchOptions?: Parameters<typeof safeFetch>[1], productToken?: string}} [options]
- * @returns {Promise<{summary: RobotsSummary, isAllowed: (url: string) => boolean, refusedRedirect: string|null}>}
+ * @returns {Promise<{summary: RobotsSummary, isAllowed: (url: string) => boolean, refusedRedirect: string|null,
+ *   allowsAgents: (url: string, agents: string[]) => boolean}>}
  */
 export async function loadRobots(siteOrigin, options = {}) {
   const origin = typeof siteOrigin === 'string' ? originOf(siteOrigin) : null;
@@ -122,10 +167,10 @@ export async function loadRobots(siteOrigin, options = {}) {
   const sameOrigin = (target) => originOf(target) === origin;
 
   if (summary.status === 'unreachable') {
-    return { summary, isAllowed: (target) => !sameOrigin(target), refusedRedirect };
+    return { summary, isAllowed: (target) => !sameOrigin(target), refusedRedirect, allowsAgents: (target) => !sameOrigin(target) };
   }
   if (summary.status === 'missing') {
-    return { summary, isAllowed: () => true, refusedRedirect: null };
+    return { summary, isAllowed: () => true, refusedRedirect: null, allowsAgents: () => true };
   }
 
   const text = (result.body ?? Buffer.alloc(0)).toString('utf8').replace(/^\uFEFF/, '');
@@ -146,9 +191,24 @@ export async function loadRobots(siteOrigin, options = {}) {
     summary.sitemaps.push(normalized);
   }
 
+  /** @type {Map<string, (url: string) => boolean>} */
+  const byAgents = new Map();
+  /** @type {Set<string>|null} Read on the first question about another crawler, not for the crawler's own. */
+  let named = null;
   return {
     summary,
     isAllowed: (target) => !sameOrigin(target) || allows(target),
     refusedRedirect: null,
+    allowsAgents: (target, agents) => {
+      if (!sameOrigin(target)) return true;
+      const key = agents.join('\n');
+      let rules = byAgents.get(key);
+      if (!rules) {
+        named ??= namedAgents(text);
+        rules = rulesForTokens(parser, agents, named);
+        byAgents.set(key, rules);
+      }
+      return rules(target);
+    },
   };
 }

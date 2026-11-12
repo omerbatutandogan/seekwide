@@ -17,6 +17,9 @@ export {};
 // Extraction: types/page.js
 /** @typedef {import('./types/page.js').LinkRecord} LinkRecord */
 /** @typedef {import('./types/page.js').ImageRecord} ImageRecord */
+/** @typedef {import('./types/page.js').VideoRecord} VideoRecord */
+/** @typedef {import('./types/page.js').VideoEmbedRecord} VideoEmbedRecord */
+/** @typedef {import('./types/page.js').VideoObjectSummary} VideoObjectSummary */
 /** @typedef {import('./types/page.js').CanonicalRef} CanonicalRef */
 /** @typedef {import('./types/page.js').HreflangRef} HreflangRef */
 /** @typedef {import('./types/page.js').Heading} Heading */
@@ -30,6 +33,10 @@ export {};
 /** @typedef {import('./types/security.js').TermHits} TermHits */
 /** @typedef {import('./types/security.js').SecurityHeaders} SecurityHeaders */
 /** @typedef {import('./types/security.js').PageSecurity} PageSecurity */
+
+// Image files: types/media.js
+/** @typedef {import('./types/media.js').ImageFileResult} ImageFileResult */
+/** @typedef {import('./types/media.js').ImageFilesSummary} ImageFilesSummary */
 
 // Crawl: types/crawl.js
 /** @typedef {import('./types/crawl.js').RobotsSummary} RobotsSummary */

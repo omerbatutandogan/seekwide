@@ -9,6 +9,7 @@ import { buildContext, runChecks } from '../checks/engine.js';
 import { onDeployedHost } from '../crawl/deployed.js';
 import { isUnverifiable } from '../checks/page-helpers.js';
 import { runNotes, skippedChecks, startPage, topGroups } from './audit-summary.js';
+import { MEDIA_ARGUMENTS, collectImageFiles, imageFilesNotes } from './audit-media.js';
 import { VITALS_ARGUMENTS, collectVitals, vitalsOutput } from './audit-vitals.js';
 import { JOB_ID_SCHEMA, PROJECT_DIR_SCHEMA, UNTRUSTED_NOTE, countBy, resolveProjectDir, withStoreErrors } from './common.js';
 import { finishedCrawl } from './crawl.js';
@@ -86,9 +87,10 @@ export function auditTools(deps) {
       name: 'audit_run',
       title: 'Run the audit',
       description:
-        'Run the SEO, link and security checks on a finished crawl, save the run under <project>/.seekwide/runs/ and return ' +
+        'Run the SEO, link, security and media checks on a finished crawl, save the run under <project>/.seekwide/runs/ and return ' +
         'scores, totals, the top problems and notes on coverage. Accepts crawls that are done or blocked. ' +
         'The security module only reads the crawled pages and sends no request of its own. ' +
+        `The media module checks up to ${LIMITS.maxImageChecks} image files the pages show (robots.txt first, then a HEAD request each), which can take a minute. ` +
         'External links are checked only when the links module runs. With the seo module, Core Web Vitals are measured ' +
         'for a few pages through Google (PageSpeed Insights and the Chrome UX Report), which can take a minute; ' +
         'when Google refuses or does not answer, those checks are skipped and the audit still completes. ' +
@@ -106,6 +108,7 @@ export function auditTools(deps) {
           },
           check_outbound_links: { type: 'boolean', default: true, description: `With the links module, check up to ${LIMITS.maxOutboundChecks} external links for broken targets.` },
           ...VITALS_ARGUMENTS,
+          ...MEDIA_ARGUMENTS,
           project_dir: PROJECT_DIR_SCHEMA,
           source_dir: {
             ...SOURCE_DIR_SCHEMA,
@@ -136,15 +139,21 @@ export function auditTools(deps) {
         // Core Web Vitals belong to the seo module. They are collected while the links are checked.
         const seoRequested = modules.includes('seo');
         const checkVitals = seoRequested && (args.check_core_web_vitals ?? true);
-        /** @type {[Map<string, OutboundResult>|null, VitalsData|null]} */
-        const [outbound, vitals] = await Promise.all([
-          !checkOutbound ? null : external.length === 0
-            ? new Map()
-            : deps.checkExternalLinks(external, { maxLinks: LIMITS.maxOutboundChecks, concurrency: LIMITS.outboundConcurrency }),
+        // Image files belong to the media module. They are checked after the external links, never at the same time:
+        // an image and a link can be on one host, and that host must see one request at a time.
+        const mediaRequested = modules.includes('media');
+        /** @type {Promise<Map<string, OutboundResult>|null>} */
+        const links = Promise.resolve(!checkOutbound ? null : external.length === 0
+          ? new Map()
+          : deps.checkExternalLinks(external, { maxLinks: LIMITS.maxOutboundChecks, concurrency: LIMITS.outboundConcurrency }));
+        /** @type {[Map<string, OutboundResult>|null, VitalsData|null, Awaited<ReturnType<typeof collectImageFiles>>]} */
+        const [outbound, vitals, images] = await Promise.all([
+          links,
           checkVitals ? collectVitals(deps, crawl, args.core_web_vitals_pages ?? LIMITS.vitalsPagesDefault, pendingVitals) : null,
+          links.catch(() => null).then(() => collectImageFiles(deps, crawl, { requested: mediaRequested, check: args.check_image_files ?? true })),
         ]);
 
-        const ctx = buildContext(crawl, { outbound, vitals });
+        const ctx = buildContext(crawl, { outbound, vitals, imageFiles: images.files, imageFilesReason: images.reason });
         const date = deps.now();
         const detectedAt = date.toISOString();
         const result = runChecks(deps.checks, ctx, { modules, detectedAt });
@@ -187,6 +196,7 @@ export function auditTools(deps) {
           core_web_vitals: vitals,
           repo: mapped === null ? null : mapped.summary,
           fixes: null,
+          image_files: images.summary,
         };
         run.fixes = fixVerification(deps, fixRequest, run, crawl);
         const saved = await saveWithNewId(deps, projectDir, run, date);
@@ -210,12 +220,15 @@ export function auditTools(deps) {
           repo: run.repo,
           fix_verification: fixOutput(run.fixes ?? null),
           skipped_checks: skippedChecks(result.checks),
-          notes: runNotes(
-            crawl,
-            { requested: linksRequested, checked: checkOutbound, found: external.length },
-            { requested: seoRequested, checked: checkVitals, vitals },
-            mapped === null ? [] : mapped.notes,
-          ),
+          notes: [
+            ...runNotes(
+              crawl,
+              { requested: linksRequested, checked: checkOutbound, found: external.length },
+              { requested: seoRequested, checked: checkVitals, vitals },
+              mapped === null ? [] : mapped.notes,
+            ),
+            ...imageFilesNotes(images),
+          ],
           _note: UNTRUSTED_NOTE,
         };
       },

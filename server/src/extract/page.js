@@ -26,7 +26,7 @@ function emptyContent() {
   return {
     html_lang: null, titles: [], meta_descriptions: [], meta_robots: [], canonicals: [], hreflang: [],
     headings: [], viewport: null, og: {}, twitter: {}, links: [], images: [], jsonld: [], mixed_content: [],
-    word_count: 0, text_hash: '', text_excerpt: '', security: emptySecurity(),
+    word_count: 0, text_hash: '', text_excerpt: '', security: emptySecurity(), videos: [], video_embeds: [], video_markup: false,
   };
 }
 

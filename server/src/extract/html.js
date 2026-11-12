@@ -1,7 +1,7 @@
 // HTML document → content fields of a PageRecord. Pure. This file walks the
 // document and collects the visible text; html-elements.js reads each element.
 
-/** @import { CanonicalRef, Heading, HreflangRef, ImageRecord, JsonLdBlock, LinkRecord, PageSecurity } from '../types.js' */
+/** @import { CanonicalRef, Heading, HreflangRef, ImageRecord, JsonLdBlock, LinkRecord, PageSecurity, VideoEmbedRecord, VideoRecord } from '../types.js' */
 /** @import { DomNode } from './dom.js' */
 /** @import { Frame, HtmlState } from './html-elements.js' */
 
@@ -12,6 +12,7 @@ import { sha1Hex } from '../util/hash.js';
 import { collapseWhitespace } from '../util/strings.js';
 import { HTML_NS, SVG_NS, findBaseUrl, isAriaHidden, parsedPart } from './dom.js';
 import { visitElement } from './html-elements.js';
+import { enterLandmark } from './media.js';
 import { streamedBoundaries } from './react-stream.js';
 import { documentSecurity, emptySecurity } from './security.js';
 
@@ -45,6 +46,9 @@ const SPACE = Symbol('space');
  * @property {string} text_hash
  * @property {string} text_excerpt
  * @property {PageSecurity} security
+ * @property {VideoRecord[]} videos
+ * @property {VideoEmbedRecord[]} video_embeds
+ * @property {boolean} video_markup
  */
 
 /**
@@ -74,12 +78,12 @@ export function extractHtml(html, context) {
   const out = {
     html_lang: null, titles: [], meta_descriptions: [], meta_robots: [], canonicals: [], hreflang: [],
     headings: [], viewport: null, og: {}, twitter: {}, links: [], images: [], jsonld: [], mixed_content: [],
-    word_count: 0, text_hash: '', text_excerpt: '', security: emptySecurity(),
+    word_count: 0, text_hash: '', text_excerpt: '', security: emptySecurity(), videos: [], video_embeds: [], video_markup: false,
   };
   /** @type {HtmlState} */
   const state = {
     out, baseUrl, https: context.responseUrl.startsWith('https:'), siteHost: context.siteHost, includeSubdomains: context.includeSubdomains,
-    listChars: 0, upgradeInsecure: context.upgradeInsecure ?? false, nextFlight: false, bodyTitle: false,
+    listChars: 0, upgradeInsecure: context.upgradeInsecure ?? false, nextFlight: false, bodyTitle: false, preloadImages: new Set(), pictures: new WeakMap(),
   };
   /** @type {string[]} */
   const text = [];
@@ -88,7 +92,7 @@ export function extractHtml(html, context) {
   const streamed = streamedBoundaries(document);
 
   /** @type {(Frame|typeof SPACE)[]} */
-  const stack = [{ node: document, head: false, body: false, hidden: false, replaced: false, ariaHidden: false }];
+  const stack = [{ node: document, head: false, body: false, hidden: false, replaced: false, ariaHidden: false, chrome: false, sectioned: false }];
   while (stack.length > 0) {
     const item = /** @type {Frame|typeof SPACE} */ (stack.pop());
     if (item === SPACE) {
@@ -111,6 +115,7 @@ export function extractHtml(html, context) {
         hidden: item.hidden || node.namespaceURI === SVG_NS || (html && HIDDEN_TEXT.has(node.tagName)),
         replaced: item.replaced,
         ariaHidden: item.ariaHidden || (html && isAriaHidden(node)),
+        ...(html ? enterLandmark(node, item) : { chrome: item.chrome, sectioned: item.sectioned }),
       };
       if (!(html && INLINE.has(node.tagName))) {
         text.push(' ');
@@ -123,6 +128,7 @@ export function extractHtml(html, context) {
       const child = children[i];
       stack.push({
         node: child, head: frame.head, body: frame.body, hidden: frame.hidden, replaced: frame.replaced || streamed.replaced.has(child), ariaHidden: frame.ariaHidden,
+        chrome: frame.chrome, sectioned: frame.sectioned,
       });
     }
   }

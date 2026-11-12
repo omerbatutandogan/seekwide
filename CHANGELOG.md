@@ -4,7 +4,7 @@ Notable changes to Seekwide. Versions follow [semantic versioning](https://semve
 
 ## 0.1.0-alpha.1 (unreleased)
 
-First working version. Rule set 0.1.5.
+First working version. Rule set 0.1.6.
 
 Rule set 0.1.1 differs from 0.1.0, which only unreleased builds used, in two ways: a module score is 99 at most when a scored check has a failure, and the `aria-label` of an element inside a link (an SVG logo, an icon, an image) counts as the link's text.
 
@@ -35,6 +35,9 @@ Rule set 0.1.1 differs from 0.1.0, which only unreleased builds used, in two way
 - Fixtures for Next.js 16 in TypeScript with `src/app`, `generateMetadata` and dynamic routes (`fixtures/next-ts`), and for an npm workspaces monorepo with the site in `apps/web` (`fixtures/monorepo`). Both were audited through the real server with Next.js 16.4.6 (`next dev`, and `next start` for the first), and every finding with a file named the right file and route.
 - An eval suite for the skill flows under `evals/`, run with `claude plugin eval`: asking before a dev server starts and starting nothing on a no, starting, auditing and stopping it on a yes (also when the crawl fails), diffs before any edit in `/seekwide:fix` and the edits and re-audit after a yes, suggestions labelled as suggestions, a blocked crawl described as blocked, and security findings worded as signs.
 - CI runs the tests on Linux, macOS and Windows, with Node.js 22 and 26.
+- A `media` module and its command, `/seekwide:media`, also part of `/seekwide:all` (not of `/seekwide:basic`): ten scripted checks for images and video. From the markup of the crawled pages: images without alt text or another text alternative (an empty `alt` is a deliberate choice and passes; a script framework's `:alt` binding counts), alt text that is a file name or a placeholder, an image the page marks as its main one that is also lazy-loaded, `VideoObject` structured data without `name`, `thumbnailUrl` or `uploadDate`, and, as information, content images without width and height and videos that may have sound and have no captions track. From up to 50 image files per audit, with a `HEAD` request each after the robots.txt of their host and after the external link check: broken images, JPEG, PNG and BMP files of 32 KiB or more served although the request accepted WebP and AVIF, content images on the site's own domain whose host's robots.txt keeps them from Googlebot or Googlebot-Image, and files over 500 KiB (info). No image is downloaded whole; for a site on this machine only its own address is contacted, and a site that challenged or rate-limited the crawler gets no image request. Each rule names the official page it was read against on 2026-11-12, and the module was measured on 19 real sites before release: the rules that were often wrong or not worth acting on were narrowed or made informational, and a check for pages with a video and no `VideoObject` was dropped. Rule set 0.1.6 differs from 0.1.5 by these checks.
+- `check_image_files` on `audit_run`; the run records how many images the pages show and how many files were checked (`image_files`), and both report formats show it with the module's score and method. Page records carry the fields the media checks need (each image's other text alternatives, hiding, tracking pixels, inline and utility-class sizes, whether it is in the page's frame, priority hint and preload, `<picture>` sources; `<video>` elements and their tracks; players of known video platforms; `VideoObject` in JSON-LD, microdata and RDFa).
+- `loadRobots` answers for another crawler's product tokens too (`allowsAgents`), choosing the group of the most specific token that has one, else `*`, as Google does for Googlebot-Image; a group that names the crawler and has no rule allows it everything.
 
 ### Fixed
 
@@ -52,6 +55,7 @@ Rule set 0.1.4 differs from 0.1.3 in the first two of these.
 - A `package.json` that starts with a byte order mark, as Windows editors often write it, is read like any other; the project was treated as having none.
 - On Windows the static server for a plain HTML folder is proposed as `python -m http.server`; `python3` is usually not installed there.
 - Tests that compared paths written for macOS and Linux, file modes, a file name with a line break, and a child process started without the variables Windows needs, now run on Windows too; three tests of POSIX file modes are skipped there. `.gitattributes` keeps line endings LF on every checkout.
+- `docs/checks.md` escapes `<`, so element names in a check's description (`<iframe>`, `<img>`) show on GitHub instead of being read as HTML.
 
 ### Fixed after a validation on real sites
 

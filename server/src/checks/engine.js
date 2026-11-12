@@ -1,4 +1,4 @@
-/** @import { CheckContext, CheckDef, CheckResult, CheckStat, CrawlResult, Finding, AuditResult, InlinkRef, OutboundResult, PageRecord, VitalsData } from '../types.js' */
+/** @import { CheckContext, CheckDef, CheckResult, CheckStat, CrawlResult, Finding, AuditResult, ImageFileResult, InlinkRef, OutboundResult, PageRecord, VitalsData } from '../types.js' */
 
 import { LIMITS, SEVERITIES } from '../config.js';
 import { shortId } from '../util/hash.js';
@@ -13,6 +13,7 @@ const SKIP_REASONS = {
   lab_data: 'Needs lab data from PageSpeed Insights. It was not collected.',
   field_data: 'Needs field data from the Chrome UX Report. It was not collected.',
   live_site: 'Needs the deployed site: this crawl was of a server on this machine, whose response headers say nothing about the live site.',
+  image_files: 'Needs the image files to be checked. They were not.',
 };
 
 /**
@@ -32,8 +33,10 @@ function unreadSitemapReason(crawl) {
 /**
  * Build the read-only view that checks run against.
  * @param {CrawlResult} crawl
- * @param {{outbound?: Map<string, OutboundResult>|null, vitals?: VitalsData|null}} [extras]
- *   What was collected besides the crawl: external link results and Core Web Vitals.
+ * @param {{outbound?: Map<string, OutboundResult>|null, vitals?: VitalsData|null, imageFiles?: Map<string, ImageFileResult>|null,
+ *          imageFilesReason?: string}} [extras]
+ *   What was collected besides the crawl: external link results, Core Web Vitals and image files; `imageFilesReason`
+ *   says why the image files were not checked, when the collector knows.
  * @returns {CheckContext}
  */
 export function buildContext(crawl, extras = {}) {
@@ -65,6 +68,8 @@ export function buildContext(crawl, extras = {}) {
   if (crawl.robots.status === 'ok') capabilities.add('robots');
   if (outbound !== null) capabilities.add('outbound');
   if (crawl.options.local !== true) capabilities.add('live_site');
+  const imageFiles = extras.imageFiles ?? null;
+  if (imageFiles !== null) capabilities.add('image_files');
 
   // Core Web Vitals come from outside services that can refuse or have nothing
   // to say; the collector's own reason is what a skipped check reports.
@@ -73,6 +78,7 @@ export function buildContext(crawl, extras = {}) {
   const skipReasons = {};
   const sitemapReason = unreadSitemapReason(crawl);
   if (sitemapReason !== null) skipReasons.sitemap = sitemapReason;
+  if (imageFiles === null && extras.imageFilesReason) skipReasons.image_files = extras.imageFilesReason;
   if (vitals !== null) {
     if (vitals.lab.available) capabilities.add('lab_data');
     else if (vitals.lab.reason) skipReasons.lab_data = vitals.lab.reason;
@@ -112,6 +118,7 @@ export function buildContext(crawl, extras = {}) {
     skipReasons,
     outbound,
     vitals,
+    imageFiles,
     resolve,
   };
 }

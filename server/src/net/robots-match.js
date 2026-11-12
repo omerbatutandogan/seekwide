@@ -94,14 +94,31 @@ export function decidingRule(rules, path) {
  * @returns {CompiledRule[]|null}
  */
 export function compiledGroup(parser, agent) {
+  return compiledGroupFor(parser, [agent]);
+}
+
+/**
+ * The group a crawler with several product tokens follows, compiled: the group
+ * of the first token that has one of its own (Google lists them most specific
+ * first; one matching token is enough, and only the most specific matching
+ * group applies), else the `*` group. Null when the parser does not hold its
+ * rules the way version 3.0.1 does.
+ * @param {unknown} parser  A robots-parser instance.
+ * @param {string[]} agents  Product tokens, most specific first, for example ["Googlebot-Image", "Googlebot"].
+ * @returns {CompiledRule[]|null}
+ */
+export function compiledGroupFor(parser, agents) {
   const rules = /** @type {{_rules?: unknown}} */ (parser)._rules;
   if (rules === null || typeof rules !== 'object') return null;
   const groups = /** @type {Record<string, unknown>} */ (rules);
-  let key = agent.toLowerCase();
-  const slash = key.indexOf('/');
-  if (slash > -1) key = key.slice(0, slash);
-  key = key.trim();
-  const group = groups[key] ?? groups['*'] ?? [];
+  const keys = agents.map((agent) => {
+    let key = agent.toLowerCase();
+    const slash = key.indexOf('/');
+    if (slash > -1) key = key.slice(0, slash);
+    return key.trim();
+  });
+  const own = keys.find((key) => Object.hasOwn(groups, key));
+  const group = (own === undefined ? groups['*'] : groups[own]) ?? [];
   if (!Array.isArray(group)) return null;
   /** @type {CompiledRule[]} */
   const compiled = [];

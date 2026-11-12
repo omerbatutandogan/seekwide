@@ -5,6 +5,7 @@
 import { allChecks } from './checks/registry.js';
 import { dataDir, defaultProjectDir, googleApiKeySetting, toolSettings } from './config.js';
 import { createCrawlManager } from './crawl/manager.js';
+import { checkImageFiles } from './net/image-check.js';
 import { checkExternalLinks } from './net/link-check.js';
 import { renderHtml } from './report/html.js';
 import { renderMarkdown } from './report/markdown.js';
@@ -43,6 +44,7 @@ export function createToolDeps(env = process.env, measure = measureVitals) {
     renderMarkdown,
     renderHtml,
     checkExternalLinks,
+    checkImageFiles,
     // A key that is set but cannot be used is said to be unusable, never taken for no key.
     measureVitals: (crawl, options) => {
       const { key, unusable } = googleApiKeySetting(env);

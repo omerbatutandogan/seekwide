@@ -8,8 +8,9 @@
 import { LIMITS } from '../config.js';
 import { clip, collapseWhitespace } from '../util/strings.js';
 import { isInternalUrl, normalizeUrl } from '../util/url.js';
-import { MAX_LIST_CHARS, attr, insecureUrl, isAriaHidden, isHtmlElement, lineOf, textChars, textOf, tokens } from './dom.js';
+import { MAX_LIST_CHARS, attr, insecureUrl, isAriaHidden, lineOf, textChars, textOf, tokens } from './dom.js';
 import { parseJsonLd } from './jsonld.js';
+import { visitMedia } from './media.js';
 
 /** Script types a browser runs as JavaScript. */
 const SCRIPT_TYPES = new Set(['', 'text/javascript', 'module']);
@@ -66,6 +67,9 @@ const HEADING_LEVELS = new Map([['h1', 1], ['h2', 2], ['h3', 3], ['h4', 4], ['h5
  * @property {boolean} hidden  Text here is not visible body text.
  * @property {boolean} replaced  Inside fallback content that React's streaming script replaces on load (react-stream.js).
  * @property {boolean} ariaHidden  Inside an element with `aria-hidden="true"`.
+ * @property {boolean} chrome  Inside the page's frame rather than its content: navigation, a complementary block, or the
+ *   header or footer of the page (media.js, `enterLandmark`).
+ * @property {boolean} sectioned  Inside `<article>`, `<main>`, `<section>`, `<aside>` or `<nav>`, where a header or footer belongs to that part.
  */
 
 /**
@@ -82,6 +86,8 @@ const HEADING_LEVELS = new Map([['h1', 1], ['h2', 2], ['h3', 3], ['h4', 4], ['h5
  * @property {boolean} nextFlight     The page has Next.js App Router data scripts.
  * @property {boolean} bodyTitle      A `<title>` is inside `<body>`.
  * @property {boolean} [ogImageAlias]  `og.image` came from `og:image:url` or `og:image:secure_url`, so a later `og:image` replaces it.
+ * @property {Set<string>} preloadImages  URLs that a `<link rel="preload" as="image">` named so far (media.js).
+ * @property {WeakMap<DomNode, import('./media-image.js').PictureSummary>} pictures  What each `<picture>` offers, read once (media-image.js).
  */
 
 /**
@@ -140,6 +146,7 @@ function addMixed(state, raw) {
 export function visitElement(node, frame, state) {
   const tag = /** @type {string} */ (node.tagName);
   const line = lineOf(node);
+  visitMedia(node, frame, state, MAX_IMAGES);
   if (tag === 'html') {
     const lang = attr(node, 'lang')?.trim();
     if (lang) state.out.html_lang = clip(lang, LIMITS.maxStringLength);
@@ -209,28 +216,6 @@ export function visitElement(node, frame, state) {
         has_onclick: attr(node, 'onclick') !== null,
         has_handler: hasHandler(node),
         aria_hidden: frame.ariaHidden || isAriaHidden(node),
-        line,
-      });
-    }
-  } else if (tag === 'img') {
-    if (state.out.images.length < MAX_IMAGES && state.listChars < MAX_LIST_CHARS) {
-      const src = attr(node, 'src');
-      const parent = node.parentNode;
-      const pictureSrcset = parent && isHtmlElement(parent, 'picture')
-        && (parent.childNodes ?? []).some((child) => isHtmlElement(child, 'source') && attr(child, 'srcset') !== null);
-      /** @param {string} name */
-      const optional = (name) => {
-        const value = attr(node, name);
-        return value === null ? null : clip(value, LIMITS.maxStringLength);
-      };
-      keep(state, state.out.images, {
-        src: clip(src ?? '', LIMITS.maxStringLength),
-        url: src === null ? null : normalizeUrl(src, state.baseUrl),
-        alt: optional('alt'),
-        width: optional('width'),
-        height: optional('height'),
-        loading: optional('loading'),
-        has_srcset: attr(node, 'srcset') !== null || Boolean(pictureSrcset),
         line,
       });
     }

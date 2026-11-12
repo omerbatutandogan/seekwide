@@ -89,7 +89,7 @@ describe('audit_run', () => {
     assert.equal(run.rules_version, RULES_VERSION);
     assert.equal(run.plugin_version, VERSION);
     assert.equal(run.schema_version, 1);
-    assert.deepEqual(run.modules_requested, ['seo', 'links', 'security']);
+    assert.deepEqual(run.modules_requested, ['seo', 'links', 'security', 'media']);
     assert.deepEqual(run.crawl, {
       id: 'c-1', pages_crawled: 2, html_pages: 2, indexable_pages: 2, unreadable_pages: 0, truncated: false, blocked: null,
       robots_status: 'ok', sitemap_urls: 0, max_pages: 25, user_agent: 'seekwide/test',

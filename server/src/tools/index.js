@@ -1,7 +1,8 @@
 // The twelve MCP tools. Every dependency is injected so handlers can be tested
 // with fakes; server/src/index.js wires the real modules.
 
-/** @import { CheckDef, CrawlJob, CrawlResult, OutboundResult, Profile, Run, RunIndexEntry, Finding, RepoSummary, VitalsData } from '../types.js' */
+/** @import { CheckDef, CrawlJob, CrawlResult, ImageFileResult, OutboundResult, Profile, Run, RunIndexEntry, Finding, RepoSummary, VitalsData } from '../types.js' */
+/** @import { checkImageFiles } from '../net/image-check.js' */
 /** @import { ToolDef } from '../mcp/stdio.js' */
 /** @import { ProjectPaths } from '../store/project.js' */
 /** @import { ProjectSources } from '../repo/sources.js' */
@@ -50,6 +51,7 @@ import { runTools } from './runs.js';
  * @property {(run: Run, options: object) => string} renderHtml
  * @property {(urls: string[], options?: {maxLinks?: number, concurrency?: number}) => Promise<Map<string, OutboundResult>>} checkExternalLinks
  * @property {(crawl: CrawlResult, options: {maxPages: number}) => Promise<VitalsData>} measureVitals
+ * @property {(urls: string[], options?: Parameters<typeof checkImageFiles>[1]) => Promise<Map<string, ImageFileResult>>} checkImageFiles
  *   Core Web Vitals of a crawl. The Google API key is bound into this function where the server is
  *   wired, so no tool ever holds it.
  * @property {(projectDir: string, sourceDir?: string) => Promise<ProjectSources>} loadProjectSources
