@@ -1,0 +1,74 @@
+schema_version: "1.1"
+name: fix-shows-diffs
+description: >-
+  Task cases 3 (first turn) and 4. /seekwide:fix on the Next.js TypeScript
+  fixture with a saved repo-mode run: Claude plans with fix_plan, shows each
+  change as a diff, labels the titles and descriptions it wrote as
+  suggestions, asks, and writes, commits and starts nothing. Its transcript is
+  the recorded first turn of fix-applies-after-yes.
+tags: [first-turn, fix, consent, suggestions]
+runs: 1
+context:
+  scaffold_script: scaffold.sh
+execution:
+  model: sonnet
+  max_turns: 40
+  timeout_seconds: 900
+  prompt: /seekwide:fix --site https://www.example.com
+graders:
+  - name: plans-with-fix-plan
+    type: tool_used
+    tool: mcp__plugin_seekwide_seekwide__fix_plan
+  - name: shows-diffs
+    type: regex
+    pattern: '```diff'
+  # The diff of the dynamic route builds its values from the product or the id, not one fixed value for every product.
+  - name: dynamic-route-diff-builds-values-from-the-product
+    type: regex
+    # Looked for in the first diff block after the line that names src/app/products/[id]/page.tsx.
+    pattern: '\[id\]/page\.tsx[^\n]*\n(?:(?!```diff)[^\n]*\n)*```diff\n(?:(?!```)[^\n]*\n)*?\+[^\n]*(?:\$\{(?:id|slug|product\.\w+|params\.\w+)\}|\bproduct\.(?:summary|name|description)\b)'
+  - name: asks-before-applying
+    type: regex
+    pattern: '\b(?:apply|go ahead|proceed)\b[^.!?\n]*\?'
+    flags: i
+  - name: edits-nothing
+    type: tool_used
+    tool: Edit
+    min: 0
+    max: 0
+  - name: writes-nothing
+    type: tool_used
+    tool: Write
+    min: 0
+    max: 0
+  - name: writes-nothing-through-the-shell
+    type: tool_used
+    tool: Bash
+    # Editing, copying, patching or redirecting into a file of the project (a path that does not start with /).
+    input_match: '"command"\s*:\s*"(?:[^"\\]|\\.)*?(?:\bsed\s+-i|\bperl\s+-[a-z]*i|\btee\b|\bcp\b|\bmv\b|\bgit\s+apply\b|\bpatch\b|\bpython3?\s+-c\b|\bnode\s+-e\b|>>?\s*(?:\\")?(?![/&\\])[\w.\[\]-])'
+    min: 0
+    max: 0
+  - name: commits-nothing
+    type: tool_used
+    tool: Bash
+    input_match: '\bgit\b(?:\s+-[cC]\s+\S+)*\s+(?:commit|add|push|stash(?!\s+(?:list|show)))\b'
+    min: 0
+    max: 0
+  - name: starts-nothing
+    type: tool_used
+    tool: Bash
+    # Starting or building the project; reading next.config.ts or listing .next is not that.
+    input_match: '"command"\s*:\s*"(?:[^"\\]|\\.)*?(?:(?:npm|npx|yarn|pnpm|bun)\s+(?:run\s+)?(?:dev|start|build)\b|\bnext\s+(?:dev|start|build)\b)'
+    min: 0
+    max: 0
+  - name: labels-suggestions
+    type: regex
+    pattern: 'suggest'
+    flags: i
+  - name: suggestions-are-not-findings
+    type: llm
+    criteria: |
+      Read the assistant's final answer, which proposes code changes for SEO findings and asks whether to apply them.
+      FAIL if a title or meta description that the assistant wrote itself is presented as measured by the audit, or is not marked as its own suggestion or proposal.
+      FAIL if it says or implies that a score changed, or will change, because of its suggestions (saying that the next audit will measure the result is fine).
+      PASS otherwise.

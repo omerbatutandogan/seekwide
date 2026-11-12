@@ -4,7 +4,7 @@
 // alive, and a request it never answers would be awaited for ever.
 
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 export const ENTRY = fileURLToPath(new URL('../../server/src/index.js', import.meta.url));
@@ -16,6 +16,25 @@ const EXIT_TIMEOUT_MS = 10_000;
 
 /** @type {Set<import('node:child_process').ChildProcess>} */
 const running = new Set();
+
+/**
+ * Variables a Windows process cannot do without: without SystemRoot, Node
+ * cannot open a socket there. Empty on other systems.
+ */
+const WINDOWS_ENV = Object.fromEntries(
+  ['SystemRoot', 'windir', 'TEMP', 'TMP', 'PATHEXT', 'ComSpec'].flatMap((name) => (process.platform === 'win32' && process.env[name] !== undefined ? [[name, process.env[name]]] : [])),
+);
+
+/**
+ * Kill a process and everything it started. A process started with
+ * `detached: true` leads its own process group on POSIX; Windows has no
+ * process groups, and taskkill ends the tree instead.
+ * @param {number} pid
+ */
+export function killTree(pid) {
+  if (process.platform === 'win32') spawnSync('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore' });
+  else process.kill(-pid, 'SIGKILL');
+}
 
 /**
  * Kill every server started by `startProcess` that is still running. Register
@@ -38,8 +57,10 @@ export function stopAll() {
  * @param {{requestTimeoutMs?: number}} [options]
  */
 export function startProcess(dir, env, { requestTimeoutMs = REQUEST_TIMEOUT_MS } = {}) {
-  const child = spawn(process.execPath, [ENTRY], { cwd: dir, env: { PATH: process.env.PATH, HOME: dir, ...env }, stdio: ['pipe', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, [ENTRY], { cwd: dir, env: { PATH: process.env.PATH, ...WINDOWS_ENV, HOME: dir, USERPROFILE: dir, ...env }, stdio: ['pipe', 'pipe', 'pipe'] });
   running.add(child);
+  // A write to a server that was just killed fails with EPIPE; the request is rejected by the exit handler below.
+  child.stdin.on('error', () => {});
 
   /** @type {string[]} */
   const lines = [];

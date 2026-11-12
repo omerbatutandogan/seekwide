@@ -1,0 +1,44 @@
+schema_version: "1.1"
+name: basic-approved-crawl-fails
+description: >-
+  Task case 2, the failing path. The user says yes, the dev command starts, but
+  nothing answers at the address it prints: Claude retries the crawl at most
+  three times, runs no audit, says that it failed, and still stops the server
+  it started.
+tags: [follow-up, repo-mode, consent]
+runs: 1
+context:
+  scaffold_script: scaffold.sh
+  history_file: history.jsonl
+execution:
+  model: sonnet
+  max_turns: 30
+  timeout_seconds: 600
+  prompt: "Yes, start it."
+graders:
+  - name: starts-the-dev-command
+    type: tool_used
+    tool: Bash
+    input_match: '"command"\s*:\s*"(?:[^"\\]|\\.)*?npm run dev'
+  - name: tries-the-crawl
+    type: tool_used
+    tool: mcp__plugin_seekwide_seekwide__crawl_start
+    min: 1
+    max: 3
+  - name: runs-no-audit
+    type: tool_used
+    tool: mcp__plugin_seekwide_seekwide__audit_run
+    min: 0
+    max: 0
+  - name: stops-the-server
+    type: tool_used
+    tool: TaskStop
+  # tool_order compares the first call of each: the server is stopped after the first crawl started.
+  - name: stops-it-after-crawling
+    type: tool_order
+    before: mcp__plugin_seekwide_seekwide__crawl_start
+    after: TaskStop
+  - name: says-it-failed
+    type: regex
+    pattern: '\bfail(?:ed|s|ure)?\b|could ?n.t|did ?n.t (?:answer|respond)|no answer|nothing answered|not reach|unreachable|refused'
+    flags: i

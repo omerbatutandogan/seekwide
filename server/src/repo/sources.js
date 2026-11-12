@@ -77,7 +77,7 @@ const DOCUMENT_CHECKS = new Set(['seo.html.lang_missing', 'seo.mobile.viewport_m
  */
 export async function loadProjectSources(projectDir, sourceDir) {
   const dirs = await resolveSourceDir(projectDir, sourceDir);
-  const detection = await detectProject(dirs.sourceDir);
+  const detection = await detectProject(dirs.sourceDir, { projectDir: dirs.projectDir });
   const base = { detection, sourceDir: dirs.sourceDir, relative: dirs.relative };
 
   if (detection.framework === 'next-app' && detection.app_dir !== null) {

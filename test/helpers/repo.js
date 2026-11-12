@@ -17,6 +17,10 @@ const FIXTURES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 
 export const NEXT_FIXTURE = path.join(FIXTURES, 'next-app');
 export const HTML_FIXTURE = path.join(FIXTURES, 'html-site');
+/** Next.js 16 in TypeScript, with src/app, generateMetadata and dynamic routes. */
+export const NEXT_TS_FIXTURE = path.join(FIXTURES, 'next-ts');
+/** An npm workspaces monorepo whose Next.js site is in apps/web. */
+export const MONOREPO_FIXTURE = path.join(FIXTURES, 'monorepo');
 
 /**
  * A temporary folder holding `files` (relative path → content). The path is

@@ -1,0 +1,102 @@
+schema_version: "1.1"
+name: fix-applies-after-yes
+description: >-
+  Task case 3, second turn. After the recorded diffs of fix-shows-diffs the user
+  approves all of them and says the dev server is already running: Claude
+  edits the metadata export of the static pages and generateMetadata of the
+  dynamic route, creates the sitemap, commits nothing, starts nothing, and
+  audits again with verify_fixes at the address of the first run.
+tags: [follow-up, fix, consent]
+runs: 1
+context:
+  scaffold_script: scaffold.sh
+  history_file: history.jsonl
+execution:
+  model: sonnet
+  max_turns: 60
+  timeout_seconds: 1200
+  prompt: "Yes, apply all of them. The dev server is already running at http://localhost:47320, so use it for the re-audit."
+graders:
+  # A title of its own (not the layout's "Acme Fixture"), a description of its own, and a canonical naming this page.
+  - name: about-page-gets-a-title-of-its-own
+    type: regex
+    target: { source: file, path: src/app/about/page.tsx }
+    pattern: 'export const metadata[\s\S]*title\s*:\s*(?:\{\s*absolute\s*:\s*)?([''"`])(?!Acme Fixture\1)[^''"`\n]+\1'
+  - name: about-page-gets-a-description-of-its-own
+    type: regex
+    target: { source: file, path: src/app/about/page.tsx }
+    pattern: 'export const metadata[\s\S]*description\s*:\s*([''"`])(?!Acme Fixture makes widgets)[^''"`\n]{10,}\1'
+  - name: about-page-canonical-names-about
+    type: regex
+    target: { source: file, path: src/app/about/page.tsx }
+    pattern: 'alternates\s*:\s*\{[^}]*canonical\s*:\s*(?:[''"`](?:https://www\.example\.com)?|`\$\{[^}]+\})/about/?[''"`]'
+  - name: products-page-gets-a-description-and-canonical
+    type: regex
+    target: { source: file, path: src/app/products/page.tsx }
+    pattern: 'export const metadata[\s\S]*description\s*:[\s\S]*canonical\s*:\s*[''"`](?:https://www\.example\.com)?/products/?[''"`]'
+  # The dynamic route: values built from the product in generateMetadata, never one fixed value for every product.
+  - name: dynamic-route-canonical-from-the-id
+    type: regex
+    target: { source: file, path: 'src/app/products/[id]/page.tsx' }
+    # Built from the route: an interpolation, a concatenation or a call with the product; a fixed string fails.
+    pattern: 'generateMetadata[\s\S]*alternates\s*:\s*\{\s*canonical\s*:\s*(?:`[^`\n]*\$\{[^}]+\}|[^,\n]*\+\s*[A-Za-z_$]|[A-Za-z_$][\w$.]*\([^)\n]*\b(?:id|slug|product|params)\b)'
+  - name: dynamic-route-description-from-the-product
+    type: regex
+    target: { source: file, path: 'src/app/products/[id]/page.tsx' }
+    pattern: 'generateMetadata[\s\S]*description\s*:\s*(?:\n\s*)?(?:[A-Za-z_$][\w$]*\.(?:summary|description|name)\b|`[^`]*\$\{[^}]*\b(?:product|item)\b)'
+  - name: dynamic-route-has-no-static-metadata
+    type: regex
+    target: { source: file, path: 'src/app/products/[id]/page.tsx' }
+    pattern: '^\s*export const metadata'
+    flags: m
+    match: not_contains
+  - name: creates-the-typescript-sitemap
+    type: file_exists
+    path: src/app/sitemap.ts
+  - name: sitemap-lists-the-pages
+    type: regex
+    target: { source: file, path: src/app/sitemap.ts }
+    pattern: 'export default[\s\S]*/about'
+  - name: robots-names-the-sitemap
+    type: regex
+    target: { source: file, path: src/app/robots.ts }
+    pattern: 'sitemap\s*:\s*[''"`]'
+  - name: commits-nothing
+    type: tool_used
+    tool: Bash
+    input_match: '\bgit\b(?:\s+-[cC]\s+\S+)*\s+(?:commit|add|push|stash(?!\s+(?:list|show)))\b'
+    min: 0
+    max: 0
+  - name: starts-nothing
+    type: tool_used
+    tool: Bash
+    # Starting or building the project; reading next.config.ts or listing .next is not that.
+    input_match: '"command"\s*:\s*"(?:[^"\\]|\\.)*?(?:(?:npm|npx|yarn|pnpm|bun)\s+(?:run\s+)?(?:dev|start|build)\b|\bnext\s+(?:dev|start|build)\b)'
+    min: 0
+    max: 0
+  - name: crawls-the-same-address
+    type: tool_used
+    tool: mcp__plugin_seekwide_seekwide__crawl_start
+    input_match: 'localhost:47320'
+  - name: re-audits-with-verify-fixes
+    type: tool_used
+    tool: mcp__plugin_seekwide_seekwide__audit_run
+    input_match: '"verify_fixes"'
+  # The fix uses Edit for the files that exist (Write would be for the new sitemap only).
+  - name: edits-before-the-re-audit
+    type: tool_order
+    before: Edit
+    after: { tool: mcp__plugin_seekwide_seekwide__audit_run, input_match: '"verify_fixes"' }
+  - name: reports-closed-findings
+    type: regex
+    pattern: '\bclosed\b\s*\(\d+\)|\bclosed\s+\d+|\d+[^.\n]{0,40}\bclosed\b'
+    flags: i
+  - name: does-not-say-none-closed
+    type: regex
+    pattern: '\bnone\b[^.\n]{0,30}\bclosed\b|\bnot\s+closed\b'
+    flags: i
+    match: not_contains
+  - name: says-nothing-was-committed
+    type: regex
+    pattern: '\b(?:not|nothing|never|no|without)\b[^.\n]{0,40}\bcommit|n.t\b[^.\n]{0,40}\bcommit|\buncommitted\b'
+    flags: i

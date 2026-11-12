@@ -10,6 +10,10 @@ import { fakeFetch } from '../net/fake-fetch.js';
 import { fakeExtract } from './fake-records.js';
 import { NOW, crawl, html, removeTempDirs, tempDir, testManager } from './harness.js';
 
+/** Whether this platform has POSIX file modes. Windows reports 0o666 whatever chmod was asked for. */
+const POSIX_MODES = process.platform !== 'win32';
+const MODES_SKIP = POSIX_MODES ? false : 'Windows has no POSIX file modes; there the ACL of the data folder decides who can read the cache';
+
 after(removeTempDirs);
 
 const S = 'https://site.test';
@@ -304,7 +308,7 @@ test('a local start URL that redirects to another origin fails with a clear mess
   }
 });
 
-test('the crawl directory is private and its files are readable only by the user', async () => {
+test('the crawl directory is private and its files are readable only by the user', { skip: MODES_SKIP }, async () => {
   const { fetch } = fakeFetch({ [`${S}/`]: PAGE });
   const dataDir = await tempDir();
   const { job } = await crawl({ url: S }, { fetch, dataDir });
@@ -334,7 +338,7 @@ test('only the 20 newest crawl files are kept', async () => {
   assert.equal(files.includes('c-keep-001.json'), false);
 });
 
-test('crawl files written before the permission fix are made private when the directory is opened', async () => {
+test('crawl files written before the permission fix are made private when the directory is opened', { skip: MODES_SKIP }, async () => {
   const dataDir = await tempDir();
   const dir = path.join(dataDir, 'crawls');
   await mkdir(dir, { recursive: true });
@@ -357,7 +361,7 @@ test('crawl files written before the permission fix are made private when the di
   assert.equal((await stat(later)).mode & 0o777, 0o600, 'writing opens the directory');
 });
 
-test('every regular file in the crawl directory becomes private when it is opened, whatever its name', async () => {
+test('every regular file in the crawl directory becomes private when it is opened, whatever its name', { skip: MODES_SKIP }, async () => {
   const dataDir = await tempDir();
   const dir = path.join(dataDir, 'crawls');
   await mkdir(dir, { recursive: true });

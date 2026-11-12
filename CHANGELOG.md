@@ -31,6 +31,10 @@ Rule set 0.1.1 differs from 0.1.0, which only unreleased builds used, in two way
 - Page records carry the module's signals (`security`), read while a page is extracted. Records of crawls made before this version have none and are not units of the security checks.
 - A report that includes the security module is titled after its modules (for example "SEO, link and security audit") and says in its method what the module can and cannot see from outside.
 - Fixtures for the security module: a clean copy and a hacked copy of a small site, under `fixtures/security/`.
+- Repo mode in a monorepo: `project_detect` at the root of a monorepo that is not a web project itself (npm, Yarn or Bun `workspaces`, or `pnpm-workspace.yaml`) lists the workspaces that are supported web projects under `workspace_projects`, and the skills ask which one to audit.
+- Fixtures for Next.js 16 in TypeScript with `src/app`, `generateMetadata` and dynamic routes (`fixtures/next-ts`), and for an npm workspaces monorepo with the site in `apps/web` (`fixtures/monorepo`). Both were audited through the real server with Next.js 16.4.6 (`next dev`, and `next start` for the first), and every finding with a file named the right file and route.
+- An eval suite for the skill flows under `evals/`, run with `claude plugin eval`: asking before a dev server starts and starting nothing on a no, starting, auditing and stopping it on a yes (also when the crawl fails), diffs before any edit in `/seekwide:fix` and the edits and re-audit after a yes, suggestions labelled as suggestions, a blocked crawl described as blocked, and security findings worded as signs.
+- CI runs the tests on Linux, macOS and Windows, with Node.js 22 and 26.
 
 ### Fixed
 
@@ -44,6 +48,10 @@ Rule set 0.1.4 differs from 0.1.3 in the first two of these.
 - A crawl takes no new page after 30 minutes (`LIMITS.crawlMaxMs`); the page under way finishes. One that still has URLs to visit then ends as truncated with `time_limit_reached`, and the audit's notes, the report and run comparisons name the time limit instead of the page budget. The skip reason of the checks that need a complete crawl names every limit.
 - The README no longer says that Claude Code installs the plugin's dependencies whenever it installs the plugin. Claude Code's documentation says it does so when it copies a plugin into its cache, from the lockfile, and not for a plugin it loads in place, which is what both install commands in the README do; the README now says to run `npm ci --ignore-scripts` first.
 - A test that starts the server as a child process now fails at once when an assertion fails, instead of keeping the test run alive with the server still running.
+- In a web project in a subfolder of the project folder (a monorepo workspace), the lock file and `node_modules` are also looked for in the folders above it, up to the project folder: the dependencies a workspace root holds were reported as not installed, so Claude proposed an install, and a pnpm, Yarn or Bun lock file at the root was missed, so the dev command was proposed with npm.
+- A `package.json` that starts with a byte order mark, as Windows editors often write it, is read like any other; the project was treated as having none.
+- On Windows the static server for a plain HTML folder is proposed as `python -m http.server`; `python3` is usually not installed there.
+- Tests that compared paths written for macOS and Linux, file modes, a file name with a line break, and a child process started without the variables Windows needs, now run on Windows too; three tests of POSIX file modes are skipped there. `.gitattributes` keeps line endings LF on every checkout.
 
 ### Fixed after a validation on real sites
 
@@ -76,4 +84,6 @@ The plugin's own security, reviewed area by area with a reproduction for every f
 - Pages whose address has a query string are never sent to Google, and each page's host is checked before it is sent.
 - A site gets one crawl at a time, and at most three crawls run at once. Argument errors report ten problems at most. A response header named `__proto__` no longer breaks a crawl.
 - `/seekwide:setup` no longer saves the profile without Claude Code's permission prompt; `/seekwide:basic`, `/seekwide:seo` and `/seekwide:links` say before the crawl which outside services are contacted.
+- On Windows, which has no `O_NOFOLLOW`, a file in `.seekwide/` that is a symbolic link was followed when read. Every saved file is now looked at before it is opened and refused when it is a link, on every system.
+- A logo path in a project profile is checked against the project folder before the file is touched, and the way to it is walked without following a link. On Windows, opening a path such as `\\host\share\logo.png`, or a link that points there, connects to that machine and offers the user's credentials; such a path was refused only after it had been opened. A profile logo reached through a symbolic link is now refused on every system, also when the link stays inside the project.
 - CI: GitHub Actions pinned to commit SHAs, Claude Code and the Node.js types pinned to exact versions, install scripts not run, and the checkout does not keep the token.

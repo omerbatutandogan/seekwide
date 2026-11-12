@@ -1,0 +1,77 @@
+schema_version: "1.1"
+name: basic-approved
+description: >-
+  Task cases 2 and 4. After the recorded question of basic-asks-first the user
+  says yes: Claude starts the dev command in the background, crawls the address
+  it prints, audits with source_dir, names the source files, labels its own
+  suggestions as suggestions, reports the measured scores unchanged, and stops
+  the server after the audit.
+tags: [follow-up, repo-mode, consent, suggestions]
+runs: 1
+context:
+  scaffold_script: scaffold.sh
+  history_file: history.jsonl
+execution:
+  model: sonnet
+  max_turns: 40
+  timeout_seconds: 900
+  prompt: "Yes, start it."
+graders:
+  - name: starts-the-dev-command
+    type: tool_used
+    tool: Bash
+    input_match: '"command"\s*:\s*"(?:[^"\\]|\\.)*?npm run dev'
+  - name: starts-it-in-the-background
+    type: tool_used
+    tool: Bash
+    input_match: '^(?=[\s\S]*npm run dev)(?=[\s\S]*"run_in_background"\s*:\s*true)'
+  - name: starts-before-crawling
+    type: tool_order
+    before: { tool: Bash, input_match: 'npm run dev' }
+    after: mcp__plugin_seekwide_seekwide__crawl_start
+  - name: crawls-the-local-server
+    type: tool_used
+    tool: mcp__plugin_seekwide_seekwide__crawl_start
+    input_match: '^(?=[\s\S]*"url"\s*:\s*"http://(?:127\.0\.0\.1|localhost):\d+)(?=[\s\S]*"allow_localhost"\s*:\s*true)'
+  - name: audits-with-source-dir
+    type: tool_used
+    tool: mcp__plugin_seekwide_seekwide__audit_run
+    input_match: '"source_dir"\s*:\s*"/'
+  # Every audit of the local server turns Core Web Vitals off: no audit_run without check_core_web_vitals false.
+  - name: sends-nothing-to-google
+    type: tool_used
+    tool: mcp__plugin_seekwide_seekwide__audit_run
+    input_match: '^(?![\s\S]*"check_core_web_vitals"\s*:\s*false)'
+    min: 0
+    max: 0
+  - name: stops-the-server
+    type: tool_used
+    tool: TaskStop
+  # tool_order compares the first call of each: the server is stopped after the first audit started.
+  - name: stops-it-after-auditing
+    type: tool_order
+    before: mcp__plugin_seekwide_seekwide__audit_run
+    after: TaskStop
+  - name: names-source-files
+    type: regex
+    pattern: '\b(about|contact|services)\.html:\d+'
+  # The scores audit_run measures for this workspace: SEO 81, links 95 (a dry run through the real server, 2026-11-12).
+  - name: reports-the-measured-seo-score
+    type: regex
+    pattern: 'SEO\D{0,40}\b81\b(?!\s*%)'
+    flags: i
+  - name: reports-the-measured-links-score
+    type: regex
+    pattern: 'Links?\D{0,40}\b95\b(?!\s*%)'
+    flags: i
+  - name: labels-suggestions
+    type: regex
+    pattern: 'suggest'
+    flags: i
+  - name: suggestions-are-not-findings
+    type: llm
+    criteria: |
+      Read the assistant's final answer about a website audit.
+      FAIL if it presents a title, meta description or other text that the assistant wrote itself as a measured finding of the audit, or does not mark such text as its own suggestion or proposal.
+      FAIL if it says or implies that a score changed, or will change, because of a suggestion it made.
+      PASS otherwise.

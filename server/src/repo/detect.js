@@ -1,7 +1,9 @@
 // Which kind of web project a folder holds, and which command starts its
 // local server. Decided from file names and from package.json read as data.
 
+import path from 'node:path';
 import { entryKind, readFileInside, SCAN_LIMITS } from './scan.js';
+import { foldersUpward, workspaceFolders } from './workspaces.js';
 import { clip } from '../util/strings.js';
 
 /**
@@ -23,6 +25,9 @@ import { clip } from '../util/strings.js';
  * @property {boolean} supported     True when findings can be mapped to source files.
  * @property {string} message        One or two plain sentences on what was found and what it means.
  * @property {string|null} app_dir   'app' or 'src/app' for a Next.js App Router project; null otherwise.
+ * @property {{source_dir: string, label: string}[]} workspace_projects  For a folder that is not a supported web
+ *   project but the root of a monorepo: the workspace folders that are one (absolute paths), to pass as `source_dir`.
+ *   Empty otherwise.
  * @property {DevServer} dev_server
  */
 
@@ -62,6 +67,8 @@ const LOCK_FILES = /** @type {const} */ ([
   ['yarn.lock', 'yarn'],
   ['bun.lockb', 'bun'],
   ['bun.lock', 'bun'],
+  ['package-lock.json', 'npm'],
+  ['npm-shrinkwrap.json', 'npm'],
 ]);
 
 /** The port Python's built-in static server is proposed on; an unassigned one that few tools use. */
@@ -79,7 +86,8 @@ async function readPackageJson(root) {
   const bytes = await readFileInside(root, 'package.json', SCAN_LIMITS.maxPackageJsonBytes);
   if (bytes === null) return null;
   try {
-    const value = JSON.parse(bytes.toString('utf8'));
+    // npm reads a package.json that starts with a byte order mark, as Windows editors often write one.
+    const value = JSON.parse(bytes.toString('utf8').replace(/^\uFEFF/, ''));
     return value !== null && typeof value === 'object' && !Array.isArray(value) ? value : null;
   } catch {
     return null;
@@ -170,24 +178,28 @@ async function classify(root, pkg) {
  * @param {string} root
  * @param {Record<string, unknown>|null} pkg
  * @param {Detection['framework']} framework
+ * @param {{projectDir: string, platform: NodeJS.Platform}} where
  * @returns {Promise<DevServer>}
  */
-async function devServer(root, pkg, framework) {
+async function devServer(root, pkg, framework, { projectDir, platform }) {
+  const levels = foldersUpward(root, projectDir);
+  const at = (/** @type {{base: string, prefix: string}} */ level, /** @type {string} */ name) => entryKind(level.base, level.prefix === '' ? name : `${level.prefix}/${name}`);
   /** @type {DevServer['package_manager']} */
   let manager = null;
+  let installed = null;
   if (pkg !== null) {
-    manager = 'npm';
-    for (const [file, name] of LOCK_FILES) {
-      if ((await entryKind(root, file)) === 'file') {
-        manager = name;
-        break;
+    installed = false;
+    for (const level of levels) {
+      for (const [file, name] of LOCK_FILES) {
+        if (manager === null && (await at(level, file)) === 'file') manager = name;
       }
+      if ((await at(level, 'node_modules')) === 'dir') installed = true;
     }
+    manager ??= 'npm';
   }
   const scripts = record(pkg?.scripts);
   /** @param {string} name */
   const script = (name) => (typeof scripts[name] === 'string' && /** @type {string} */ (scripts[name]).trim() !== '' ? /** @type {string} */ (scripts[name]) : null);
-  const installed = pkg === null ? null : (await entryKind(root, 'node_modules')) === 'dir';
   const base = { package_manager: manager, dependencies_installed: installed };
   const none = { script: null, script_clipped: false, also_runs: [] };
   /**
@@ -220,9 +232,30 @@ async function devServer(root, pkg, framework) {
       const text = script(name);
       if (text !== null) return { ...runs(name, text), default_url: null, ...base };
     }
-    return { command: `python3 -m http.server ${STATIC_PORT} --bind 127.0.0.1`, ...none, default_url: `http://127.0.0.1:${STATIC_PORT}`, ...base };
+    // python3 is the name on macOS and Linux; on Windows the installer from python.org provides python.
+    const python = platform === 'win32' ? 'python' : 'python3';
+    return { command: `${python} -m http.server ${STATIC_PORT} --bind 127.0.0.1`, ...none, default_url: `http://127.0.0.1:${STATIC_PORT}`, ...base };
   }
   return { command: null, ...none, default_url: null, ...base };
+}
+
+const MONOREPO_NEXT = 'call project_detect again with one of them as source_dir.';
+
+/**
+ * The workspaces of a monorepo root that are supported web projects.
+ * @param {string} root
+ * @param {Record<string, unknown>|null} pkg
+ * @returns {Promise<Detection['workspace_projects']>}
+ */
+async function workspaceProjects(root, pkg) {
+  /** @type {Detection['workspace_projects']} */
+  const found = [];
+  for (const folder of (await workspaceFolders(root, pkg)) ?? []) {
+    const dir = path.join(root, ...folder.split('/'));
+    const kind = await classify(dir, await readPackageJson(dir));
+    if (kind.supported) found.push({ source_dir: dir, label: kind.label });
+  }
+  return found;
 }
 
 /**
@@ -230,15 +263,27 @@ async function devServer(root, pkg, framework) {
  *
  * Guarantees: only Next.js with the App Router and plain HTML are reported as
  * supported; everything else gets a message in plain words that names what was
- * found. The answer comes from file names and from package.json parsed as
- * JSON. No file of the project is executed or imported, and no symbolic link
- * is followed.
+ * found. A folder that is not supported but declares workspaces (package.json
+ * or pnpm-workspace.yaml) lists those that are, under `workspace_projects`.
+ * The lock file and `node_modules` are looked for in `root` and in the folders
+ * above it up to `projectDir`, never above. The answer comes from file names
+ * and from package.json parsed as JSON. No file of the project is executed or
+ * imported, and no symbolic link is followed.
  *
  * @param {string} root  Absolute real path of the folder (see `resolveSourceDir`).
+ * @param {{projectDir?: string, platform?: NodeJS.Platform}} [options]  `projectDir`: absolute real path of the
+ *   project folder that holds `root` (default `root`); `platform`: where the dev server will run (default this one).
  * @returns {Promise<Detection>}
  */
-export async function detectProject(root) {
+export async function detectProject(root, { projectDir = root, platform = process.platform } = {}) {
   const pkg = await readPackageJson(root);
   const kind = await classify(root, pkg);
-  return { ...kind, dev_server: await devServer(root, pkg, kind.framework) };
+  const workspaces = kind.supported ? [] : await workspaceProjects(root, pkg);
+  let { message } = kind;
+  if (workspaces.length > 0) {
+    message = kind.framework === 'none'
+      ? `This folder is the root of a monorepo and is not a web project itself. Supported web projects were found in its workspaces (workspace_projects): ${MONOREPO_NEXT}`
+      : `${message} This folder is also the root of a monorepo, and supported web projects were found in its workspaces (workspace_projects): ${MONOREPO_NEXT}`;
+  }
+  return { ...kind, message, workspace_projects: workspaces, dev_server: await devServer(root, pkg, kind.framework, { projectDir, platform }) };
 }

@@ -1,0 +1,1226 @@
+{
+  "schema_version": 1,
+  "rules_version": "0.1.4",
+  "plugin_version": "0.1.0-alpha.1",
+  "run_id": "2026-11-12T04-10-54Z",
+  "created_at": "2026-11-12T04:10:54.408Z",
+  "start_url": "http://localhost:47320/",
+  "site_origin": "http://localhost:47320",
+  "crawl": {
+    "id": "c-20261112T041042Z-4a1882",
+    "pages_crawled": 8,
+    "html_pages": 7,
+    "indexable_pages": 7,
+    "unreadable_pages": 0,
+    "truncated": false,
+    "blocked": null,
+    "robots_status": "ok",
+    "sitemap_urls": 0,
+    "max_pages": 25,
+    "user_agent": "seekwide/0.1.0-alpha.1 (+https://github.com/omerbatutandogan/seekwide)"
+  },
+  "modules_requested": [
+    "seo",
+    "links"
+  ],
+  "modules": {
+    "links": {
+      "score": 99,
+      "coverage": 0.9,
+      "checks_total": 10,
+      "checks_run": 9,
+      "checks_skipped": 1,
+      "note": null
+    },
+    "seo": {
+      "score": 89,
+      "coverage": 0.81,
+      "checks_total": 47,
+      "checks_run": 38,
+      "checks_skipped": 9,
+      "note": null
+    }
+  },
+  "checks": [
+    {
+      "id": "links.anchor.empty",
+      "module": "links",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 32,
+      "passed": 32,
+      "failed": 0
+    },
+    {
+      "id": "links.anchor.generic",
+      "module": "links",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 32,
+      "passed": 32,
+      "failed": 0
+    },
+    {
+      "id": "links.anchor.uncrawlable",
+      "module": "links",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 32,
+      "passed": 32,
+      "failed": 0
+    },
+    {
+      "id": "links.depth.deep",
+      "module": "links",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 7,
+      "passed": 7,
+      "failed": 0
+    },
+    {
+      "id": "links.internal.broken",
+      "module": "links",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 32,
+      "passed": 31,
+      "failed": 1
+    },
+    {
+      "id": "links.internal.insecure",
+      "module": "links",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 0,
+      "passed": 0,
+      "failed": 0
+    },
+    {
+      "id": "links.internal.nofollow",
+      "module": "links",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 32,
+      "passed": 32,
+      "failed": 0
+    },
+    {
+      "id": "links.internal.redirect",
+      "module": "links",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 32,
+      "passed": 32,
+      "failed": 0
+    },
+    {
+      "id": "links.orphan.sitemap_only",
+      "module": "links",
+      "status": "skipped",
+      "skip_reason": "Needs an XML sitemap. None was found.",
+      "applicable": 0,
+      "passed": 0,
+      "failed": 0
+    },
+    {
+      "id": "links.outbound.broken",
+      "module": "links",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 0,
+      "passed": 0,
+      "failed": 0
+    },
+    {
+      "id": "seo.canonical.cross_host",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    {
+      "id": "seo.canonical.invalid",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    {
+      "id": "seo.canonical.missing",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 7,
+      "passed": 3,
+      "failed": 4
+    },
+    {
+      "id": "seo.canonical.multiple",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    {
+      "id": "seo.canonical.outside_head",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    {
+      "id": "seo.canonical.relative",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    {
+      "id": "seo.canonical.streamed_in_body",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    {
+      "id": "seo.canonical.target_not_ok",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 0,
+      "passed": 0,
+      "failed": 0
+    },
+    {
+      "id": "seo.content.duplicate_body",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 5,
+      "passed": 5,
+      "failed": 0
+    },
+    {
+      "id": "seo.content.thin",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 7,
+      "passed": 0,
+      "failed": 7
+    },
+    {
+      "id": "seo.cwv.field_cls",
+      "module": "seo",
+      "status": "skipped",
+      "skip_reason": "Needs field data from the Chrome UX Report. It was not collected.",
+      "applicable": 0,
+      "passed": 0,
+      "failed": 0
+    },
+    {
+      "id": "seo.cwv.field_inp",
+      "module": "seo",
+      "status": "skipped",
+      "skip_reason": "Needs field data from the Chrome UX Report. It was not collected.",
+      "applicable": 0,
+      "passed": 0,
+      "failed": 0
+    },
+    {
+      "id": "seo.cwv.field_lcp",
+      "module": "seo",
+      "status": "skipped",
+      "skip_reason": "Needs field data from the Chrome UX Report. It was not collected.",
+      "applicable": 0,
+      "passed": 0,
+      "failed": 0
+    },
+    {
+      "id": "seo.cwv.lab_cls",
+      "module": "seo",
+      "status": "skipped",
+      "skip_reason": "Needs lab data from PageSpeed Insights. It was not collected.",
+      "applicable": 0,
+      "passed": 0,
+      "failed": 0
+    },
+    {
+      "id": "seo.cwv.lab_lcp",
+      "module": "seo",
+      "status": "skipped",
+      "skip_reason": "Needs lab data from PageSpeed Insights. It was not collected.",
+      "applicable": 0,
+      "passed": 0,
+      "failed": 0
+    },
+    {
+      "id": "seo.cwv.lab_tbt",
+      "module": "seo",
+      "status": "skipped",
+      "skip_reason": "Needs lab data from PageSpeed Insights. It was not collected.",
+      "applicable": 0,
+      "passed": 0,
+      "failed": 0
+    },
+    {
+      "id": "seo.h1.missing",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 7,
+      "passed": 7,
+      "failed": 0
+    },
+    {
+      "id": "seo.h1.multiple",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 7,
+      "passed": 7,
+      "failed": 0
+    },
+    {
+      "id": "seo.headings.skipped_level",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 7,
+      "passed": 7,
+      "failed": 0
+    },
+    {
+      "id": "seo.html.lang_missing",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 7,
+      "passed": 7,
+      "failed": 0
+    },
+    {
+      "id": "seo.http.fetch_failed",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 8,
+      "passed": 8,
+      "failed": 0
+    },
+    {
+      "id": "seo.http.server_error",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 8,
+      "passed": 8,
+      "failed": 0
+    },
+    {
+      "id": "seo.https.mixed_content",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 0,
+      "passed": 0,
+      "failed": 0
+    },
+    {
+      "id": "seo.https.not_enforced",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 0,
+      "passed": 0,
+      "failed": 0
+    },
+    {
+      "id": "seo.https.site_not_https",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 1,
+      "passed": 0,
+      "failed": 1
+    },
+    {
+      "id": "seo.indexing.homepage_noindex",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 1,
+      "passed": 1,
+      "failed": 0
+    },
+    {
+      "id": "seo.indexing.noindex_in_sitemap",
+      "module": "seo",
+      "status": "skipped",
+      "skip_reason": "Needs an XML sitemap. None was found.",
+      "applicable": 0,
+      "passed": 0,
+      "failed": 0
+    },
+    {
+      "id": "seo.meta_description.duplicate",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 7,
+      "passed": 3,
+      "failed": 4
+    },
+    {
+      "id": "seo.meta_description.missing",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 7,
+      "passed": 7,
+      "failed": 0
+    },
+    {
+      "id": "seo.meta_description.multiple",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 7,
+      "passed": 7,
+      "failed": 0
+    },
+    {
+      "id": "seo.meta_description.too_long",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 7,
+      "passed": 7,
+      "failed": 0
+    },
+    {
+      "id": "seo.mobile.viewport_missing",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 7,
+      "passed": 7,
+      "failed": 0
+    },
+    {
+      "id": "seo.redirect.broken",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 0,
+      "passed": 0,
+      "failed": 0
+    },
+    {
+      "id": "seo.redirect.chain",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 0,
+      "passed": 0,
+      "failed": 0
+    },
+    {
+      "id": "seo.robots.disallow_all",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 1,
+      "passed": 1,
+      "failed": 0
+    },
+    {
+      "id": "seo.robots.unreachable",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 1,
+      "passed": 1,
+      "failed": 0
+    },
+    {
+      "id": "seo.sitemap.file_error",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 0,
+      "passed": 0,
+      "failed": 0
+    },
+    {
+      "id": "seo.sitemap.missing",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 1,
+      "passed": 0,
+      "failed": 1
+    },
+    {
+      "id": "seo.sitemap.url_canonicalized",
+      "module": "seo",
+      "status": "skipped",
+      "skip_reason": "Needs an XML sitemap. None was found.",
+      "applicable": 0,
+      "passed": 0,
+      "failed": 0
+    },
+    {
+      "id": "seo.sitemap.url_not_ok",
+      "module": "seo",
+      "status": "skipped",
+      "skip_reason": "Needs an XML sitemap. None was found.",
+      "applicable": 0,
+      "passed": 0,
+      "failed": 0
+    },
+    {
+      "id": "seo.social.og_incomplete",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 7,
+      "passed": 7,
+      "failed": 0
+    },
+    {
+      "id": "seo.structured_data.invalid_json",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 0,
+      "passed": 0,
+      "failed": 0
+    },
+    {
+      "id": "seo.title.duplicate",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 7,
+      "passed": 5,
+      "failed": 2
+    },
+    {
+      "id": "seo.title.missing",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 7,
+      "passed": 7,
+      "failed": 0
+    },
+    {
+      "id": "seo.title.multiple",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 7,
+      "passed": 7,
+      "failed": 0
+    },
+    {
+      "id": "seo.title.too_long",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 7,
+      "passed": 7,
+      "failed": 0
+    },
+    {
+      "id": "seo.title.too_short",
+      "module": "seo",
+      "status": "run",
+      "skip_reason": null,
+      "applicable": 7,
+      "passed": 7,
+      "failed": 0
+    }
+  ],
+  "findings": [
+    {
+      "id": "b9fad6db70407a6b",
+      "check_id": "links.internal.broken",
+      "module": "links",
+      "engine": "code",
+      "title": "Internal link to a broken page",
+      "severity": "high",
+      "weight": 4,
+      "impact": 3,
+      "effort": 1,
+      "confidence": "confirmed",
+      "status": "fail",
+      "url": "http://localhost:47320/blog",
+      "selector": "a[href=\"/blog/deleted-post\"]",
+      "line": 1,
+      "evidence": {
+        "observed": {
+          "target_url": "http://localhost:47320/blog/deleted-post",
+          "status": 404,
+          "final_status": 404,
+          "fetch_error": null
+        },
+        "expected": "A target that answers with a status below 400",
+        "detail": "http://localhost:47320/blog/deleted-post answered 404."
+      },
+      "related_urls": [],
+      "recommendation": "Change the link to a working URL, or remove it. If the page moved, link to its new address.",
+      "fix": null,
+      "doc_ref": "https://developers.google.com/crawling/docs/troubleshooting/http-status-codes",
+      "detected_at": "2026-11-12T04:10:54.408Z",
+      "source": {
+        "file": "src/app/blog/page.tsx",
+        "line": null,
+        "route": "/blog"
+      }
+    },
+    {
+      "id": "5d63b58a22002d4e",
+      "check_id": "seo.https.site_not_https",
+      "module": "seo",
+      "engine": "code",
+      "title": "Site is not served over HTTPS",
+      "severity": "high",
+      "weight": 4,
+      "impact": 3,
+      "effort": 3,
+      "confidence": "confirmed",
+      "status": "fail",
+      "url": "http://localhost:47320",
+      "selector": null,
+      "line": null,
+      "evidence": {
+        "observed": "http://localhost:47320",
+        "expected": "An https:// origin",
+        "detail": "The site is served over plain HTTP."
+      },
+      "related_urls": [],
+      "recommendation": "Install a TLS certificate, serve every page over https://, and redirect http:// URLs to their https:// versions with a 301.",
+      "fix": null,
+      "doc_ref": "https://web.dev/articles/why-https-matters",
+      "detected_at": "2026-11-12T04:10:54.408Z"
+    },
+    {
+      "id": "ae4712328bbcfa2b",
+      "check_id": "seo.title.duplicate",
+      "module": "seo",
+      "engine": "code",
+      "title": "Title is shared with other pages",
+      "severity": "medium",
+      "weight": 3,
+      "impact": 2,
+      "effort": 2,
+      "confidence": "confirmed",
+      "status": "fail",
+      "url": "http://localhost:47320/about",
+      "selector": "head > title",
+      "line": null,
+      "evidence": {
+        "observed": {
+          "pages_with_same_title": 2
+        },
+        "expected": "A title no other indexable page uses",
+        "detail": "1 other page use the same title."
+      },
+      "related_urls": [
+        "http://localhost:47320/products"
+      ],
+      "recommendation": "Write a distinct title for each page that names what is specific to it, or consolidate the pages if they really are the same content.",
+      "fix": null,
+      "doc_ref": "https://developers.google.com/search/docs/appearance/title-link",
+      "detected_at": "2026-11-12T04:10:54.408Z",
+      "source": {
+        "file": "src/app/about/page.tsx",
+        "line": null,
+        "route": "/about"
+      }
+    },
+    {
+      "id": "7633c60ba0919bef",
+      "check_id": "seo.title.duplicate",
+      "module": "seo",
+      "engine": "code",
+      "title": "Title is shared with other pages",
+      "severity": "medium",
+      "weight": 3,
+      "impact": 2,
+      "effort": 2,
+      "confidence": "confirmed",
+      "status": "fail",
+      "url": "http://localhost:47320/products",
+      "selector": "head > title",
+      "line": null,
+      "evidence": {
+        "observed": {
+          "pages_with_same_title": 2
+        },
+        "expected": "A title no other indexable page uses",
+        "detail": "1 other page use the same title."
+      },
+      "related_urls": [
+        "http://localhost:47320/about"
+      ],
+      "recommendation": "Write a distinct title for each page that names what is specific to it, or consolidate the pages if they really are the same content.",
+      "fix": null,
+      "doc_ref": "https://developers.google.com/search/docs/appearance/title-link",
+      "detected_at": "2026-11-12T04:10:54.408Z",
+      "source": {
+        "file": "src/app/products/page.tsx",
+        "line": null,
+        "route": "/products"
+      }
+    },
+    {
+      "id": "3925ac6802043eee",
+      "check_id": "seo.canonical.missing",
+      "module": "seo",
+      "engine": "code",
+      "title": "Page has no canonical URL",
+      "severity": "low",
+      "weight": 1,
+      "impact": 1,
+      "effort": 1,
+      "confidence": "confirmed",
+      "status": "fail",
+      "url": "http://localhost:47320/about",
+      "selector": "link[rel=canonical]",
+      "line": null,
+      "evidence": {
+        "observed": "No canonical link or header",
+        "expected": "A canonical link in the <head> or a canonical Link header"
+      },
+      "related_urls": [],
+      "recommendation": "Add <link rel=\"canonical\" href=\"…\"> to the <head> with the absolute URL of the version of this page you want in search results.",
+      "fix": null,
+      "doc_ref": "https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls",
+      "detected_at": "2026-11-12T04:10:54.408Z",
+      "source": {
+        "file": "src/app/about/page.tsx",
+        "line": null,
+        "route": "/about"
+      }
+    },
+    {
+      "id": "d56fcad58e8cd030",
+      "check_id": "seo.canonical.missing",
+      "module": "seo",
+      "engine": "code",
+      "title": "Page has no canonical URL",
+      "severity": "low",
+      "weight": 1,
+      "impact": 1,
+      "effort": 1,
+      "confidence": "confirmed",
+      "status": "fail",
+      "url": "http://localhost:47320/products",
+      "selector": "link[rel=canonical]",
+      "line": null,
+      "evidence": {
+        "observed": "No canonical link or header",
+        "expected": "A canonical link in the <head> or a canonical Link header"
+      },
+      "related_urls": [],
+      "recommendation": "Add <link rel=\"canonical\" href=\"…\"> to the <head> with the absolute URL of the version of this page you want in search results.",
+      "fix": null,
+      "doc_ref": "https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls",
+      "detected_at": "2026-11-12T04:10:54.408Z",
+      "source": {
+        "file": "src/app/products/page.tsx",
+        "line": null,
+        "route": "/products"
+      }
+    },
+    {
+      "id": "f02c61a6f5dfa3bc",
+      "check_id": "seo.canonical.missing",
+      "module": "seo",
+      "engine": "code",
+      "title": "Page has no canonical URL",
+      "severity": "low",
+      "weight": 1,
+      "impact": 1,
+      "effort": 1,
+      "confidence": "confirmed",
+      "status": "fail",
+      "url": "http://localhost:47320/products/alpha",
+      "selector": "link[rel=canonical]",
+      "line": null,
+      "evidence": {
+        "observed": "No canonical link or header",
+        "expected": "A canonical link in the <head> or a canonical Link header"
+      },
+      "related_urls": [],
+      "recommendation": "Add <link rel=\"canonical\" href=\"…\"> to the <head> with the absolute URL of the version of this page you want in search results.",
+      "fix": null,
+      "doc_ref": "https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls",
+      "detected_at": "2026-11-12T04:10:54.408Z",
+      "source": {
+        "file": "src/app/products/[id]/page.tsx",
+        "line": null,
+        "route": "/products/[id]"
+      }
+    },
+    {
+      "id": "15b48b4bfa1dabee",
+      "check_id": "seo.canonical.missing",
+      "module": "seo",
+      "engine": "code",
+      "title": "Page has no canonical URL",
+      "severity": "low",
+      "weight": 1,
+      "impact": 1,
+      "effort": 1,
+      "confidence": "confirmed",
+      "status": "fail",
+      "url": "http://localhost:47320/products/beta",
+      "selector": "link[rel=canonical]",
+      "line": null,
+      "evidence": {
+        "observed": "No canonical link or header",
+        "expected": "A canonical link in the <head> or a canonical Link header"
+      },
+      "related_urls": [],
+      "recommendation": "Add <link rel=\"canonical\" href=\"…\"> to the <head> with the absolute URL of the version of this page you want in search results.",
+      "fix": null,
+      "doc_ref": "https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls",
+      "detected_at": "2026-11-12T04:10:54.408Z",
+      "source": {
+        "file": "src/app/products/[id]/page.tsx",
+        "line": null,
+        "route": "/products/[id]"
+      }
+    },
+    {
+      "id": "4790d44495d98551",
+      "check_id": "seo.meta_description.duplicate",
+      "module": "seo",
+      "engine": "code",
+      "title": "Meta description is shared with other pages",
+      "severity": "low",
+      "weight": 1,
+      "impact": 1,
+      "effort": 2,
+      "confidence": "confirmed",
+      "status": "fail",
+      "url": "http://localhost:47320/about",
+      "selector": "meta[name=description]",
+      "line": null,
+      "evidence": {
+        "observed": {
+          "pages_with_same_description": 4
+        },
+        "expected": "A description no other indexable page uses",
+        "detail": "3 other pages use the same meta description."
+      },
+      "related_urls": [
+        "http://localhost:47320/products",
+        "http://localhost:47320/products/alpha",
+        "http://localhost:47320/products/beta"
+      ],
+      "recommendation": "Write a description for each page that summarizes what is specific to it.",
+      "fix": null,
+      "doc_ref": "https://developers.google.com/search/docs/appearance/snippet",
+      "detected_at": "2026-11-12T04:10:54.408Z",
+      "source": {
+        "file": "src/app/about/page.tsx",
+        "line": null,
+        "route": "/about"
+      }
+    },
+    {
+      "id": "78eb55b3fc197610",
+      "check_id": "seo.meta_description.duplicate",
+      "module": "seo",
+      "engine": "code",
+      "title": "Meta description is shared with other pages",
+      "severity": "low",
+      "weight": 1,
+      "impact": 1,
+      "effort": 2,
+      "confidence": "confirmed",
+      "status": "fail",
+      "url": "http://localhost:47320/products",
+      "selector": "meta[name=description]",
+      "line": null,
+      "evidence": {
+        "observed": {
+          "pages_with_same_description": 4
+        },
+        "expected": "A description no other indexable page uses",
+        "detail": "3 other pages use the same meta description."
+      },
+      "related_urls": [
+        "http://localhost:47320/about",
+        "http://localhost:47320/products/alpha",
+        "http://localhost:47320/products/beta"
+      ],
+      "recommendation": "Write a description for each page that summarizes what is specific to it.",
+      "fix": null,
+      "doc_ref": "https://developers.google.com/search/docs/appearance/snippet",
+      "detected_at": "2026-11-12T04:10:54.408Z",
+      "source": {
+        "file": "src/app/products/page.tsx",
+        "line": null,
+        "route": "/products"
+      }
+    },
+    {
+      "id": "43b854d08a37bbcd",
+      "check_id": "seo.meta_description.duplicate",
+      "module": "seo",
+      "engine": "code",
+      "title": "Meta description is shared with other pages",
+      "severity": "low",
+      "weight": 1,
+      "impact": 1,
+      "effort": 2,
+      "confidence": "confirmed",
+      "status": "fail",
+      "url": "http://localhost:47320/products/alpha",
+      "selector": "meta[name=description]",
+      "line": null,
+      "evidence": {
+        "observed": {
+          "pages_with_same_description": 4
+        },
+        "expected": "A description no other indexable page uses",
+        "detail": "3 other pages use the same meta description."
+      },
+      "related_urls": [
+        "http://localhost:47320/about",
+        "http://localhost:47320/products",
+        "http://localhost:47320/products/beta"
+      ],
+      "recommendation": "Write a description for each page that summarizes what is specific to it.",
+      "fix": null,
+      "doc_ref": "https://developers.google.com/search/docs/appearance/snippet",
+      "detected_at": "2026-11-12T04:10:54.408Z",
+      "source": {
+        "file": "src/app/products/[id]/page.tsx",
+        "line": null,
+        "route": "/products/[id]"
+      }
+    },
+    {
+      "id": "82cc263da0a40fc9",
+      "check_id": "seo.meta_description.duplicate",
+      "module": "seo",
+      "engine": "code",
+      "title": "Meta description is shared with other pages",
+      "severity": "low",
+      "weight": 1,
+      "impact": 1,
+      "effort": 2,
+      "confidence": "confirmed",
+      "status": "fail",
+      "url": "http://localhost:47320/products/beta",
+      "selector": "meta[name=description]",
+      "line": null,
+      "evidence": {
+        "observed": {
+          "pages_with_same_description": 4
+        },
+        "expected": "A description no other indexable page uses",
+        "detail": "3 other pages use the same meta description."
+      },
+      "related_urls": [
+        "http://localhost:47320/about",
+        "http://localhost:47320/products",
+        "http://localhost:47320/products/alpha"
+      ],
+      "recommendation": "Write a description for each page that summarizes what is specific to it.",
+      "fix": null,
+      "doc_ref": "https://developers.google.com/search/docs/appearance/snippet",
+      "detected_at": "2026-11-12T04:10:54.408Z",
+      "source": {
+        "file": "src/app/products/[id]/page.tsx",
+        "line": null,
+        "route": "/products/[id]"
+      }
+    },
+    {
+      "id": "365a572c5c454b60",
+      "check_id": "seo.sitemap.missing",
+      "module": "seo",
+      "engine": "code",
+      "title": "No XML sitemap found",
+      "severity": "low",
+      "weight": 1,
+      "impact": 1,
+      "effort": 1,
+      "confidence": "confirmed",
+      "status": "fail",
+      "url": null,
+      "selector": null,
+      "line": null,
+      "evidence": {
+        "observed": {
+          "sitemap_files": 0,
+          "robots_sitemap_lines": 0
+        },
+        "expected": "At least one XML sitemap",
+        "detail": "robots.txt has no Sitemap line and /sitemap.xml was not found."
+      },
+      "related_urls": [],
+      "recommendation": "Publish an XML sitemap that lists the pages you want in search results, and add a \"Sitemap:\" line with its full URL to robots.txt.",
+      "fix": null,
+      "doc_ref": "https://developers.google.com/search/docs/crawling-indexing/sitemaps/overview",
+      "detected_at": "2026-11-12T04:10:54.408Z"
+    },
+    {
+      "id": "8c1edac66563d4dd",
+      "check_id": "seo.content.thin",
+      "module": "seo",
+      "engine": "code",
+      "title": "Page has little visible text",
+      "severity": "info",
+      "weight": 0,
+      "impact": 1,
+      "effort": 3,
+      "confidence": "likely",
+      "status": "fail",
+      "url": "http://localhost:47320/",
+      "selector": null,
+      "line": null,
+      "evidence": {
+        "observed": {
+          "word_count": 87
+        },
+        "expected": "100 words or more"
+      },
+      "related_urls": [],
+      "recommendation": "Check whether the page gives visitors what they came for; if not, add the missing information or merge it into a related page.",
+      "fix": null,
+      "doc_ref": "https://developers.google.com/search/docs/fundamentals/creating-helpful-content",
+      "detected_at": "2026-11-12T04:10:54.408Z",
+      "source": {
+        "file": "src/app/page.tsx",
+        "line": null,
+        "route": "/"
+      }
+    },
+    {
+      "id": "bec6d9e04f3c2477",
+      "check_id": "seo.content.thin",
+      "module": "seo",
+      "engine": "code",
+      "title": "Page has little visible text",
+      "severity": "info",
+      "weight": 0,
+      "impact": 1,
+      "effort": 3,
+      "confidence": "likely",
+      "status": "fail",
+      "url": "http://localhost:47320/about",
+      "selector": null,
+      "line": null,
+      "evidence": {
+        "observed": {
+          "word_count": 87
+        },
+        "expected": "100 words or more"
+      },
+      "related_urls": [],
+      "recommendation": "Check whether the page gives visitors what they came for; if not, add the missing information or merge it into a related page.",
+      "fix": null,
+      "doc_ref": "https://developers.google.com/search/docs/fundamentals/creating-helpful-content",
+      "detected_at": "2026-11-12T04:10:54.408Z",
+      "source": {
+        "file": "src/app/about/page.tsx",
+        "line": null,
+        "route": "/about"
+      }
+    },
+    {
+      "id": "c71c3cb33a827b71",
+      "check_id": "seo.content.thin",
+      "module": "seo",
+      "engine": "code",
+      "title": "Page has little visible text",
+      "severity": "info",
+      "weight": 0,
+      "impact": 1,
+      "effort": 3,
+      "confidence": "likely",
+      "status": "fail",
+      "url": "http://localhost:47320/blog",
+      "selector": null,
+      "line": null,
+      "evidence": {
+        "observed": {
+          "word_count": 42
+        },
+        "expected": "100 words or more"
+      },
+      "related_urls": [],
+      "recommendation": "Check whether the page gives visitors what they came for; if not, add the missing information or merge it into a related page.",
+      "fix": null,
+      "doc_ref": "https://developers.google.com/search/docs/fundamentals/creating-helpful-content",
+      "detected_at": "2026-11-12T04:10:54.408Z",
+      "source": {
+        "file": "src/app/blog/page.tsx",
+        "line": null,
+        "route": "/blog"
+      }
+    },
+    {
+      "id": "a7addc6589e0b0b1",
+      "check_id": "seo.content.thin",
+      "module": "seo",
+      "engine": "code",
+      "title": "Page has little visible text",
+      "severity": "info",
+      "weight": 0,
+      "impact": 1,
+      "effort": 3,
+      "confidence": "likely",
+      "status": "fail",
+      "url": "http://localhost:47320/blog/hello-widgets",
+      "selector": null,
+      "line": null,
+      "evidence": {
+        "observed": {
+          "word_count": 52
+        },
+        "expected": "100 words or more"
+      },
+      "related_urls": [],
+      "recommendation": "Check whether the page gives visitors what they came for; if not, add the missing information or merge it into a related page.",
+      "fix": null,
+      "doc_ref": "https://developers.google.com/search/docs/fundamentals/creating-helpful-content",
+      "detected_at": "2026-11-12T04:10:54.408Z",
+      "source": {
+        "file": "src/app/blog/[slug]/page.tsx",
+        "line": null,
+        "route": "/blog/[slug]"
+      }
+    },
+    {
+      "id": "b67ee561b4f06f97",
+      "check_id": "seo.content.thin",
+      "module": "seo",
+      "engine": "code",
+      "title": "Page has little visible text",
+      "severity": "info",
+      "weight": 0,
+      "impact": 1,
+      "effort": 3,
+      "confidence": "likely",
+      "status": "fail",
+      "url": "http://localhost:47320/products",
+      "selector": null,
+      "line": null,
+      "evidence": {
+        "observed": {
+          "word_count": 47
+        },
+        "expected": "100 words or more"
+      },
+      "related_urls": [],
+      "recommendation": "Check whether the page gives visitors what they came for; if not, add the missing information or merge it into a related page.",
+      "fix": null,
+      "doc_ref": "https://developers.google.com/search/docs/fundamentals/creating-helpful-content",
+      "detected_at": "2026-11-12T04:10:54.408Z",
+      "source": {
+        "file": "src/app/products/page.tsx",
+        "line": null,
+        "route": "/products"
+      }
+    },
+    {
+      "id": "c3bcbb49b055ad9d",
+      "check_id": "seo.content.thin",
+      "module": "seo",
+      "engine": "code",
+      "title": "Page has little visible text",
+      "severity": "info",
+      "weight": 0,
+      "impact": 1,
+      "effort": 3,
+      "confidence": "likely",
+      "status": "fail",
+      "url": "http://localhost:47320/products/alpha",
+      "selector": null,
+      "line": null,
+      "evidence": {
+        "observed": {
+          "word_count": 75
+        },
+        "expected": "100 words or more"
+      },
+      "related_urls": [],
+      "recommendation": "Check whether the page gives visitors what they came for; if not, add the missing information or merge it into a related page.",
+      "fix": null,
+      "doc_ref": "https://developers.google.com/search/docs/fundamentals/creating-helpful-content",
+      "detected_at": "2026-11-12T04:10:54.408Z",
+      "source": {
+        "file": "src/app/products/[id]/page.tsx",
+        "line": null,
+        "route": "/products/[id]"
+      }
+    },
+    {
+      "id": "04abc21b697b15d2",
+      "check_id": "seo.content.thin",
+      "module": "seo",
+      "engine": "code",
+      "title": "Page has little visible text",
+      "severity": "info",
+      "weight": 0,
+      "impact": 1,
+      "effort": 3,
+      "confidence": "likely",
+      "status": "fail",
+      "url": "http://localhost:47320/products/beta",
+      "selector": null,
+      "line": null,
+      "evidence": {
+        "observed": {
+          "word_count": 74
+        },
+        "expected": "100 words or more"
+      },
+      "related_urls": [],
+      "recommendation": "Check whether the page gives visitors what they came for; if not, add the missing information or merge it into a related page.",
+      "fix": null,
+      "doc_ref": "https://developers.google.com/search/docs/fundamentals/creating-helpful-content",
+      "detected_at": "2026-11-12T04:10:54.408Z",
+      "source": {
+        "file": "src/app/products/[id]/page.tsx",
+        "line": null,
+        "route": "/products/[id]"
+      }
+    }
+  ],
+  "core_web_vitals": null,
+  "repo": {
+    "framework": "next-app",
+    "label": "Next.js (App Router)",
+    "source_dir": ".",
+    "deployed_origin": "https://www.example.com",
+    "deployed_localized": 3,
+    "findings_with_source": 18,
+    "pages_matched": 7,
+    "pages_total": 7
+  },
+  "fixes": null
+}
