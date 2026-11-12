@@ -26,7 +26,7 @@ In repo mode the same flow runs against the project's own local server: `project
 
 `/seekwide:fix` builds on that (4.13): `fix_plan` says which findings of a repo-mode run a metadata fix exists for and where it belongs, Claude writes each change after the user approved its diff, and a second `audit_run` with `verify_fixes` says what became of each fixed finding. The server plans and verifies; it never writes into a project.
 
-Not in this milestone: fixes other than metadata, and every module other than `seo` and `links`.
+Not in this milestone: fixes other than metadata, and every module other than `seo`, `links` and `security` (4.14).
 
 ## 2. Principles that shape the code
 
@@ -52,6 +52,7 @@ server/src/
   extract/    page.js indexability.js (+ helpers)
   checks/seo/     index.js + one file per area
   checks/links/   index.js + one file per area
+  checks/security/  index.js + one file per area (4.14)
   vitals/     measure.js select.js psi.js crux.js google-api.js thresholds.js
   repo/       scan.js detect.js next-routes.js html-routes.js html-lines.js sources.js fixes.js fix-texts.js verify.js
   store/      project.js runs.js run-validate.js profile.js compare.js
@@ -321,7 +322,7 @@ export function renderHtml(run, options)       // → string
 
 Both are pure and depend only on their arguments (dates come from `run.created_at`). They render one shared model (`report/model.js`), so the two formats cannot drift apart. Invalid options throw `TypeError`: a `comparison` that belongs to another run, or a `logoDataUri` that is not a base64 PNG, JPEG, WebP or SVG data URI. Sections, in order:
 
-1. Title: "SEO and link audit", the site, the date, "Prepared by" when `brandName` is given.
+1. Title: "SEO and link audit" (a run with the security module names its modules instead, 4.14), the site, the date, "Prepared by" when `brandName` is given.
 2. Summary: `executiveSummary` when given, otherwise a factual one built from the numbers.
 3. Scope and limits: pages crawled against the budget, truncation, blocks, robots.txt status, sitemap URLs, user agent. In repo mode (`run.repo` is an object) also "Source files": the kind of project and how many findings name a file, or that the project could not be mapped; and, when the crawl was told the deployed address, that canonical links and sitemap entries naming it were read as pages of the local server, or that the address matched none of them.
 4. Fixes verified in this run, when the run holds a fix verification (`run.fixes` with results; 4.13): one sentence with the counts, the base run, and a row per fixed finding with its outcome (closed, replaced, still open, not verified), the page, the source file and what the re-audit found, closed ones first, at most 100 rows. The counts are made from the rows, and an outcome the plugin does not know is shown as not verified. Then the caveats of the comparison.
@@ -524,6 +525,30 @@ export function verifyFixes({base, run, crawl, findingIds, comparison})   // →
 A finding of a check outside the nine is never `closed`: it is `open` while its id is in the new run and `unverified` once it is gone, because nothing here knows which pages that check looks at. Ids the base run does not hold are returned under `unknown`; the tool refuses them before the audit runs. `notes` are the comparison's notes.
 
 **Values in instructions.** `how` holds fixed text, the deployed origin and line numbers that are positive integers; file names are never part of it, because a repository chooses them: the sitemap fix refers to "the first file under `create`" and "the file under `edit`". A fix's `file` is the name from the project's listing. `site_url_source` says whether the deployed address came from the argument or from the saved profile; for the profile, a note asks the model to confirm it with the user. In `verifyFixes`, whether a fixable check looks at the whole site comes from `FIXABLE_CHECKS`, and a result's title (from the check definitions), severity and file are never taken from the stored run as they are.
+
+### 4.14 The security module: `extract/security.js`, `checks/security/`
+
+Signs, measurable from outside, that a site was hacked or misused, and the security headers of its start page. The rules and their sources are in `CHECKS-SPEC.md`; the pages were read on 2026-11-12.
+
+```js
+// extract/security-scan.js, extract/security.js                  pure
+export function scanDocument(document, context)                  // → {hidden_links, visible_hosts, embeds, meta_csp, meta_referrer}
+export function documentSecurity(document, context, text)        // → PageSecurity (headers: what the document says)
+export function emptySecurity(headers)                           // → PageSecurity with nothing found
+
+// extract/concealment.js, extract/terms.js, extract/security-headers.js   pure
+export function enterElement(parent, element)                    // → HiddenState below an element
+export function spamTermHits(texts), topicHits(texts), scriptLetters(text)
+export function securityHeaders(result, documentSays)            // → SecurityHeaders
+```
+
+- **Passive.** The module adds no request, no tool argument and no network destination. It reads the records of the pages the crawl fetched anyway, with the crawler's own user agent, robots.txt and pacing (4.5). It never requests a path the site does not link to or list, never sends a request with other headers to look for cloaking, and never tries anything against the site. A test holds the crawl of the security fixtures to that: one request per URL, only robots.txt, the sitemap and pages the site links or lists, all with `USER_AGENT`.
+- **Read during extraction.** `extractHtml` calls `documentSecurity` with the parsed document and the text it has already collected, and `extractPage` adds the response headers (`securityHeaders`, read from the full header values, not from the clipped copies in `headers`). The record keeps only a 2,000-character excerpt of the text, so spam terms and writing systems are counted here, over the whole visible text and the first 50,000 characters respectively. The result is `PageRecord.security`. A record made before the module existed has none, and the checks leave such a record out (`hasSecurity`).
+- **One walk, aligned with `links`.** `scanDocument` walks the parse5 tree in document order like `extractHtml`, visiting only HTML elements, so the n-th `<a>` it sees is `links[n]`, whose text and host it reads. The hidden state is carried down the walk (`enterElement`) together with each element's previous sibling, not looked up from ancestors or siblings, so a deep or wide tree stays linear; so does the reading of a `style` (no backtracking pattern, comments removed by scanning, at most 20,000 characters).
+- **What a visitor can open is not hidden.** An element with an openable role or attribute, or right after a disclosure control, is marked when it is entered; after the walk, one whose `id` a control anywhere on the page names is dropped too. A link is concealed only when one of the elements hiding it is neither. Links are then reduced to hosts: `visible_hosts`, and for each other host the first concealed link with a count, so that the room for hidden hosts cannot be used up by a hidden copy of a visible menu.
+- **The header checks need `live_site`**, a capability `buildContext` adds unless `crawl.options.local` is `true`: a development server's headers say nothing about the deployed site. They read the start page only (`ctx.resolve(start_url)`).
+- **Wording.** Findings are signs, never verdicts: every check except the headers is `likely`, and the skill, the report and the README say that a clean result is not proof of a clean site, because many hacks show their spam only to Google's crawler.
+- **Report.** When `run.modules_requested` includes `security`, the title names the modules (`reportTitle`) and the method adds what the module looks at and a checklist of what an outside audit cannot see (admin accounts, file integrity, backups, updates, Search Console's reports).
 
 ## 5. Coding rules
 

@@ -50,7 +50,7 @@ function evidenceCell(finding) {
 
 /** @param {Report} r */
 function header(r) {
-  const lines = ['# SEO and link audit', '', `- **Site:** ${mdUrl(r.startUrl)}`, `- **Date:** ${mdText(r.date.long)}`];
+  const lines = [`# ${mdText(r.title)}`, '', `- **Site:** ${mdUrl(r.startUrl)}`, `- **Date:** ${mdText(r.date.long)}`];
   if (r.brand) lines.push(`- **Prepared by:** ${mdText(r.brand)}`);
   lines.push(`- **Run:** ${mdCode(r.runId)}`, '');
   return lines;

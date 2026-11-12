@@ -32,7 +32,7 @@ describe('createTools', () => {
     assert.deepEqual(problems('crawl_start', { url: 'https://a.test/', max_pages: 0 }), ['max_pages must be at least 1']);
     assert.deepEqual(problems('crawl_start', {}), ['url is required']);
     assert.deepEqual(problems('crawl_status', { job_id: 'c', wait_seconds: 26 }), ['wait_seconds must be at most 25']);
-    assert.deepEqual(problems('audit_run', { job_id: 'c', modules: ['ads'] }), ['modules[0] must be one of "seo", "links"']);
+    assert.deepEqual(problems('audit_run', { job_id: 'c', modules: ['ads'] }), ['modules[0] must be one of "seo", "links", "security"']);
     assert.deepEqual(problems('findings_query', { limit: 201 }), ['limit must be at most 200']);
     assert.deepEqual(problems('findings_query', { offset: -1 }), ['offset must be at least 0']);
     assert.deepEqual(problems('findings_query', { severity: 'urgent' }), ['severity must be one of "critical", "high", "medium", "low", "info"']);

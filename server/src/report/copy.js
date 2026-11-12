@@ -3,11 +3,27 @@
 
 export const TITLE = 'SEO and link audit';
 
+const TITLE_WORDS = /** @type {Record<string, string>} */ ({ seo: 'SEO', links: 'link', security: 'security' });
+
+/**
+ * The report's title. A run without the security module keeps the title
+ * reports have always had; one with it names the modules it ran.
+ * @param {unknown} modules  `run.modules_requested`.
+ * @returns {string}
+ */
+export function reportTitle(modules) {
+  const names = Array.isArray(modules) ? ['seo', 'links', 'security'].filter((name) => modules.includes(name)) : [];
+  if (!names.includes('security')) return TITLE;
+  const words = names.map((name) => TITLE_WORDS[name]);
+  const joined = words.length === 1 ? words[0] : `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`;
+  return `${joined.charAt(0).toUpperCase()}${joined.slice(1)} audit`;
+}
+
 export const SEVERITY_LABELS = Object.freeze({ critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low', info: 'Info' });
 
 export const CONFIDENCE_LABELS = Object.freeze({ confirmed: 'Confirmed', likely: 'Likely' });
 
-export const MODULE_LABELS = Object.freeze({ seo: 'SEO', links: 'Links' });
+export const MODULE_LABELS = Object.freeze({ seo: 'SEO', links: 'Links', security: 'Security' });
 
 export const BLOCK_REASONS = Object.freeze({
   robots_unreachable: 'robots.txt could not be read, so the crawler did not continue',
@@ -64,13 +80,26 @@ export const SCORE_NOTE =
 
 export const CONFIDENCE_NOTE = 'Confirmed means a measured fact. Likely means a strong signal that can have a legitimate exception, so review it before acting.';
 
+/** What the security module looks at, and what an audit from outside cannot see. */
+export const SECURITY_METHOD = Object.freeze([
+  {
+    label: 'How security signals are found',
+    text: "The security checks read the same pages as the rest of the audit, with the same user agent: links and frames that the page's own markup hides, scripts and frames from other sites, spam terms, text in a writing system the site does not use, and the security headers of the start page. No other path is requested, nothing is tried against the site, and the crawler never pretends to be Google. Many hacks show their spam only to Google's crawler or to visitors who arrive from Google, so a clean result here does not prove that the site is clean; Search Console's Security issues report shows what Google found. Security headers protect visitors and are not Google ranking factors.",
+  },
+  {
+    label: 'What an outside audit cannot see',
+    text: 'Check these by hand: who has an admin account and whether each one is still needed; whether the files on the server match the versions you installed (core, plugins, themes); whether backups exist and can be restored; whether the software is up to date; and the Security issues and Manual actions reports in Search Console.',
+  },
+]);
+
 /**
- * @param {{pluginVersion: string, rulesVersion: string, vitals?: boolean, repo?: boolean}} run
+ * @param {{pluginVersion: string, rulesVersion: string, vitals?: boolean, repo?: boolean, security?: boolean}} run
  *   `vitals`: the run asked for Core Web Vitals, so the method says how they are measured.
  *   `repo`: the findings name source files, so the method says how those were found.
+ *   `security`: the run included the security module, so the method says what it can and cannot see.
  * @returns {{label: string, text: string}[]}
  */
-export function methodSections({ pluginVersion, rulesVersion, vitals = false, repo = false }) {
+export function methodSections({ pluginVersion, rulesVersion, vitals = false, repo = false, security = false }) {
   const vitalsMethod = {
     label: 'How Core Web Vitals are measured',
     text: 'Only a few pages are measured, because each test takes many seconds: the start page, then one page from each of the largest groups of similar pages. Google loads each of them once on an emulated mid-range phone (PageSpeed Insights); that is the lab data, and it changes from run to run. Field data is what real Chrome users on phones experienced over 28 days (Chrome UX Report); it exists only for sites and pages with enough visits, and collecting it needs a Google API key. The URLs of the measured pages are sent to Google.',
@@ -89,6 +118,7 @@ export function methodSections({ pluginVersion, rulesVersion, vitals = false, re
       label: 'How source files are found',
       text: "The audit ran against the project's own local server. The address of each finding is matched to the file that answers it: by the routing rules of the Next.js App Router, or by its path for plain HTML. The file says where a fix belongs. Everything a finding reports was measured on the page the server sent, never read from the source code.",
     }] : []),
+    ...(security ? SECURITY_METHOD : []),
     { label: 'How scores work', text: SCORE_NOTE },
     {
       label: 'What is not measured',

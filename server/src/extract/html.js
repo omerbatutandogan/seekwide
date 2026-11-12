@@ -1,6 +1,6 @@
 // HTML document → content fields of a PageRecord. Pure.
 
-/** @import { CanonicalRef, Heading, HreflangRef, ImageRecord, JsonLdBlock, LinkRecord } from '../types.js' */
+/** @import { CanonicalRef, Heading, HreflangRef, ImageRecord, JsonLdBlock, LinkRecord, PageSecurity } from '../types.js' */
 /** @import { DomNode } from './dom.js' */
 
 import { parse } from 'parse5';
@@ -11,6 +11,7 @@ import { clip, collapseWhitespace } from '../util/strings.js';
 import { isInternalUrl, normalizeUrl } from '../util/url.js';
 import { HTML_NS, MAX_LIST_CHARS, SVG_NS, attr, findBaseUrl, insecureUrl, isHtmlElement, lineOf, parsedPart, textChars, textOf, tokens } from './dom.js';
 import { parseJsonLd } from './jsonld.js';
+import { documentSecurity, emptySecurity } from './security.js';
 
 /** Script types a browser runs as JavaScript. */
 const SCRIPT_TYPES = new Set(['', 'text/javascript', 'module']);
@@ -71,6 +72,7 @@ const SPACE = Symbol('space');
  * @property {number} word_count
  * @property {string} text_hash
  * @property {string} text_excerpt
+ * @property {PageSecurity} security
  */
 
 /**
@@ -143,7 +145,7 @@ export function extractHtml(html, context) {
   const out = {
     html_lang: null, titles: [], meta_descriptions: [], meta_robots: [], canonicals: [], hreflang: [],
     headings: [], viewport: null, og: {}, twitter: {}, links: [], images: [], jsonld: [], mixed_content: [],
-    word_count: 0, text_hash: '', text_excerpt: '',
+    word_count: 0, text_hash: '', text_excerpt: '', security: emptySecurity(),
   };
   /** @type {string[]} */
   const text = [];
@@ -306,5 +308,8 @@ export function extractHtml(html, context) {
   out.word_count = visible.match(WORD)?.length ?? 0;
   out.text_hash = visible === '' ? '' : sha1Hex(visible.toLowerCase());
   out.text_excerpt = visible.slice(0, LIMITS.textExcerptChars);
+  out.security = documentSecurity(document, { baseUrl, siteHost: context.siteHost, includeSubdomains: context.includeSubdomains, links: out.links }, {
+    titles: out.titles, metaDescriptions: out.meta_descriptions, headings: out.headings, visibleText: visible,
+  });
   return out;
 }

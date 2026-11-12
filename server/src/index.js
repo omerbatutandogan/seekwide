@@ -10,7 +10,7 @@ import { createStdioServer } from './mcp/stdio.js';
 import { createTools } from './tools/index.js';
 
 const INSTRUCTIONS = [
-  'Seekwide audits a website for SEO and link problems with deterministic checks.',
+  'Seekwide audits a website for SEO and link problems, and for signs that it was hacked, with deterministic checks.',
   'Workflow: crawl_start → crawl_status (with wait_seconds) until done → audit_run → findings_query / page_get → report_render.',
   'audit_run also measures Core Web Vitals for a few pages through Google and names the pages it tested; it completes even when Google refuses.',
   'For the web project in the current folder: project_detect, then a crawl of its local server and audit_run with source_dir; fix_plan says which findings of that run a metadata fix exists for and where, and audit_run with verify_fixes says what became of them after the fix. The server never edits a project.',
