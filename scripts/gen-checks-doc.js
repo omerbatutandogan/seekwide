@@ -28,8 +28,11 @@ const NEEDS_TEXT = {
   image_files: 'the check of image files (requests to the image hosts)',
 };
 
-/** @param {string} value */
-const cell = (value) => value.replace(/\|/g, '\\|').replace(/</g, '&lt;').replace(/\s+/g, ' ').trim();
+/**
+ * A table cell. Backslashes are escaped first, so a backslash in the text cannot undo an escaped pipe.
+ * @param {string} value
+ */
+const cell = (value) => value.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/</g, '&lt;').replace(/\s+/g, ' ').trim();
 
 function render() {
   const checks = allChecks();

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { LIMITS } from '../../server/src/config.js';
 import { MAX_IMAGES } from '../../server/src/extract/html-elements.js';
 import { MAX_VIDEOS, MAX_VIDEO_EMBEDS, srcsetUrls, styleDeclarations, videoPlatform } from '../../server/src/extract/media.js';
 import { extractPage } from '../../server/src/extract/page.js';
@@ -191,12 +192,17 @@ test('video lists are capped, and a page of many images and long styles stays fa
   assert.equal(videos.length, MAX_VIDEOS);
   const embeds = page('<iframe src="https://player.vimeo.com/video/1"></iframe>'.repeat(MAX_VIDEO_EMBEDS + 10)).video_embeds;
   assert.equal(embeds.length, MAX_VIDEO_EMBEDS);
+  // More images than the cap: the list stops at the cap.
+  assert.equal(page('<img src="/a.jpg" alt="x">'.repeat(MAX_IMAGES + 500)).images.length, MAX_IMAGES);
+  // Long styles and srcsets, as many as fit in the largest body the crawler reads (LIMITS.maxBodyBytes):
+  // reading them must stay linear. A quadratic style or srcset parser takes far longer than the limit.
   const style = `style="${'/* x '.repeat(5000)}"`;
   const srcset = `srcset="${'/a.jpg 1x, '.repeat(5000)}"`;
-  const body = `<img src="/a.jpg" ${style} ${srcset} alt="x">`.repeat(MAX_IMAGES + 500);
+  const heavy = `<img src="/a.jpg" ${style} ${srcset} alt="x">`;
+  const count = Math.floor((LIMITS.maxBodyBytes - 100_000) / heavy.length);
   const start = cpuMs();
-  const record = page(body, `<link rel="preload" as="image" imagesrcset="${'/p.jpg 1x, '.repeat(5000)}">`);
+  const record = page(heavy.repeat(count), `<link rel="preload" as="image" imagesrcset="${'/p.jpg 1x, '.repeat(5000)}">`);
   const spent = cpuMs() - start;
-  assert.ok(record.images.length <= MAX_IMAGES);
+  assert.equal(record.images.length, count);
   assert.ok(spent < 8000, `took ${spent} ms of CPU time`);
 });
