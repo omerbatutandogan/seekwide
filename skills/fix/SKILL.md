@@ -46,7 +46,7 @@ Read `${CLAUDE_PLUGIN_ROOT}/references/fix.md` before you start. It has the rule
 - **What changed**: the files you edited or created, with the findings each change addressed. Say plainly that nothing was committed.
 - **What the re-audit found**, from `fix_verification`: how many fixes are closed, still open, replaced by another finding, or not verified, with the finding and file for each one that is not closed and its `detail`. Do not call a finding fixed unless its outcome is `closed`.
 - **What was left alone**: findings that could not be fixed safely, with the reason, and fixes the user declined.
-- **Scores** before and after, as measured. A dev server is not the live site: recommend auditing the deployed site after the change ships.
+- **Scores** before and after, as measured: the base run's are in `runs_list`, the new run's in the result of `audit_run`. A dev server is not the live site: recommend auditing the deployed site after the change ships.
 - **Report files**: the paths `report_render` returned.
 
 Do not promise rankings, traffic or inclusion in AI answers.
