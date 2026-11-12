@@ -149,3 +149,39 @@ test('nested boundaries with a long fallback are read in a bounded time', () => 
   // The first version took about 13 seconds of CPU here.
   assert.ok((used.user + used.system) / 1000 < 3000, `took ${(used.user + used.system) / 1000} ms of CPU time`);
 });
+
+// Review of the small fixes, 2026-11-12: shapes React never writes, places no visitor sees, ids an SVG element
+// takes, and React's table modes, all checked against the output of React 19.2.
+test('only an element React writes as a segment is revealed: a link or another element that is itself hidden is not', () => {
+  for (const segment of ['<a hidden id="S:3" href="https://spam.test/">pills</a>', '<p hidden id="S:3"><a href="https://spam.test/">pills</a></p>', '<section hidden id="S:3"><a href="https://spam.test/">pills</a></section>']) {
+    assert.deepEqual(hiddenHosts(`${placeholder}${segment}<script>${RUNTIME};$RC("B:3","S:3")</script>`), ['spam.test'], segment);
+  }
+});
+
+test('React\'s table modes count: the <table hidden> around a segment\'s <tbody> or <tr>, or the table itself', () => {
+  const slot = '<table><tbody><tr><td><a href="/a">A</a></td></tr><!--$?--><template id="B:3"></template><!--/$--></tbody></table>';
+  const row = '<tr><td><a href="https://row.partner.test/">row</a></td></tr>';
+  for (const segment of [`<table hidden><tbody id="S:3">${row}</tbody></table>`, `<table hidden>${row.replace('<tr>', '<tr id="S:3">')}</table>`, `<table hidden id="S:3"><tbody>${row}</tbody></table>`]) {
+    assert.deepEqual(hiddenHosts(`${slot}${segment}<script>${RUNTIME};$RC("B:3","S:3")</script>`), [], segment);
+    assert.deepEqual(hiddenHosts(`${slot}${segment}`), ['row.partner.test'], 'without the call it stays hidden');
+  }
+  assert.deepEqual(hiddenHosts(`${slot}<table><tbody id="S:3">${row}</tbody></table><div hidden><script>${RUNTIME};$RC("B:3","S:3")</script></div>`), [], 'a visible row needs no exemption');
+});
+
+test('a template in a place the page does not render (the head, a video\'s fallback) reveals nothing', () => {
+  const call = `<script>${RUNTIME};$RC("B:3","S:3")</script>`;
+  const page = (head, body) => extractHtml(`<!doctype html><html lang="en"><head><title>T</title>${head}</head><body>${body}</body></html>`, {
+    responseUrl: 'https://www.example.test/', siteHost: 'www.example.test', includeSubdomains: false,
+  }).security?.hidden_links.map((link) => link.host);
+  assert.deepEqual(page('<!--$?--><template id="B:3"></template><!--/$-->', `${footer}${call}`), ['community.partner.test']);
+  for (const tag of ['video', 'canvas', 'object']) {
+    assert.deepEqual(hiddenHosts(`<${tag}><!--$?--><template id="B:3"></template><!--/$--></${tag}>${footer}${call}`), ['community.partner.test'], tag);
+  }
+  assert.deepEqual(hiddenHosts(`<div><!--$?--><template id="B:3"></template><!--/$--></div>${footer}${call}`), [], 'in the body it is revealed');
+});
+
+test('an earlier SVG element with the segment\'s id is the one the script finds, so the segment stays hidden', () => {
+  const call = `<script>${RUNTIME};$RC("B:3","S:3")</script>`;
+  assert.deepEqual(hiddenHosts(`<svg><g id="S:3"></g></svg>${placeholder}${footer}${call}`), ['community.partner.test']);
+  assert.deepEqual(hiddenHosts(`${placeholder}${footer}${call}<svg><g id="S:3"></g></svg>`), [], 'a later one changes nothing');
+});

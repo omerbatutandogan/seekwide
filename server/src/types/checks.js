@@ -119,7 +119,9 @@ export {};
 
 /**
  * @typedef {Object} ModuleScore
- * @property {number|null} score        0–100, or null when nothing could be scored.
+ * @property {number|null} score        0–100, or null when nothing could be scored, and always for a score given as a count.
+ * @property {{passed: number, of: number}|null} [count]  Only for a score given as a count (`COUNTED_SCORES`): of the
+ *   scored checks that looked at a unit (`of`), how many passed every unit (`passed`); null when none did.
  * @property {number} coverage          Share of the module's checks that ran, 0–1 with two decimals.
  * @property {number} checks_total
  * @property {number} checks_run

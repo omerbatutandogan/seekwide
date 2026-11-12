@@ -81,6 +81,8 @@ export {};
  * @property {string} created_at
  * @property {string} start_url
  * @property {Record<string, number|null>} scores
+ * @property {Record<string, {passed: number, of: number}>} [counts]  The scores given as a count (`ModuleScore.count`) that
+ *   counted something; absent when none did.
  * @property {number} findings
  */
 

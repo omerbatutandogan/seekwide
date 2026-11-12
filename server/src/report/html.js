@@ -84,8 +84,8 @@ function scores(r) {
   const body =
     r.scores.length === 0
       ? html`<p>No module was scored.</p>`
-      : html`<table><thead><tr><th>Module</th><th>Score</th><th class="n">Coverage</th><th class="n">Checks run</th></tr></thead><tbody>
-${r.scores.map((s) => html`<tr><td>${s.label}</td>${s.score === null ? (s.note ? html`<td class="nt">${s.note}</td>` : html`<td>n/a</td>`) : html`<td><b>${s.score}</b> / 100<span class="bar"><i style="width:${s.score}%"></i></span></td>`}<td class="n">${Math.round(s.coverage * 100)}%</td><td class="n">${s.checksRun} of ${s.checksTotal}${s.checksSkipped > 0 ? ` (${s.checksSkipped} skipped)` : ''}</td></tr>`)}
+      : html`<table><thead><tr><th>Module</th><th>Result</th><th class="n">Coverage</th><th class="n">Checks run</th></tr></thead><tbody>
+${r.scores.map((s) => html`<tr><td>${s.label}</td>${s.counted !== null ? html`<td>${s.counted}</td>` : s.score === null ? (s.note ? html`<td class="nt">${s.note}</td>` : html`<td>n/a</td>`) : html`<td><b>${s.score}</b> / 100<span class="bar"><i style="width:${s.score}%"></i></span></td>`}<td class="n">${Math.round(s.coverage * 100)}%</td><td class="n">${s.checksRun} of ${s.checksTotal}${s.checksSkipped > 0 ? ` (${s.checksSkipped} skipped)` : ''}</td></tr>`)}
 </tbody></table><p class="meta">${SCORE_NOTE}</p>`;
   return html`<section id="scores"><h2>Scores</h2>${body}</section>`;
 }
@@ -179,7 +179,7 @@ function changeList(list, heading) {
 function changes(r) {
   const c = r.comparison;
   if (c === null) return '';
-  const rows = c.scores.map((s) => html`<tr><td>${s.label}</td><td class="n">${scoreText(s.from)}</td><td class="n">${scoreText(s.to)}</td><td class="n">${s.delta === null ? 'n/a' : `${s.delta > 0 ? '+' : ''}${s.delta}`}</td></tr>`);
+  const rows = c.scores.map((s) => html`<tr><td>${s.label}</td><td class="n">${s.fromText ?? scoreText(s.from)}</td><td class="n">${s.toText ?? scoreText(s.to)}</td><td class="n">${s.delta === null ? 'n/a' : `${s.delta > 0 ? '+' : ''}${s.delta}`}</td></tr>`);
   return html`<section id="changes"><h2>Changes since the previous run</h2>
 <p>Compared with run <code>${c.baseRunId}</code>.</p>
 <div class="figs"><div class="fig"><b>${c.resolved.total}</b><span>Resolved</span></div><div class="fig"><b>${c.added.total}</b><span>New</span></div><div class="fig"><b>${c.persisting}</b><span>Still present</span></div></div>

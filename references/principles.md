@@ -19,7 +19,7 @@ Each module (SEO, links, security, media) gets a score from 0 to 100.
 - Checks that could not run, and checks with nothing to look at, are left out of the average. That includes the Core Web Vitals checks when Google gave no data.
 - A module gets no score when none of its scored checks had anything to look at, for example when the site blocked the crawl on its first page. The result then says why instead of showing a number.
 
-The security module has two scores: `security` for the signs of a hack and `security_headers` for the start page's security headers, each with its own coverage. The headers protect visitors and say nothing about whether the site was hacked, so a clean site with headers missing is not shown as insecure.
+The security module has two results, each with its own coverage: `security`, a score for the signs of a hack, and `security_headers`, a count of the recommended security headers the start page sets ("0 of 3 recommended headers set"). The headers protect visitors and say nothing about whether the site was hacked, so a clean site with headers missing is not shown as insecure. They are counted rather than scored because three checks of one page make a poor percentage: "0/100" read like a verdict on the site, while the count says what was measured.
 
 **Coverage** is the share of a module's checks that ran. A score of 90 with 60% coverage says less than a score of 80 with full coverage, so the two are always shown together. A skipped check lists its reason, for example "needs a complete crawl".
 

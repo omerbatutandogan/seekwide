@@ -8,10 +8,12 @@
 
 import { LIMITS } from '../config.js';
 import { clip } from '../util/strings.js';
+import { siteLabel } from '../util/site-name.js';
 import { hostKey, isInternalUrl, normalizeUrl } from '../util/url.js';
 import { VISIBLE, combineStates, concealments, enterElement, tinyFrame } from './concealment.js';
 import { HTML_NS, attr, isHtmlElement, lineOf } from './dom.js';
 import { metaReferrerPolicy } from './security-headers.js';
+import { isShareLink } from './share-links.js';
 
 /**
  * Most hosts with hidden links kept per page; each keeps its first link and a
@@ -40,8 +42,6 @@ const DATA_TARGETS = new Set([
   'data-target', 'data-bs-target', 'data-toggle-target', 'data-tab', 'data-tab-target', 'data-src', 'data-modal', 'data-modal-target',
   'data-popup', 'data-open', 'data-reveal-id', 'data-micromodal-trigger', 'data-controls', 'data-panel', 'data-fancybox-src',
 ]);
-/** Second-level labels under which country domains register names (example.co.uk, example.com.tr). */
-const SECOND_LEVEL = new Set(['co', 'com', 'net', 'org', 'gov', 'edu', 'ac', 'or', 'ne', 'go', 'gob', 'nic', 'mil', 'ltd', 'plc', 'biz', 'info']);
 
 /**
  * @typedef {Object} ScanContext
@@ -105,27 +105,12 @@ function referencedIds(node) {
 }
 
 /**
- * The label a site registers its name under: `acme` for acme.com, acme.de,
- * shop.acme.co.uk. Null for an address without one (an IP, localhost).
- * @param {string} host  A `hostKey`, possibly with a port.
- * @returns {string|null}
- */
-export function siteLabel(host) {
-  const name = host.replace(/:\d+$/, '').replace(/\.$/, '');
-  if (/^[\d.]+$/.test(name) || name.startsWith('[')) return null;
-  const labels = name.split('.');
-  if (labels.length < 2) return null;
-  const tld = /** @type {string} */ (labels.at(-1));
-  const second = /** @type {string} */ (labels.at(-2));
-  if (labels.length >= 3 && tld.length === 2 && SECOND_LEVEL.has(second)) return /** @type {string} */ (labels.at(-3));
-  return second;
-}
-
-/**
  * True for a link to another domain of the same organisation (the same
- * registered label under another ending: acme.com and acme.de), or for a
- * share link, whose query carries the address of the audited site
- * (`facebook.com/sharer?u=https://acme.com/post`). Neither is a sign of a hack.
+ * registered name under another ending: acme.com and acme.de; `siteLabel`,
+ * which keeps each customer of a shared hosting domain apart), or for a share
+ * link of the site on a known share or messaging service
+ * (`facebook.com/sharer?u=https://acme.com/post`, `isShareLink`). Neither is a
+ * sign of a hack.
  * @param {string} url
  * @param {string} host  `hostKey` of the URL.
  * @param {ScanContext} context
@@ -134,16 +119,7 @@ export function siteLabel(host) {
 function ownSite(url, host, context) {
   const own = siteLabel(hostKey(context.siteHost));
   if (own !== null && siteLabel(host) === own) return true;
-  const query = url.indexOf('?');
-  if (query < 0) return false;
-  let decoded = url.slice(query + 1);
-  try {
-    decoded = decodeURIComponent(decoded);
-  } catch {
-    // Matched as it is.
-  }
-  const siteName = hostKey(context.siteHost).replace(/:\d+$/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`(?:^|[^a-z0-9.-])(?:www\\.)?${siteName}(?:[^a-z0-9.-]|$)`).test(decoded.toLowerCase());
+  return isShareLink(url, host, hostKey(context.siteHost));
 }
 
 /**

@@ -32,6 +32,10 @@ const DEFINITION = /^(?:\$R([CRS])\s*=\s*function\b|function\s+\$R([CRS])\s*\()/
 const CALL = /^\$R([CRS])\(\0(\d+)\0,\0(\d+)\0[,)]/;
 /** Comments that open a Suspense boundary: completed, pending, client-rendered. */
 const OPENERS = new Set(['$', '$?', '$!']);
+/** The elements that carry a segment's id inside `<table hidden>` in React's table modes. */
+const TABLE_SEGMENTS = new Set(['tbody', 'tr', 'colgroup']);
+/** Elements whose content a page does not render (fallback content, the head): content moved there is never seen. */
+const UNRENDERED = new Set(['head', 'canvas', 'video', 'audio', 'object', 'datalist']);
 
 /**
  * @typedef {Object} StreamedBoundaries
@@ -149,6 +153,24 @@ function readScript(source, order, defined, calls) {
 }
 
 /**
+ * The element whose `hidden` attribute keeps a streamed segment out of view,
+ * when the element with the segment's id is one React writes: `<div hidden>`,
+ * or in its table modes `<table hidden>` itself or the `<table hidden>` around
+ * a `<tbody>`, `<tr>` (with the `<tbody>` the parser adds) or `<colgroup>`.
+ * Null for any other element: React's script moves only a segment's children,
+ * so a link that is itself the hidden element is never shown.
+ * @param {DomNode} node  An HTML element with an id.
+ * @returns {DomNode|null}
+ */
+function segmentOf(node) {
+  if ((node.tagName === 'div' || node.tagName === 'table') && attr(node, 'hidden') !== null) return node;
+  if (!TABLE_SEGMENTS.has(node.tagName ?? '')) return null;
+  let table = node.parentNode;
+  if (node.tagName === 'tr' && table && isHtmlElement(table, 'tbody')) table = table.parentNode;
+  return table && isHtmlElement(table, 'table') && attr(table, 'hidden') !== null ? table : null;
+}
+
+/**
  * The fallback of a pending boundary: the siblings after its template up to
  * the comment that closes the boundary, nested boundaries counted. Null when
  * the template does not follow `<!--$?-->`, the boundary is never closed, or
@@ -180,8 +202,10 @@ function fallbackOf(template, budget) {
  * Find React's streamed boundaries in a parsed document.
  *
  * A hidden element counts as revealed when all of this holds, as React writes
- * it: it has the `hidden` attribute and an id; an empty `<template>` with the
- * other id of the call comes before it in the document; and after it an inline
+ * it: it is a segment of React's shape (`segmentOf`); an empty `<template>`
+ * with the other id of the call comes before it in the document, in a place
+ * the page renders (not in `<head>` or in the fallback content of a
+ * `<video>`, `<canvas>` and the like); and after it an inline
  * script of a JavaScript type, not `nomodule`, has as a top-level statement a
  * call of `$RC` or `$RR` (the template's id, then the element's) or `$RS` (the
  * element's id, then the template's), with that function defined by a
@@ -189,7 +213,8 @@ function fallbackOf(template, budget) {
  * insides of string literals do not count. For `$RC` and `$RR` the template
  * must also follow a `<!--$?-->` comment and the boundary must be closed by
  * `<!--/$-->`; the nodes in between are the fallback the call replaces. When
- * ids repeat, the first element with the id counts, as for `getElementById`.
+ * ids repeat, the first element with the id counts, as for `getElementById`,
+ * whatever its namespace (an earlier SVG element takes the id).
  * @param {DomNode} document
  * @returns {StreamedBoundaries}
  */
@@ -205,28 +230,32 @@ export function streamedBoundaries(document) {
   /** Every id seen, for the first-element rule; bounded by the parsed tags of a page. @type {Set<string>} */
   const seen = new Set();
   let order = 0;
-  /** @type {DomNode[]} */
-  const stack = [document];
+  /** Each node with whether it is inside an element whose content is not rendered. @type {{node: DomNode, unrendered: boolean}[]} */
+  const stack = [{ node: document, unrendered: false }];
   while (stack.length > 0) {
-    const node = /** @type {DomNode} */ (stack.pop());
-    if (node.tagName && node.namespaceURI === HTML_NS) {
-      order += 1;
+    const { node, unrendered } = /** @type {{node: DomNode, unrendered: boolean}} */ (stack.pop());
+    let inside = unrendered;
+    if (node.tagName) {
       const id = attr(node, 'id');
-      if (id !== null && id !== '' && id.length <= MAX_ID_CHARS && !seen.has(id)) {
-        seen.add(id);
-        if (node.tagName === 'template' && (node.content?.childNodes ?? []).length === 0) {
-          if (templates.size < MAX_REMEMBERED) templates.set(id, { node, order });
-        } else if (attr(node, 'hidden') !== null && hidden.size < MAX_REMEMBERED) {
-          hidden.set(id, { node, order });
+      const first = id !== null && id !== '' && id.length <= MAX_ID_CHARS && !seen.has(id);
+      if (first) seen.add(/** @type {string} */ (id));
+      if (node.namespaceURI === HTML_NS) {
+        order += 1;
+        inside = unrendered || UNRENDERED.has(node.tagName);
+        if (first && node.tagName === 'template') {
+          if (!unrendered && (node.content?.childNodes ?? []).length === 0 && templates.size < MAX_REMEMBERED) templates.set(/** @type {string} */ (id), { node, order });
+        } else if (first) {
+          const segment = segmentOf(node);
+          if (segment !== null && hidden.size < MAX_REMEMBERED) hidden.set(/** @type {string} */ (id), { node: segment, order });
         }
-      }
-      const type = (attr(node, 'type') ?? '').split(';', 1)[0].trim().toLowerCase();
-      if (isHtmlElement(node, 'script') && attr(node, 'src') === null && attr(node, 'nomodule') === null && JS_TYPE.test(type)) {
-        readScript((node.childNodes ?? []).map((child) => child.value ?? '').join(''), order, defined, calls);
+        const type = (attr(node, 'type') ?? '').split(';', 1)[0].trim().toLowerCase();
+        if (isHtmlElement(node, 'script') && attr(node, 'src') === null && attr(node, 'nomodule') === null && JS_TYPE.test(type)) {
+          readScript((node.childNodes ?? []).map((child) => child.value ?? '').join(''), order, defined, calls);
+        }
       }
     }
     const children = node.childNodes ?? [];
-    for (let i = children.length - 1; i >= 0; i -= 1) stack.push(children[i]);
+    for (let i = children.length - 1; i >= 0; i -= 1) stack.push({ node: children[i], unrendered: inside });
   }
 
   /** @type {StreamedBoundaries} */

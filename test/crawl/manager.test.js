@@ -176,13 +176,14 @@ test('blocked crawls have stored results too', async () => {
   assert.ok(blocked.result);
 });
 
-test('a site that refuses connections, including for robots.txt, is blocked as robots_unreachable', async () => {
+test('a local site that refuses connections, including for robots.txt, fails: nothing answered there', async () => {
   const closed = await startServer({});
   const url = `${closed.origin}/`;
   await closed.close();
   const { job, result } = await crawl({ url, allowLoopback: true });
-  assert.equal(job?.status, 'blocked');
-  assert.deepEqual(result?.blocked, { reason: 'robots_unreachable', url: `${closed.origin}/robots.txt`, status: 0 });
+  assert.equal(job?.status, 'failed');
+  assert.match(String(job?.error), new RegExp(`^Nothing answered at ${closed.origin.replace(/[.]/g, '\\.')} \\(`));
+  assert.equal(result, null);
 });
 
 test('the last five results stay in memory; older ones come from disk', async () => {

@@ -4,7 +4,7 @@ Notable changes to Seekwide. Versions follow [semantic versioning](https://semve
 
 ## 0.1.0-alpha.1 (unreleased)
 
-First working version. Rule set 0.1.6.
+First working version. Rule set 0.1.7.
 
 Rule set 0.1.1 differs from 0.1.0, which only unreleased builds used, in two ways: a module score is 99 at most when a scored check has a failure, and the `aria-label` of an element inside a link (an SVG logo, an icon, an image) counts as the link's text.
 
@@ -75,6 +75,17 @@ An audit of 20 real sites (Next.js, WordPress, Shopify, static documentation, a 
 - The report of a crawl blocked before any page was read opens with that fact instead of "found no problems", and does not count checks that had nothing to look at. A start URL that redirects to a login or password page, and a start page with no links and almost no text (an empty JavaScript shell), get a note in the report and in `audit_run`. A sitemap the site refuses (401, 403, 429) is not reported as broken; the note and the skip reasons say it was refused. "1 other page has", not "have"; a canonical target that redirects is described by where it leads, not as a page that is not HTML.
 - The security module has two scores: `security` for signs of a hack and `security_headers` for the start page's headers, which protect visitors and say nothing about a hack. A clean site with missing headers keeps a security score of 100.
 - `security.embeds.rare_host` needs a crawl of 50 pages or more (on 25 pages every embed on one page is "rare") and leaves out the site's own host and its subdomains. A finding with a single hidden link says that it can be the site's own, such as a partner's logo in a block no longer shown, and the recommendation names that case before the hack.
+
+### Fixed before the release
+
+Rule set 0.1.7 differs from 0.1.6 in the first four of these.
+
+- **Security headers are a count, not a score.** A site that sends none of the three scored headers got "Security headers 0/100" (example.com did), which reads as a verdict on the site. The result is now "0 of 3 recommended headers set" (2 on an http site, where Strict-Transport-Security does not apply): `security_headers` has `score: null`, a `count` (`passed` of `of`) and a note that says it in words, in `audit_run`, both report formats, the run index, the comparison of two runs and the skills. Runs stored earlier keep their score.
+- **A spam link on another customer's host of a shared hosting service counts.** `security.hidden.external_link` treated every host under the same registered name as the site's own, so on acme.vercel.app a hidden link to spam.vercel.app, and on vercel.com one to any `*.vercel.app`, was never reported. Under the shared hosting domains of the Public Suffix List's private section (`vercel.app`, `netlify.app`, `github.io`, `myshopify.com`, `wixsite.com`, `blogspot.com`, `pages.dev`, `herokuapp.com` and 20 more), only the site's own host and its subdomains are its own. The media module compares image hosts the same way. The rule that makes acme.de the same organisation as acme.com stays: on the 205 saved validation pages it made no hidden link the site's own.
+- **A link that names the site in its query is no longer a share link by that alone.** Any link whose query named the audited site was left out of `security.hidden.external_link`, so an injected `spam.test/pills?ref=acme.com` or `?u=https://acme.com/` hid. A share link now has to go to a known share or messaging service (Facebook, X, LinkedIn, Pinterest, WhatsApp, Telegram, Reddit, Tumblr, VK, Mastodon Share; the list and its sources are in `CHECKS-SPEC.md`) and name the site. On the 205 saved validation pages no finding was added or removed.
+- React's streaming exemption is read as React writes it: only a `<div hidden>` or `<table hidden>` segment (React's table modes included, which were reported as hidden links), and only when the content lands in a place the page renders and no earlier element, SVG included, has the segment's id. A link that was itself the hidden element, or content moved into `<head>` or a video's fallback, took the exemption although no visitor sees it.
+- A crawl of a local address where nothing answers (the dev server is not running, or listens on another port) ends as `failed` with "Nothing answered at http://127.0.0.1:3000 (…). Check that the dev server is running and that the port is right." It ended as blocked, with "robots.txt could not be read". A public site keeps that result.
+- The gap through which a page can forge React's streaming runtime and keep a hidden block out of the hidden-link check is kept, and `CHECKS-SPEC.md` says why: each way of closing it that was measured either fell to one more statement of the forger's or brought the false alarms on nextjs.org and vercel.com back. The spam-term check reads such a block like the rest of the page, with its usual limits; a new test holds that.
 
 ### Security
 

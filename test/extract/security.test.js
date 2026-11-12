@@ -75,6 +75,20 @@ test('links to the same organisation under another domain, and share links, are 
 <a href="https://spam.test/?q=notexample.testing">spam</a></div></body>`), ['spam.test']);
 });
 
+test('on a shared hosting domain only the site\'s own host is its own: another customer, or the service, is another site', () => {
+  /** @param {string} site @param {string} href */
+  const hiddenOn = (site, href) => /** @type {PageSecurity} */ (extractPage(makeInput(
+    makeFetch({ url: `https://${site}/`, html: `<body><p>Hi</p><div style="display:none"><a href="${href}">cheap pills</a></div></body>` }),
+    { siteHost: site },
+  )).security).hidden_links.map((link) => link.host);
+  assert.deepEqual(hiddenOn('acme.vercel.app', 'https://spam-pills.vercel.app/buy'), ['spam-pills.vercel.app']);
+  assert.deepEqual(hiddenOn('acme.github.io', 'https://casino.github.io/'), ['casino.github.io']);
+  assert.deepEqual(hiddenOn('vercel.com', 'https://spam-pills.vercel.app/'), ['spam-pills.vercel.app'], 'the service\'s own site does not own its customers');
+  assert.deepEqual(hiddenOn('acme.vercel.app', 'https://vercel.com/'), ['vercel.com']);
+  assert.deepEqual(hiddenOn('acme.vercel.app', 'https://preview.acme.vercel.app/'), [], 'a subdomain of the customer\'s host is its own');
+  assert.deepEqual(hiddenOn('acme.test', 'https://acme.ru/'), [], 'the same name under another ending stays the same organisation');
+});
+
 test('a plain button, link or id that only happens to match does not open what follows', () => {
   assert.deepEqual(hiddenHosts(`<body><footer><p>(c) Acme</p><a href="#" class="top">Top</a><div style="display:none">
 <a href="https://payday.test/">payday loans</a></div><button class="top">Up</button><div style="display:none"><a href="https://followers.test/">buy followers</a></div>

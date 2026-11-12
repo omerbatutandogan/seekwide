@@ -6,6 +6,7 @@
 /** @import { ToolDef } from '../mcp/stdio.js' */
 /** @import { ProjectPaths } from '../store/project.js' */
 /** @import { ProjectSources } from '../repo/sources.js' */
+/** @import { ScoreChange } from '../store/compare.js' */
 
 import { auditTools } from './audit.js';
 import { projectTools } from './project.js';
@@ -22,7 +23,7 @@ import { runTools } from './runs.js';
  * @property {Finding[]} resolved
  * @property {Finding[]} added
  * @property {number} persisting
- * @property {Record<string, {from: number|null, to: number|null, delta: number|null}>} scores
+ * @property {Record<string, ScoreChange>} scores
  * @property {string[]} notes
  */
 

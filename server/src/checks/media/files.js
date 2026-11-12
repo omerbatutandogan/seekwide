@@ -1,7 +1,7 @@
 /** @import { CheckContext, CheckDef, CheckResult, ImageFileResult } from '../../types.js' */
 /** @import { FileUse } from './select.js' */
 
-import { siteLabel } from '../../extract/security-scan.js';
+import { siteLabel } from '../../util/site-name.js';
 import { clip } from '../../util/strings.js';
 import { hostKey } from '../../util/url.js';
 import { DOCS, MEDIA, attributeSelector, imageName } from './helpers.js';
@@ -31,7 +31,8 @@ function negotiates(vary) {
 
 /**
  * True when an image URL is on the audited site: the site's own host, or the same registered name (`acme` in
- * acme.com, cdn.acme.com and acme.co.uk), so its robots.txt is the owner's to change.
+ * acme.com, cdn.acme.com and acme.co.uk; a customer's own host under a shared hosting domain, `siteLabel`), so its
+ * robots.txt is the owner's to change.
  * @param {string} url
  * @param {string} siteHost
  */

@@ -39,11 +39,18 @@ export function isRunShape(value) {
 export function entryFromRun(run) {
   /** @type {Record<string, number|null>} */
   const scores = {};
+  /** @type {Record<string, {passed: number, of: number}>} */
+  const counts = {};
   for (const name of Object.keys(run.modules).sort()) {
     const score = run.modules[name]?.score;
     scores[name] = typeof score === 'number' ? score : null;
+    const count = run.modules[name]?.count;
+    if (count) counts[name] = { passed: count.passed, of: count.of };
   }
-  return { run_id: run.run_id, created_at: run.created_at, start_url: run.start_url, scores, findings: run.findings.length };
+  return {
+    run_id: run.run_id, created_at: run.created_at, start_url: run.start_url, scores,
+    ...(Object.keys(counts).length > 0 ? { counts } : {}), findings: run.findings.length,
+  };
 }
 
 /**

@@ -77,7 +77,7 @@ export const SUMMARY_NOTE = 'Written summary (interpretation, not scored). The m
 
 export const SCORE_NOTE =
   'A score is the weighted pass rate, from 0 to 100, of the checks that ran; 100 means no scored check found a failure. Coverage is the share of the module\'s checks that ran. Checks that did not run and informational checks do not change a score. ' +
-  'The security module has two scores: Security for signs that the site was hacked, and Security headers for the response headers of the start page, which protect visitors and say nothing about a hack.';
+  'The security module has two results: Security, a score for signs that the site was hacked, and Security headers, a count of the recommended response headers the start page sets (Strict-Transport-Security on https, nosniff and protection against framing), which protect visitors and say nothing about a hack.';
 
 export const CONFIDENCE_NOTE = 'Confirmed means a measured fact. Likely means a strong signal that can have a legitimate exception, so review it before acting.';
 

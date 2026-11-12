@@ -1,6 +1,7 @@
 /** @import { Run } from '../types.js' */
 /** @import { RunComparison } from '../store/compare.js' */
 
+import { countText } from '../checks/scoring.js';
 import { SEVERITIES } from '../config.js';
 import { clip, collapseWhitespace } from '../util/strings.js';
 import { methodSections, reportTitle } from './copy.js';
@@ -71,6 +72,29 @@ function readOptions(run, options) {
 const roundedOrNull = (value) => (typeof value === 'number' && Number.isFinite(value) ? Math.round(value) : null);
 
 /**
+ * A stored count of a score given as one, checked again: whole numbers, `passed` at most `of`. Null otherwise.
+ * @param {unknown} value
+ * @returns {{passed: number, of: number}|null}
+ */
+function viewCount(value) {
+  const { passed, of } = obj(value);
+  return Number.isSafeInteger(passed) && Number.isSafeInteger(of) && 0 <= /** @type {number} */ (passed) && /** @type {number} */ (passed) <= /** @type {number} */ (of)
+    ? { passed: /** @type {number} */ (passed), of: /** @type {number} */ (of) }
+    : null;
+}
+
+/**
+ * The text of a score that is given as a count, or null for a score of 0 to 100.
+ * @param {string} name
+ * @param {unknown} value
+ * @returns {string|null}
+ */
+function countView(name, value) {
+  const count = viewCount(value);
+  return count === null ? null : countText(name, count);
+}
+
+/**
  * @param {RunComparison} comparison
  */
 function viewComparison(comparison) {
@@ -84,7 +108,11 @@ function viewComparison(comparison) {
     added: changeList(list(comparison.added).map(viewFinding)),
     scores: orderModules(Object.keys(scores)).map((name) => {
       const entry = obj(scores[name]);
-      return { label: moduleLabel(name), from: roundedOrNull(entry.from), to: roundedOrNull(entry.to), delta: roundedOrNull(entry.delta) };
+      return {
+        label: moduleLabel(name), from: roundedOrNull(entry.from), to: roundedOrNull(entry.to), delta: roundedOrNull(entry.delta),
+        // A score given as a count is shown as the count ("2 of 3 recommended headers set").
+        fromText: countView(name, entry.from_count), toText: countView(name, entry.to_count),
+      };
     }),
     notes: list(comparison.notes).filter((note) => typeof note === 'string').map((note) => clip(note, 600)),
   };
@@ -97,17 +125,20 @@ function viewScores(run) {
   const modules = obj(run.modules);
   return orderModules(Object.keys(modules)).map((name) => {
     const m = obj(modules[name]);
-    const score = typeof m.score === 'number' && Number.isFinite(m.score) ? Math.min(100, Math.max(0, Math.round(m.score))) : null;
+    const counted = countView(name, m.count);
+    const score = counted === null && typeof m.score === 'number' && Number.isFinite(m.score) ? Math.min(100, Math.max(0, Math.round(m.score))) : null;
     return {
       module: name,
       label: moduleLabel(name),
       score,
+      // A score given as a count ("0 of 3 recommended headers set"), shown instead of a number out of 100.
+      counted,
       coverage: Math.min(1, Math.max(0, num(m.coverage))),
       checksRun: num(m.checks_run),
       checksTotal: num(m.checks_total),
       checksSkipped: num(m.checks_skipped),
       // Why there is no score. Runs stored before the note existed have none.
-      note: score === null ? text(m.note) || null : null,
+      note: score === null && counted === null ? text(m.note) || null : null,
     };
   });
 }
@@ -154,7 +185,7 @@ export function buildReport(run, options = {}) {
       findings: findings.length,
       checksWithFindings: groups.length,
       severityCounts,
-      scores: scores.map(({ label, score }) => ({ label, score })),
+      scores: scores.map(({ label, score, counted }) => ({ label, score, counted })),
       truncated: crawl.truncated === true,
       timeLimited: crawl.time_limit_reached === true,
       blocked,

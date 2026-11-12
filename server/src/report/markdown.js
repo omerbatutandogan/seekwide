@@ -103,11 +103,11 @@ function scores(r) {
   if (r.scores.length === 0) return [...lines, 'No module was scored.', ''];
   const rows = r.scores.map((s) => [
     mdText(s.label),
-    s.score === null ? (s.note ? mdText(s.note) : 'n/a') : `${s.score} / 100`,
+    s.counted !== null ? mdText(s.counted) : s.score === null ? (s.note ? mdText(s.note) : 'n/a') : `${s.score} / 100`,
     `${Math.round(s.coverage * 100)}%`,
     `${s.checksRun} of ${s.checksTotal}${s.checksSkipped > 0 ? ` (${s.checksSkipped} skipped)` : ''}`,
   ]);
-  return [...lines, ...table(['Module', 'Score', 'Coverage', 'Checks run'], rows), '', `*${mdText(SCORE_NOTE)}*`, ''];
+  return [...lines, ...table(['Module', 'Result', 'Coverage', 'Checks run'], rows), '', `*${mdText(SCORE_NOTE)}*`, ''];
 }
 
 /** @param {Report} r */
@@ -198,7 +198,7 @@ function changes(r) {
   const lines = ['## Changes since the previous run', '', `Compared with run ${mdCode(c.baseRunId)}.`, ''];
   lines.push(`- **Resolved:** ${plural(c.resolved.total, 'finding')}`, `- **New:** ${plural(c.added.total, 'finding')}`, `- **Still present:** ${c.persisting}`, '');
   if (c.scores.length > 0) {
-    const rows = c.scores.map((s) => [mdText(s.label), scoreText(s.from), scoreText(s.to), s.delta === null ? 'n/a' : `${s.delta > 0 ? '+' : ''}${s.delta}`]);
+    const rows = c.scores.map((s) => [mdText(s.label), mdText(s.fromText ?? scoreText(s.from)), mdText(s.toText ?? scoreText(s.to)), s.delta === null ? 'n/a' : `${s.delta > 0 ? '+' : ''}${s.delta}`]);
     lines.push(...table(['Module', 'Before', 'Now', 'Change'], rows), '');
   }
   lines.push(...changeSection(c, 'resolved', 'Resolved'), ...changeSection(c, 'added', 'New'));

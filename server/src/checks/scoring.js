@@ -1,6 +1,17 @@
 /** @import { CheckDef, CheckStat, ModuleScore } from '../types.js' */
 
-import { MODULES } from '../config.js';
+import { COUNTED_SCORES, MODULES } from '../config.js';
+
+/**
+ * How a score given as a count reads: "0 of 3 recommended headers set".
+ * @param {string} name  A key of `COUNTED_SCORES`.
+ * @param {{passed: number, of: number}} count
+ * @returns {string}
+ */
+export function countText(name, count) {
+  const unit = /** @type {Record<string, string>} */ (COUNTED_SCORES)[name] ?? 'checks passed';
+  return `${count.passed} of ${count.of} ${unit}`;
+}
 
 /**
  * Score each module from its check statistics. A check with a `score_group`
@@ -20,6 +31,11 @@ import { MODULES } from '../config.js';
  * not move the score. `coverage` says how much of the module actually ran, so a
  * high score with low coverage is visible for what it is.
  *
+ * A score listed in `COUNTED_SCORES` is given as a count instead: `score` is
+ * null, `count` says how many of the scored checks that looked at a unit
+ * passed every unit, and `note` says so in words ("0 of 3 recommended headers
+ * set"). With nothing counted, `count` is null and `note` says why.
+ *
  * @param {CheckStat[]} stats
  * @param {CheckDef[]} checks  Definitions for every stat in `stats`.
  * @returns {Record<string, ModuleScore>}
@@ -27,11 +43,11 @@ import { MODULES } from '../config.js';
 export function scoreModules(stats, checks) {
   const weights = new Map(checks.map((check) => [check.id, check.weight]));
   const groups = new Map(checks.map((check) => [check.id, check.score_group ?? check.module]));
-  /** @type {Record<string, {total: number, run: number, skipped: number, weightedPass: number, weightSum: number, failures: boolean}>} */
+  /** @type {Record<string, {total: number, run: number, skipped: number, weightedPass: number, weightSum: number, failures: boolean, scored: number, passed: number}>} */
   const acc = {};
 
   for (const stat of stats) {
-    const m = (acc[groups.get(stat.id) ?? stat.module] ??= { total: 0, run: 0, skipped: 0, weightedPass: 0, weightSum: 0, failures: false });
+    const m = (acc[groups.get(stat.id) ?? stat.module] ??= { total: 0, run: 0, skipped: 0, weightedPass: 0, weightSum: 0, failures: false, scored: 0, passed: 0 });
     m.total += 1;
     if (stat.status !== 'run') {
       m.skipped += 1;
@@ -42,7 +58,9 @@ export function scoreModules(stats, checks) {
     if (weight > 0 && stat.applicable > 0) {
       m.weightedPass += weight * (stat.passed / stat.applicable);
       m.weightSum += weight;
+      m.scored += 1;
       if (stat.passed < stat.applicable) m.failures = true;
+      else m.passed += 1;
     }
   }
 
@@ -52,17 +70,22 @@ export function scoreModules(stats, checks) {
     const m = acc[name];
     const scored = m.weightSum > 0;
     const rounded = Math.round((100 * m.weightedPass) / m.weightSum);
+    const counted = Object.hasOwn(COUNTED_SCORES, name);
+    const count = counted && scored ? { passed: m.passed, of: m.scored } : null;
     modules[name] = {
-      score: scored ? (m.failures ? Math.min(rounded, 99) : rounded) : null,
+      score: scored && !counted ? (m.failures ? Math.min(rounded, 99) : rounded) : null,
+      ...(counted ? { count } : {}),
       coverage: m.total > 0 ? Math.round((100 * m.run) / m.total) / 100 : 0,
       checks_total: m.total,
       checks_run: m.run,
       checks_skipped: m.skipped,
-      note: scored
-        ? null
-        : m.run === 0
-          ? (MODULES.includes(name) ? 'None of this module\'s checks could run.' : 'None of the checks behind this score could run.')
-          : 'No score: the scored checks had nothing to look at in this crawl.',
+      note: count !== null
+        ? `${countText(name, count)}. A count, not a score.`
+        : scored
+          ? null
+          : m.run === 0
+            ? (MODULES.includes(name) ? 'None of this module\'s checks could run.' : 'None of the checks behind this score could run.')
+            : 'No score: the scored checks had nothing to look at in this crawl.',
     };
   }
   return modules;

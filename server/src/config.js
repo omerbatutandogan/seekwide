@@ -10,7 +10,7 @@ const pkg = JSON.parse(readFileSync(path.join(PLUGIN_ROOT, 'package.json'), 'utf
 export const VERSION = /** @type {string} */ (pkg.version);
 
 /** Version of the rule set. Bump it whenever a check changes what it reports. */
-export const RULES_VERSION = '0.1.6';
+export const RULES_VERSION = '0.1.7';
 
 /** Version of the JSON written under `.seekwide/`. */
 export const SCHEMA_VERSION = 1;
@@ -69,6 +69,15 @@ export const MODULES = Object.freeze(['seo', 'links', 'security', 'media']);
  * site is not read as insecure because of its headers alone.
  */
 export const SCORE_GROUPS = Object.freeze({ security_headers: 'security' });
+
+/**
+ * Scores given as a count of the scored checks that passed instead of 0–100,
+ * with what they count. The security headers are three checks of one page: as
+ * "0/100" a site without them read like a verdict on the site, while "0 of 3
+ * recommended headers set" says what was measured. Such a score is null and
+ * comes with `count` (`checks/scoring.js`).
+ */
+export const COUNTED_SCORES = Object.freeze({ security_headers: 'recommended headers set' });
 
 export const SEVERITIES = Object.freeze(['critical', 'high', 'medium', 'low', 'info']);
 

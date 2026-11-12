@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { LARGE_BYTES, LEGACY_MIN_BYTES } from '../../../server/src/checks/media/files.js';
-import { SITE } from '../../helpers/factories.js';
+import { SITE, makePage } from '../../helpers/factories.js';
 import { audit, findingsFor, imageFile, mediaImage, mediaPage, statFor } from './support.js';
 
 const BROKEN = 'media.image.broken';
@@ -129,6 +129,18 @@ test(`${ROBOTS} counts only images on the site's own domain, whose robots.txt th
   });
   assert.deepEqual([statFor(result, ROBOTS).applicable, statFor(result, ROBOTS).failed], [1, 1]);
   assert.equal(findingsFor(result, ROBOTS)[0].selector, `img[src="${cdn}"]`);
+});
+
+test(`${ROBOTS} on a shared hosting domain counts only the site's own host, not another customer's or the service's`, () => {
+  const site = 'https://acme.vercel.app';
+  const own = `${site}/a.jpg`;
+  const others = ['https://photos.vercel.app/b.jpg', 'https://vercel.com/c.jpg'];
+  const result = audit([makePage({ url: `${site}/`, images: [own, ...others].map((url) => mediaImage({ src: url, url })) })], {
+    crawl: { start_url: `${site}/`, site_origin: site, site_host: 'acme.vercel.app' },
+    files: [own, ...others].map((url) => imageFile(url, { google: 'disallowed', google_agent: 'Googlebot', google_host: new URL(url).host })),
+  });
+  assert.deepEqual([statFor(result, ROBOTS).applicable, statFor(result, ROBOTS).failed], [1, 1]);
+  assert.equal(findingsFor(result, ROBOTS)[0].selector, `img[src="${own}"]`);
 });
 
 test(`${ROBOTS} leaves out a file shown only in the page's frame, such as a badge in the footer`, () => {

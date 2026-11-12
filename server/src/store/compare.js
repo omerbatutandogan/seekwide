@@ -1,13 +1,21 @@
 /** @import { Run, Finding } from '../types.js' */
 
 /**
+ * How one score changed. For a score given as a count (`ModuleScore.count`), `from_count` and `to_count` hold the
+ * counts (null for a run that has none, as before rule set 0.1.7), `from` and `to` are null, and `delta` is the change
+ * in how many passed.
+ * @typedef {{from: number|null, to: number|null, delta: number|null,
+ *   from_count?: {passed: number, of: number}|null, to_count?: {passed: number, of: number}|null}} ScoreChange
+ */
+
+/**
  * @typedef {Object} RunComparison
  * @property {string} base_run_id
  * @property {string} run_id
  * @property {Finding[]} resolved    In the base run, gone from the current run.
  * @property {Finding[]} added       In the current run, not in the base run.
  * @property {number} persisting     Findings present in both runs.
- * @property {Record<string, {from: number|null, to: number|null, delta: number|null}>} scores
+ * @property {Record<string, ScoreChange>} scores
  * @property {string[]} notes        Reasons the comparison may be unreliable.
  */
 
@@ -92,7 +100,15 @@ export function compareRuns(base, current) {
   for (const name of [...new Set([...Object.keys(base.modules), ...Object.keys(current.modules)])].sort()) {
     const from = base.modules[name]?.score ?? null;
     const to = current.modules[name]?.score ?? null;
-    scores[name] = { from, to, delta: from === null || to === null ? null : to - from };
+    const fromCount = base.modules[name]?.count;
+    const toCount = current.modules[name]?.count;
+    if (fromCount === undefined && toCount === undefined) {
+      scores[name] = { from, to, delta: from === null || to === null ? null : to - from };
+    } else {
+      // A score given as a count: compare the counts; delta is the change in how many passed.
+      const counts = { from_count: fromCount ?? null, to_count: toCount ?? null };
+      scores[name] = { from, to, ...counts, delta: counts.from_count && counts.to_count ? counts.to_count.passed - counts.from_count.passed : null };
+    }
   }
 
   return {

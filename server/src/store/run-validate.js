@@ -102,6 +102,17 @@ function findingProblem(finding) {
 const isScoreKey = (name) => MODULES.includes(name) || Object.hasOwn(SCORE_GROUPS, name);
 
 /**
+ * @param {unknown} count
+ * @returns {boolean} Absent, null, or the count of a score given as one: `passed` of `of`, whole numbers up to 1000.
+ */
+const isScoreCount = (count) => {
+  if (count === undefined || count === null) return true;
+  if (!isObject(count)) return false;
+  const { passed, of } = /** @type {Record<string, unknown>} */ (count);
+  return isCount(passed) && isCount(of) && /** @type {number} */ (passed) <= /** @type {number} */ (of) && /** @type {number} */ (of) <= 1000;
+};
+
+/**
  * @param {Record<string, unknown>} crawl
  * @returns {string|null}
  */
@@ -161,6 +172,7 @@ export function storedRunProblem(run) {
     if (!isScoreKey(name)) return 'modules';
     const score = /** @type {{score?: unknown}|null} */ (module)?.score;
     if (!isObject(module) || !(score === null || score === undefined || (typeof score === 'number' && Number.isFinite(score)))) return `modules.${name}.score`;
+    if (!isScoreCount(/** @type {{count?: unknown}} */ (module).count)) return `modules.${name}.count`;
   }
   const crawl = crawlProblem(/** @type {Record<string, unknown>} */ (run.crawl));
   if (crawl !== null) return crawl;
@@ -182,11 +194,13 @@ export function storedRunProblem(run) {
 
 /**
  * Whether an index entry has the plugin's form, so that `runs_list` returns
- * nothing but a run id, a date, an address, scores by module and a count.
+ * nothing but a run id, a date, an address, scores by module, the scores
+ * given as counts, and a count of findings.
  * @param {Record<string, unknown>} entry  A value with the keys of a RunIndexEntry.
  * @returns {boolean}
  */
 export function isStoredEntry(entry) {
   if (!isPastDate(entry.created_at) || !isStoredUrl(entry.start_url) || !isCount(entry.findings) || !isObject(entry.scores)) return false;
+  if (entry.counts !== undefined && !(isObject(entry.counts) && Object.entries(/** @type {object} */ (entry.counts)).every(([name, count]) => isScoreKey(name) && count !== null && isScoreCount(count)))) return false;
   return Object.entries(/** @type {object} */ (entry.scores)).every(([name, score]) => isScoreKey(name) && (score === null || (typeof score === 'number' && Number.isFinite(score))));
 }

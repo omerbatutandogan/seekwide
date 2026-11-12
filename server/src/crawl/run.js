@@ -16,6 +16,10 @@ import { createRequests } from './requests.js';
 
 const MAX_ROBOTS_BLOCKED = 200;
 const STRIKES = 3;
+/** Fetch errors after which no HTTP answer came back: the connection was refused or cut, or nothing answered in time. */
+const NO_ANSWER = new Set(['connection_error', 'timeout']);
+/** What to check when a server on this machine does not answer. */
+const DEV_SERVER_HINT = ' Check that the dev server is running and that the port is right.';
 
 /**
  * @typedef {Object} CrawlParams
@@ -133,7 +137,7 @@ export async function runCrawl(params, deps, onProgress) {
   const failure = (url, error) => {
     const hint = error.code === 'blocked_address'
       ? ' Seekwide audits public sites only; for a site on this machine, allow localhost explicitly.'
-      : ' Check the URL and that the site is reachable.';
+      : loopbackOrigin !== null && NO_ANSWER.has(error.code) ? DEV_SERVER_HINT : ' Check the URL and that the site is reachable.';
     return { status: 'failed', error: `Could not fetch ${url}: ${error.message} (${error.code}).${hint}` };
   };
   /** @param {string} url */
@@ -168,12 +172,17 @@ export async function runCrawl(params, deps, onProgress) {
   };
 
   // 1. robots.txt for the start origin. A host that cannot be resolved, or may
-  // not be contacted at all, is a failed crawl rather than a robots.txt problem.
+  // not be contacted at all, is a failed crawl rather than a robots.txt problem;
+  // so is a server on this machine that does not answer (a dev server not started
+  // yet, or another port).
   if (robots.summary.status === 'unreachable') {
     // robots.txt answered with a redirect to an address this crawl may not request: say where it led.
     if (robots.refusedRedirect !== null) return block('robots_unreachable', robots.summary.url, robots.summary.http_status, robots.refusedRedirect);
     const error = lastError(robots.summary.url);
     if (error && (error.code === 'blocked_address' || error.code === 'dns_error')) return failure(startUrl, error);
+    if (error && loopbackOrigin !== null && NO_ANSWER.has(error.code)) {
+      return { status: 'failed', error: `Nothing answered at ${loopbackOrigin} (${error.message}).${DEV_SERVER_HINT}` };
+    }
     return block('robots_unreachable', robots.summary.url, robots.summary.http_status);
   }
   if (!robots.isAllowed(startUrl)) return block('robots_disallow', startUrl, 0);

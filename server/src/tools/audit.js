@@ -162,7 +162,7 @@ export function auditTools(deps) {
         const blockedUnread = crawl.blocked !== null && ctx.htmlPages.length === 0;
         /** @type {Record<string, ModuleScore>} */
         const scores = blockedUnread
-          ? Object.fromEntries(Object.entries(result.modules).map(([name, score]) => [name, { ...score, score: null, note: BLOCKED_SCORE_NOTE }]))
+          ? Object.fromEntries(Object.entries(result.modules).map(([name, score]) => [name, { ...score, score: null, ...('count' in score ? { count: null } : {}), note: BLOCKED_SCORE_NOTE }]))
           : result.modules;
 
         /** @type {Run} */

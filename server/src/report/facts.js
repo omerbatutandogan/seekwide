@@ -84,7 +84,7 @@ export function describeShell(words) {
  * @param {{
  *   host: string, pages: number, htmlPages: number, indexablePages: number, maxPages: number,
  *   checksRun: number, checksTotal: number, findings: number, checksWithFindings: number,
- *   severityCounts: Record<string, number>, scores: {label: string, score: number|null}[],
+ *   severityCounts: Record<string, number>, scores: {label: string, score: number|null, counted?: string|null}[],
  *   truncated: boolean, timeLimited?: boolean, blocked: {reason: string, url: string, status: number}|null, unreadablePages: number,
  *   vitals?: string|null, startGate?: string|null, startShellWords?: number|null, nothingRead?: boolean,
  * }} facts  `vitals` is one sentence on the Core Web Vitals of the run, when they were asked for. `timeLimited`:
@@ -118,10 +118,13 @@ export function factualSummary(facts) {
     );
     paragraphs.push(`It recorded ${plural(facts.findings, 'finding')} across ${plural(facts.checksWithFindings, 'check')}: ${parts.join(', ')}.`);
   }
-  if (facts.scores.length > 0) {
-    const scored = facts.scores.map(({ label, score }) => (score === null ? `${label} could not be scored` : `${label} ${score}`));
+  const scores = facts.scores.filter(({ counted }) => !counted);
+  if (scores.length > 0) {
+    const scored = scores.map(({ label, score }) => (score === null ? `${label} could not be scored` : `${label} ${score}`));
     paragraphs.push(`Scores (pass rates of the checks that ran, 0 to 100): ${scored.join('; ')}.`);
   }
+  // A score given as a count says what it counts ("Security headers: 0 of 3 recommended headers set").
+  for (const { label, counted } of facts.scores) if (counted) paragraphs.push(`${label}: ${counted}.`);
   if (facts.vitals) paragraphs.push(facts.vitals);
   if (facts.blocked) paragraphs.push(`${describeBlock(facts.blocked)} These results are partial.`);
   if (facts.unreadablePages > 0) paragraphs.push(describeUnreadable(facts.unreadablePages));
