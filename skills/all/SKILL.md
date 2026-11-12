@@ -94,6 +94,7 @@ Lead with the state of the site in one or two sentences: what was audited (pages
 Then:
 
 - **Scores** per module, each with its coverage. Explain coverage when it is below 100%: some checks could not run, and the reason is in the result. A module without a score has `score: null` and a `note` that says why; give that reason instead of a number.
+- The security module has two scores, `security` (signs of a hack) and `security_headers` (the start page's headers). Give them as two lines; missing headers are not a sign of a hack.
 - **Core Web Vitals**: the measured pages and their values, field data first, each marked good, needs improvement or poor. When a source gave nothing, give its `reason` in a sentence.
 - **What to fix first**: up to seven items across the modules, with signs of a hack and problems that block indexing first. For each: the problem, how many pages it affects with one example URL, why it matters in a clause, and the fix. Findings with `confidence: likely` are worth checking by hand; say so.
 - **Suggestions** of your own, under their own heading.

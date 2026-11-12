@@ -41,6 +41,8 @@ export {};
  * @property {{observed?: unknown, expected?: unknown, detail?: string}} [evidence]
  * @property {string[]} [related_urls] Other URLs involved, for example the other pages with the same title (max 20).
  * @property {{type: string, snippet?: string}} [fix]
+ * @property {'likely'} [confidence]  Lowers this finding's confidence from the check's `confirmed` to `likely`, for a unit
+ *   with a known legitimate exception. A result never raises it.
  */
 
 /**
@@ -60,6 +62,8 @@ export {};
  * @property {string} doc_ref          Official documentation the rule is based on.
  * @property {string} last_verified    Date the rule was last checked against `doc_ref`, YYYY-MM-DD.
  * @property {string} recommendation   What to do about a failure, imperative mood.
+ * @property {'security_headers'} [score_group]  The score the check counts toward instead of its module's
+ *   (`SCORE_GROUPS`): the security header checks have a score of their own.
  * @property {(ctx: CheckContext) => CheckResult[]} run  Pure and deterministic. No I/O.
  */
 

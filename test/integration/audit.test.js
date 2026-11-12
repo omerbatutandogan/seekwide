@@ -222,8 +222,11 @@ test('scores and coverage are reported for every module', () => {
   assert.equal(seo.checks_total, 47);
   assert.equal(seo.coverage, 0.87);
   assert.equal(links.checks_skipped, 1);
-  assert.equal(security.checks_total, 10);
-  assert.equal(security.checks_skipped, 5);
+  // The header checks count toward a score of their own (security_headers), which a local crawl cannot give.
+  assert.equal(security.checks_total, 5);
+  assert.equal(security.checks_skipped, 0);
+  assert.equal(audit.modules.security_headers.checks_skipped, 5);
+  assert.equal(audit.modules.security_headers.score, null);
   assert.match(skipped.find((stat) => stat.id === 'security.headers.hsts_missing')?.skip_reason ?? '', /server on this machine/);
   // An ordinary site with SEO and link problems has no sign of a hack.
   assert.deepEqual(audit.findings.filter((finding) => finding.module === 'security').map((finding) => finding.check_id), []);

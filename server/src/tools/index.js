@@ -34,6 +34,7 @@ import { runTools } from './runs.js';
  *   result(id: string): Promise<CrawlResult|null>,
  *   storedVitals(id: string, pages: number): Promise<{vitals: VitalsData, measured_at: string}|null>,
  *   storeVitals(id: string, pages: number, vitals: VitalsData, measuredAt: string): Promise<void>,
+ *   wasPruned?(id: string): Promise<boolean>,
  * }} crawlManager
  * @property {CheckDef[]} checks
  * @property {(projectDir: string) => ProjectPaths} projectPaths

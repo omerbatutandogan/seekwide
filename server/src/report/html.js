@@ -1,9 +1,10 @@
 /** @import { Run } from '../types.js' */
 
 import { clip } from '../util/strings.js';
-import { CONFIDENCE_LABELS, CONFIDENCE_NOTE, FIXES_NOTE, FIX_OUTCOME_LABELS, RATING_LABELS, SCORE_NOTE, SEVERITY_LABELS, SUGGESTIONS_NOTE, SUMMARY_NOTE } from './copy.js';
+import { CONFIDENCE_NOTE, FIXES_NOTE, FIX_OUTCOME_LABELS, RATING_LABELS, SCORE_NOTE, SEVERITY_LABELS, SUGGESTIONS_NOTE, SUMMARY_NOTE } from './copy.js';
 import { html, raw, safeHttpUrl } from './escape.js';
 import { plural } from './facts.js';
+import { affectedText, confidenceText } from './findings.js';
 import { CSS } from './html-css.js';
 import { buildReport } from './model.js';
 
@@ -24,8 +25,6 @@ function urlHtml(url) {
 /** @param {string} severity */
 const sevLabel = (severity) => SEVERITY_LABELS[/** @type {keyof typeof SEVERITY_LABELS} */ (severity)];
 
-/** @param {string} confidence */
-const confLabel = (confidence) => CONFIDENCE_LABELS[/** @type {keyof typeof CONFIDENCE_LABELS} */ (confidence)];
 
 /** @param {number|null} value */
 const scoreText = (value) => (value === null ? 'n/a' : String(value));
@@ -106,14 +105,14 @@ ${v.notes.length > 0 ? html`<ul class="meta">${v.notes.map((note) => html`<li>${
 
 /** @param {Report['groups'][number]} g */
 function badges(g) {
-  return html`<span class="badge sev-${g.severity}">${sevLabel(g.severity)}</span> <span class="badge ${g.confidence}">${confLabel(g.confidence)}</span>`;
+  return html`<span class="badge sev-${g.severity}">${sevLabel(g.severity)}</span> <span class="badge ${g.confidence}">${confidenceText(g)}</span>`;
 }
 
 /** @param {Report} r */
 function topFixes(r) {
   const cards = r.topFixes.map((g, i) => html`<article class="card sev-${g.severity}">
 <h3><span class="rank">${i + 1}.</span>${g.title} ${badges(g)}</h3>
-<p class="meta"><code>${g.checkId}</code> &middot; ${plural(g.count, 'finding')}</p>
+<p class="meta"><code>${g.checkId}</code> &middot; ${affectedText(g)}</p>
 ${g.recommendation ? html`<p><strong>What to do:</strong> ${g.recommendation}</p>` : ''}
 ${g.examples.length > 0 ? html`<p class="meta">Examples: ${g.examples.map((url) => html`<br>${urlHtml(url)}`)}</p>` : ''}
 ${g.docRef ? html`<p class="meta">Documentation: ${urlHtml(g.docRef)}</p>` : ''}
@@ -143,7 +142,7 @@ function findingItem(f) {
 function allFindings(r) {
   const cards = r.groups.map((g) => html`<article class="card sev-${g.severity}">
 <h3>${g.title} ${badges(g)}</h3>
-<p class="meta"><code>${g.checkId}</code> &middot; ${plural(g.count, 'finding')}</p>
+<p class="meta"><code>${g.checkId}</code> &middot; ${affectedText(g)}</p>
 <ul class="items">${g.shown.map(findingItem)}</ul>
 ${g.more > 0 ? html`<p class="meta">+${g.more} more ${g.more === 1 ? 'finding' : 'findings'} not shown.</p>` : ''}
 </article>`);

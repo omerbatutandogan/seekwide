@@ -4,7 +4,7 @@ Notable changes to Seekwide. Versions follow [semantic versioning](https://semve
 
 ## 0.1.0-alpha.1 (unreleased)
 
-First working version. Rule set 0.1.4.
+First working version. Rule set 0.1.5.
 
 Rule set 0.1.1 differs from 0.1.0, which only unreleased builds used, in two ways: a module score is 99 at most when a scored check has a failure, and the `aria-label` of an element inside a link (an SVG logo, an icon, an image) counts as the link's text.
 
@@ -44,6 +44,24 @@ Rule set 0.1.4 differs from 0.1.3 in the first two of these.
 - A crawl takes no new page after 30 minutes (`LIMITS.crawlMaxMs`); the page under way finishes. One that still has URLs to visit then ends as truncated with `time_limit_reached`, and the audit's notes, the report and run comparisons name the time limit instead of the page budget. The skip reason of the checks that need a complete crawl names every limit.
 - The README no longer says that Claude Code installs the plugin's dependencies whenever it installs the plugin. Claude Code's documentation says it does so when it copies a plugin into its cache, from the lockfile, and not for a plugin it loads in place, which is what both install commands in the README do; the README now says to run `npm ci --ignore-scripts` first.
 - A test that starts the server as a child process now fails at once when an assertion fails, instead of keeping the test run alive with the server still running.
+
+### Fixed after a validation on real sites
+
+An audit of 20 real sites (Next.js, WordPress, Shopify, static documentation, a wiki, news, government, universities, small businesses, two Turkish sites) judged 923 findings: 1.6% were false and 46% accurate but not worth acting on. Rule set 0.1.5 differs from 0.1.4 in these:
+
+- **No false hacking alarm on Next.js sites.** React's streaming server rendering sends a Suspense boundary's content later in the page inside `<div hidden id="S:n">` and moves it into place with an inline script as the page loads; on nextjs.org the whole footer arrives that way, and its links to other sites were reported as hidden links ("the site may have been hacked", security 75). A hidden element counts as revealed when the page has every part React writes, in order: the boundary's template before it, and an inline call of React's function, defined on the page, after it. Only its own `hidden` attribute is excused; `display: none` or an off-screen box inside or around it, or around the place the content is moved to, still counts, and the script must run the call as a top-level statement (not in a comment, a string or a block). The fallback such a boundary replaces no longer adds headings and text, so a page is not counted with two identical `h1` elements; its links stay, and its text still counts for spam terms.
+- `og:image:url` and `og:image:secure_url` count as `og:image`, as the Open Graph protocol defines them.
+- `links.internal.nofollow` reports a page only when every link to it on the page is nofollow, and only for a page the crawler could fetch: not the page itself, no query string (share, comment reply, cart and export links), allowed by robots.txt. Crawl results list the internal link targets robots.txt disallows (`disallowed_links`) for this.
+- `links.anchor.uncrawlable` follows one rule: a link fails when what it opens is not in its href as a web address. A `javascript:` link that only prints, goes back or does nothing, on an element with no script handler, is a control and not counted; a script that may open a page, a `data:` URL, and a script that does nothing behind an `onclick` or another handler (`onmousedown`, `ng-click`, `@click`, a `data-href`) still fail. Page records keep `has_handler` for each link.
+- `links.anchor.empty` and `links.anchor.generic` leave out links hidden from screen readers with `aria-hidden` and links to a place on the same page (`#`, `#id`), and pass a link when another link on the page to the same address is named (an image link beside the product's text link, "Read more" beside the article title). `links.anchor.generic` also passes a link with a descriptive `aria-label`. Page records keep `aria_hidden` for each link.
+- `links.internal.redirect` reports a temporary redirect (302, 303, 307) as `likely`, with a sentence that the site can mean it (a login, a region, a cart), and leaves out a temporary redirect to a page that carries the link's own address, such as a login that sends the visitor back (`/login?next=%2Fdashboard`). A finding can now carry a lower confidence than its check.
+- The report counts what the owner fixes: a group of link findings says how many distinct links on how many pages ("66 findings (3 links on 22 pages)") and shows each link once before repeating one; `audit_run`'s top groups carry `distinct_links` and `pages`.
+- Three crawls started at the same moment all start; the third was refused while two existed.
+- A crawl deleted from the cache (only the 20 newest are kept) is reported as deleted, with what to do, instead of as an unknown job id.
+- `%7E` and `~` (and the other escapes of unreserved characters) are one URL, and robots.txt rules match either form. A canonical that differs from the page URL only in how `'`, `(`, `)`, `!` or `*` is written names the page itself, so a wiki page linked with an apostrophe is no longer left out of the checks as canonicalized elsewhere.
+- The report of a crawl blocked before any page was read opens with that fact instead of "found no problems", and does not count checks that had nothing to look at. A start URL that redirects to a login or password page, and a start page with no links and almost no text (an empty JavaScript shell), get a note in the report and in `audit_run`. A sitemap the site refuses (401, 403, 429) is not reported as broken; the note and the skip reasons say it was refused. "1 other page has", not "have"; a canonical target that redirects is described by where it leads, not as a page that is not HTML.
+- The security module has two scores: `security` for signs of a hack and `security_headers` for the start page's headers, which protect visitors and say nothing about a hack. A clean site with missing headers keeps a security score of 100.
+- `security.embeds.rare_host` needs a crawl of 50 pages or more (on 25 pages every embed on one page is "rare") and leaves out the site's own host and its subdomains. A finding with a single hidden link says that it can be the site's own, such as a partner's logo in a block no longer shown, and the recommendation names that case before the hack.
 
 ### Security
 

@@ -41,6 +41,7 @@ function headerCheck({ applies = () => true, failure, ...definition }) {
   return {
     ...definition,
     module: 'security',
+    score_group: 'security_headers',
     engine: 'code',
     scope: 'site',
     requires: ['live_site'],

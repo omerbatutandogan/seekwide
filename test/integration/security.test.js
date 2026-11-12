@@ -64,8 +64,8 @@ test('the clean site has no security finding, info included', () => {
   assert.deepEqual(found(sites.clean), []);
   const { security } = sites.clean.audit.modules;
   assert.equal(security.score, 100);
-  // Every check that does not need the deployed site looked at something.
-  for (const id of ['security.hidden.external_link', 'security.content.spam_terms', 'security.content.foreign_script', 'security.embeds.hidden_frame', 'security.embeds.rare_host']) {
+  // Every check that does not need the deployed site looked at something; rare_host needs a crawl of 50 pages or more.
+  for (const id of ['security.hidden.external_link', 'security.content.spam_terms', 'security.content.foreign_script', 'security.embeds.hidden_frame']) {
     const stat = sites.clean.audit.checks.find((check) => check.id === id);
     assert.equal(stat?.status, 'run', id);
     assert.ok((stat?.applicable ?? 0) > 0, `${id} had units`);
@@ -78,7 +78,6 @@ test('the injected site gives exactly the findings it was built with', () => {
     'security.content.spam_terms /',
     'security.content.spam_terms /promo.html',
     'security.embeds.hidden_frame /about.html',
-    'security.embeds.rare_host /about.html',
     'security.hidden.external_link /',
     'security.hidden.external_link /about.html',
   ]);
@@ -108,7 +107,10 @@ test('the header checks are skipped for a site on this machine, with the reason'
       assert.equal(stat.status, 'skipped');
       assert.match(stat.skip_reason ?? '', /server on this machine/);
     }
-    assert.equal(site.audit.modules.security.coverage, 0.5);
+    // The signs of a hack are scored apart from the headers, so the security score keeps full coverage.
+    assert.equal(site.audit.modules.security.coverage, 1);
+    assert.equal(site.audit.modules.security_headers.coverage, 0);
+    assert.equal(site.audit.modules.security_headers.note, 'None of the checks behind this score could run.');
   }
 });
 

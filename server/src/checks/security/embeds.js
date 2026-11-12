@@ -1,10 +1,15 @@
 /** @import { CheckDef, CheckResult, EmbedRecord } from '../../types.js' */
 
 import { clip } from '../../util/strings.js';
+import { hostKey } from '../../util/url.js';
 import { VERIFIED, attributeSelector, compareText, deployedSite, securedPages } from './helpers.js';
 
-/** A host is rare only on a site with at least this many crawled html pages. */
-export const MIN_PAGES_FOR_RARE = 5;
+/**
+ * Crawled pages with the signals needed before a host used by one page counts
+ * as rare. On a crawl of 25 pages every video, map or form embedded on one
+ * page is used by one page.
+ */
+export const MIN_PAGES_FOR_RARE = 50;
 const MAX_LISTED = 5;
 
 /** @type {CheckDef} */
@@ -77,7 +82,7 @@ const rareHost = {
   engine: 'code',
   title: 'Script or frame from a site no other page uses',
   description:
-    'Lists scripts and frames that a page loads from another site when no other crawled page loads anything from that site, on a crawl of five or more pages. Google names scripts loaded from an attacker\'s domain as a sign of a hacked site, but a video, map or form embedded on one page is just as rare, so this only marks code worth a look.',
+    'Lists scripts and frames that a page loads from another site when no other crawled page loads anything from that site, on a crawl of 50 or more pages; the site\'s own host and its subdomains are left out. Google names scripts loaded from an attacker\'s domain as a sign of a hacked site, but a video, map or form embedded on one page is just as rare, so this only marks code worth a look.',
   severity: 'info',
   weight: 0,
   impact: 1,
@@ -93,9 +98,16 @@ const rareHost = {
     const pages = securedPages(ctx);
     if (pages.length < MIN_PAGES_FOR_RARE) return [];
     const deployed = deployedSite(ctx);
+    // The site's own host and its subdomains (it.example.org on example.org). Another domain with the same name, or another
+    // tenant of a shared host such as vercel.app, is not the site's.
+    const own = hostKey(ctx.site.host).replace(/:\d+$/, '');
     /** @type {Map<string, number>} */
     const pagesPerHost = new Map();
-    const perPage = pages.map((page) => ({ page, hosts: firstPerHost(page.security.embeds.filter((embed) => !deployed(embed.url))) }));
+    const foreign = (/** @type {EmbedRecord} */ embed) => {
+      const host = hostKey(embed.host).replace(/:\d+$/, '');
+      return !deployed(embed.url) && host !== own && !host.endsWith(`.${own}`);
+    };
+    const perPage = pages.map((page) => ({ page, hosts: firstPerHost(page.security.embeds.filter(foreign)) }));
     for (const { hosts } of perPage) {
       for (const host of hosts.keys()) pagesPerHost.set(host, (pagesPerHost.get(host) ?? 0) + 1);
     }

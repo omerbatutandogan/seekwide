@@ -221,7 +221,7 @@ export function fixTools(deps) {
         const offset = args.offset ?? 0;
         const fixes = plan.fixes.slice(offset, offset + limit);
         const notes = [];
-        if (crawl === null) notes.push('The crawl behind this run is no longer stored, so current is null: what each page sends is not known here. Read the source file.');
+        if (crawl === null) notes.push('The crawl behind this run is no longer stored (Seekwide keeps the 20 newest crawls), so current is null: what each page sends is not known here. Read the source file.');
         if (siteUrl === null && plan.fixes.some((fix) => fix.needs_site_url)) {
           notes.push('Some fixes write the deployed address of the site, and none is known. Ask the user for it, then call fix_plan again with site_url.');
         }

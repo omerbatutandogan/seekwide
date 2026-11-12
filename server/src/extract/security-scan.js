@@ -9,7 +9,7 @@
 import { LIMITS } from '../config.js';
 import { clip } from '../util/strings.js';
 import { hostKey, isInternalUrl, normalizeUrl } from '../util/url.js';
-import { VISIBLE, concealments, enterElement, tinyFrame } from './concealment.js';
+import { VISIBLE, combineStates, concealments, enterElement, tinyFrame } from './concealment.js';
 import { HTML_NS, attr, isHtmlElement, lineOf } from './dom.js';
 import { metaReferrerPolicy } from './security-headers.js';
 
@@ -49,6 +49,8 @@ const SECOND_LEVEL = new Set(['co', 'com', 'net', 'org', 'gov', 'edu', 'ac', 'or
  * @property {string} siteHost
  * @property {boolean} includeSubdomains
  * @property {LinkRecord[]} links  The record's links, in the document order this walk counts `<a>` elements in.
+ * @property {Map<DomNode, DomNode>} [revealed]  Hidden elements that React's streaming script reveals on load, each with the
+ *   template whose place its content takes (react-stream.js).
  */
 
 /**
@@ -197,11 +199,21 @@ export function scanDocument(document, context) {
   /** @type {string|null} */
   let metaReferrer = null;
   let anchorCount = 0;
+  const revealed = context.revealed ?? new Map();
+  const places = new Set(revealed.values());
+  /** The hidden state where each such template stands, which is where its segment's content ends up. @type {Map<DomNode, HiddenState>} */
+  const placeStates = new Map();
   /** @typedef {{node: DomNode, state: HiddenState, head: boolean, previous: DomNode|null}} Frame */
   /** @type {Frame[]} */
   const stack = [{ node: document, state: VISIBLE, head: false, previous: null }];
   while (stack.length > 0) {
-    const { node, state: above, head: inHead, previous } = /** @type {Frame} */ (stack.pop());
+    const popped = /** @type {Frame} */ (stack.pop());
+    const { node, head: inHead, previous } = popped;
+    if (places.has(node)) placeStates.set(node, popped.state);
+    // A streamed React segment's content is seen where it is served and where the page's script moves it (its template):
+    // what hides it in either place hides it.
+    const place = revealed.get(node);
+    const above = place === undefined ? popped.state : combineStates(placeStates.get(place) ?? VISIBLE, popped.state);
     let state = above;
     let head = inHead;
     const tag = node.tagName;
@@ -209,9 +221,11 @@ export function scanDocument(document, context) {
       const line = lineOf(node);
       const style = attr(node, 'style');
       const hidden = attr(node, 'hidden');
+      // A streamed React segment is revealed by the page itself; only its `hidden` attribute is excused, never a style.
+      const streamed = style === null && hidden !== null && place !== undefined;
       state = enterElement(above, {
         tag, hidden, style, line, id: attr(node, 'id'),
-        revealable: (style !== null || hidden !== null) && openable(node, previous),
+        revealable: streamed || ((style !== null || hidden !== null) && openable(node, previous)),
         classed: (attr(node, 'class') ?? '').trim() !== '',
       });
       head = inHead || tag === 'head';

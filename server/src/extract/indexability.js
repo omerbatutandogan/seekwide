@@ -3,11 +3,14 @@
 
 /** @import { Indexability, PageRecord } from '../types.js' */
 
+import { sameCanonicalTarget } from '../util/url.js';
+
 const NOINDEX = ['noindex', 'none'];
 
 /**
  * Reasons in the documented order: fetch_error, redirect, status_<code>,
- * not_html, noindex_meta, noindex_header, canonical_elsewhere. A record with
+ * not_html, noindex_meta, noindex_header, canonical_elsewhere. A canonical names
+ * the page itself when `sameCanonicalTarget` says so. A record with
  * no response (status 0), with an unusable response (`fetch_error`) or for a
  * followed redirect gets no status or not_html reason.
  * @param {Omit<PageRecord, 'indexability'>} record
@@ -26,7 +29,7 @@ export function indexabilityOf(record) {
   if (record.meta_robots.some((token) => NOINDEX.includes(token))) reasons.push('noindex_meta');
   if (record.x_robots.some((token) => NOINDEX.includes(token))) reasons.push('noindex_header');
   const effective = record.canonicals.filter((canonical) => canonical.in_head && canonical.url !== null);
-  if (effective.length > 0 && effective.every((canonical) => canonical.url !== record.url)) {
+  if (effective.length > 0 && effective.every((canonical) => !sameCanonicalTarget(/** @type {string} */ (canonical.url), record.url))) {
     reasons.push('canonical_elsewhere');
   }
   return { indexable: reasons.length === 0, reasons };

@@ -1,6 +1,6 @@
 /** @import { CheckDef } from '../../types.js' */
 
-import { effectiveCanonicalUrls, isRedirectRecord, isUnverifiable } from '../page-helpers.js';
+import { effectiveCanonicalUrls, isRedirectRecord, isRefusedSitemap, isUnverifiable } from '../page-helpers.js';
 import { clip } from '../../util/strings.js';
 import { DOCS, SEO } from './common.js';
 
@@ -61,7 +61,7 @@ const fileError = {
     'Make the sitemap URL return 200 with a UTF-8 XML <urlset> or <sitemapindex> document, or remove the reference to it from robots.txt.',
   run(ctx) {
     return ctx.crawl.sitemap.files
-      .filter((file) => file.type !== 'external' && file.type !== 'disallowed')
+      .filter((file) => file.type !== 'external' && file.type !== 'disallowed' && !isRefusedSitemap(file))
       .map((file) => {
         if (file.type !== 'unreachable' && file.type !== 'invalid') return { status: 'pass', url: file.url };
         return {

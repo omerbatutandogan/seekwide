@@ -33,7 +33,8 @@ export function describeBlock(blocked) {
   const at = blocked.url ? ` at ${blocked.url}` : '';
   const status = blocked.status ? ` (HTTP ${blocked.status})` : '';
   const redirect = blockedRedirect(blocked);
-  return `The crawl stopped early: ${reason}${at}${status}.${redirect ? ` ${redirect}` : ''}`;
+  // The address and status first, so the reason ends the sentence ("…did not try to get past it.").
+  return `The crawl stopped early${at}${status}: ${reason}.${redirect ? ` ${redirect}` : ''}`;
 }
 
 /**
@@ -60,6 +61,24 @@ export function describeUnreadable(count) {
 }
 
 /**
+ * One sentence on a start URL that redirects to a login or password page.
+ * @param {string} url  Where it redirects.
+ * @returns {string}
+ */
+export function describeStartGate(url) {
+  return `The start URL redirects to ${url}, a login or password page, so the site looks closed to visitors who are not logged in. The audit describes that page, not the site behind it.`;
+}
+
+/**
+ * One sentence on a start page that holds almost nothing in the HTML the server sends.
+ * @param {number} words
+ * @returns {string}
+ */
+export function describeShell(words) {
+  return `The start page as served has ${plural(words, 'word')} and no links: either it is nearly empty, or JavaScript builds it in the browser. Seekwide reads the HTML the server sends and runs no scripts, so findings about its title, text and links describe that empty page.`;
+}
+
+/**
  * The summary used when no written summary is given: only statements that
  * follow from the numbers, including any limit that makes the results partial.
  * @param {{
@@ -67,19 +86,30 @@ export function describeUnreadable(count) {
  *   checksRun: number, checksTotal: number, findings: number, checksWithFindings: number,
  *   severityCounts: Record<string, number>, scores: {label: string, score: number|null}[],
  *   truncated: boolean, timeLimited?: boolean, blocked: {reason: string, url: string, status: number}|null, unreadablePages: number,
- *   vitals?: string|null,
+ *   vitals?: string|null, startGate?: string|null, startShellWords?: number|null, nothingRead?: boolean,
  * }} facts  `vitals` is one sentence on the Core Web Vitals of the run, when they were asked for. `timeLimited`:
- *   the crawl was truncated by its time limit, not by its page limit.
+ *   the crawl was truncated by its time limit, not by its page limit. `startGate`: the login or password page the
+ *   start URL redirects to. `startShellWords`: the words of a start page that holds almost nothing. `nothingRead`: the crawl
+ *   was blocked before any HTML page was read.
  * @returns {string[]} Paragraphs.
  */
 export function factualSummary(facts) {
   /** @type {string[]} */
   const paragraphs = [];
+  if (facts.blocked && facts.nothingRead === true) {
+    // Nothing could be read: say so first, and claim nothing about checks that had nothing to look at.
+    paragraphs.push(`${describeBlock(facts.blocked)} No page of ${facts.host} could be read, so the checks of pages had nothing to look at and no module was scored.`);
+    if (facts.findings > 0) paragraphs.push(`The checks of the site as a whole recorded ${plural(facts.findings, 'finding')}.`);
+    if (facts.vitals) paragraphs.push(facts.vitals);
+    return paragraphs;
+  }
   paragraphs.push(
     facts.pages === 0
       ? `Seekwide could not crawl any page of ${facts.host}.`
       : `Seekwide crawled ${plural(facts.pages, 'page')} of ${facts.host} (${facts.htmlPages} HTML, ${facts.indexablePages} indexable) and ran ${facts.checksRun} of ${plural(facts.checksTotal, 'check')}.`,
   );
+  if (facts.startGate) paragraphs.push(describeStartGate(facts.startGate));
+  if (typeof facts.startShellWords === 'number') paragraphs.push(describeShell(facts.startShellWords));
   if (facts.findings === 0) {
     paragraphs.push('It found no problems in the checks that ran.');
   } else {

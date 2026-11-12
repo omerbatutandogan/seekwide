@@ -3,6 +3,7 @@
 import { clip } from '../../util/strings.js';
 import { isRedirectRecord, isUnverifiable } from '../page-helpers.js';
 import { distinctInternalTargets, linkSelector } from './helpers.js';
+import { nofollow } from './nofollow.js';
 
 const LAST_VERIFIED = '2026-11-11';
 
@@ -55,6 +56,58 @@ function isUnverifiableTarget(record) {
   return isUnverifiable(record) || (isRedirectRecord(record) && record.final_external);
 }
 
+/** Redirect statuses that say the move is temporary: Google reads them as a weak signal. */
+const TEMPORARY = new Set([302, 303, 307]);
+
+/**
+ * True when every hop of a redirect record is temporary (302, 303 or 307).
+ * @param {PageRecord} record
+ * @returns {boolean}
+ */
+function isTemporary(record) {
+  return record.redirect_chain.length > 0 && record.redirect_chain.every((hop) => TEMPORARY.has(hop.status));
+}
+
+/** Query parameters through which a login or consent page is told where to send the visitor back, compared lower-cased without `_` and `-`. */
+const RETURN_PARAMETERS = new Set([
+  'next', 'return', 'returnto', 'returnurl', 'returnpath', 'redirect', 'redirectto', 'redirecturl', 'redirecturi', 'continue',
+  'destination', 'back', 'backurl', 'camefrom', 'callbackurl',
+]);
+
+/**
+ * True when a redirect ends on the site at a page whose return parameter
+ * names the target itself (`/login?next=%2Fdashboard`,
+ * `?redirect_to=https://…/account/`): a gate such as a login page that sends
+ * the visitor back afterwards. A link to the target is then the right link.
+ * The parameter's value must be a path or an http(s) URL on the target's
+ * host; paths are compared without a trailing slash.
+ * @param {PageRecord} record
+ * @returns {boolean}
+ */
+function returnsToTarget(record) {
+  let final;
+  let target;
+  try {
+    final = new URL(record.final_url);
+    target = new URL(record.url);
+  } catch {
+    return false;
+  }
+  if (record.final_external || final.host !== target.host) return false;
+  const path = (/** @type {string} */ value) => value.replace(/\/+$/, '') || '/';
+  const wanted = path(target.pathname);
+  for (const [name, value] of final.searchParams) {
+    if (!RETURN_PARAMETERS.has(name.toLowerCase().replace(/[-_]/g, '')) || value.length > 2048 || !/^(?:\/|https?:\/\/)/i.test(value)) continue;
+    try {
+      const named = new URL(value, final);
+      if (named.host === target.host && path(named.pathname) === wanted) return true;
+    } catch {
+      // Not a URL.
+    }
+  }
+  return false;
+}
+
 /**
  * One result per distinct internal link target of each html page, for targets
  * that have a record and are units of the check.
@@ -62,9 +115,10 @@ function isUnverifiableTarget(record) {
  * @param {(record: PageRecord) => boolean} isUnit  Whether a crawled target is a unit of the check.
  * @param {(record: PageRecord) => boolean} fails  Decides whether a unit fails.
  * @param {(record: PageRecord) => NonNullable<CheckResult['evidence']>} evidence
+ * @param {(record: PageRecord) => CheckResult['confidence']} [confidence]  Lowers a failed unit's confidence.
  * @returns {CheckResult[]}
  */
-function crawledTargetResults(ctx, isUnit, fails, evidence) {
+function crawledTargetResults(ctx, isUnit, fails, evidence, confidence = () => undefined) {
   /** @type {CheckResult[]} */
   const results = [];
   for (const page of ctx.htmlPages) {
@@ -78,6 +132,8 @@ function crawledTargetResults(ctx, isUnit, fails, evidence) {
         result.status = 'fail';
         result.line = first.line;
         result.evidence = evidence(record);
+        const lowered = confidence(record);
+        if (lowered !== undefined) result.confidence = lowered;
       }
       results.push(result);
     }
@@ -130,7 +186,7 @@ const redirect = {
   engine: 'code',
   title: 'Internal link goes through a redirect',
   description:
-    'Looks at internal links whose target redirects to a page that works, to another site, or to a page the audit could not read. The link still gets visitors there, but every visit costs an extra request and the link names a URL that is not the final one.',
+    'Looks at internal links whose target redirects to a page that works, to another site, or to a page the audit could not read. The link still gets visitors there, but every visit costs an extra request and the link names a URL that is not the final one. A temporary redirect (302, 303 or 307) is reported as likely, because a site can mean it (a login, a region, a cart), and one that leads to a page carrying the link\'s own address, such as a login page that sends the visitor back, is not counted.',
   severity: 'low',
   weight: 2,
   impact: 1,
@@ -139,12 +195,12 @@ const redirect = {
   scope: 'page',
   requires: [],
   doc_ref: 'https://developers.google.com/search/docs/crawling-indexing/site-move-with-url-changes',
-  last_verified: LAST_VERIFIED,
-  recommendation: 'Change the link to point straight at the final URL given in the evidence.',
+  last_verified: '2026-11-12',
+  recommendation: 'Change the link to point straight at the final URL given in the evidence. If the redirect is temporary on purpose (a login, a region, a cart), the link can stay.',
   run(ctx) {
     return crawledTargetResults(
       ctx,
-      () => true,
+      (record) => !(isTemporary(record) && returnsToTarget(record)),
       (record) =>
         isRedirectRecord(record) &&
         (record.final_external || isUnverifiable(record) || (record.final_status >= 200 && record.final_status <= 399)),
@@ -159,60 +215,12 @@ const redirect = {
           hops: record.redirect_chain.length,
         },
         expected: `A link to ${clip(record.final_url)}`,
-        detail: describeRedirect(record),
+        detail: isTemporary(record)
+          ? `${describeRedirect(record)} The redirect is temporary (${[...new Set(record.redirect_chain.map((hop) => hop.status))].join(', ')}), which a site can mean (a login, a region, a cart); if the page moved for good, link to the final URL.`
+          : describeRedirect(record),
       }),
+      (record) => (isTemporary(record) ? 'likely' : undefined),
     );
-  },
-};
-
-/** @type {CheckDef} */
-const nofollow = {
-  id: 'links.internal.nofollow',
-  module: 'links',
-  engine: 'code',
-  title: 'Internal link marked nofollow',
-  description:
-    'Looks at internal links that carry rel="nofollow". Google generally does not follow links marked this way, and for pages on your own site it recommends a robots.txt disallow rule instead.',
-  severity: 'low',
-  weight: 1,
-  impact: 1,
-  effort: 1,
-  confidence: 'confirmed',
-  scope: 'page',
-  requires: [],
-  doc_ref: 'https://developers.google.com/search/docs/crawling-indexing/qualify-outbound-links',
-  last_verified: LAST_VERIFIED,
-  recommendation:
-    'Remove rel="nofollow" from internal links you want Google to follow. To stop Google fetching a page on your own site, use a robots.txt disallow rule instead.',
-  run(ctx) {
-    /** @type {CheckResult[]} */
-    const results = [];
-    for (const page of ctx.htmlPages) {
-      for (const target of distinctInternalTargets(page)) {
-        const marked = target.links.filter((link) => link.rel.includes('nofollow'));
-        if (marked.length === 0) {
-          results.push({ status: 'pass', url: page.url, selector: linkSelector(target.links[0]) });
-          continue;
-        }
-        results.push({
-          status: 'fail',
-          url: page.url,
-          selector: linkSelector(marked[0]),
-          line: marked[0].line,
-          evidence: {
-            observed: {
-              target_url: clip(target.url),
-              rel: marked[0].rel.map((token) => clip(token)),
-              nofollow_links: marked.length,
-              links_to_target: target.links.length,
-            },
-            expected: 'Internal links without rel="nofollow"',
-            detail: `${marked.length} of ${target.links.length} link(s) to ${clip(target.url)} on this page have rel="nofollow".`,
-          },
-        });
-      }
-    }
-    return results;
   },
 };
 

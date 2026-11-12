@@ -120,7 +120,7 @@ const duplicate = {
         evidence: {
           observed: { pages_with_same_title: others.length + 1 },
           expected: 'A title no other indexable page uses',
-          detail: `${otherPages(others.length)} use the same title.`,
+          detail: `${otherPages(others.length, 'uses', 'use')} the same title.`,
         },
       }),
     );

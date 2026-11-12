@@ -32,7 +32,7 @@ const duplicateBody = {
         evidence: {
           observed: { pages_with_same_text: others.length + 1, word_count: page.word_count },
           expected: 'Visible text that no other indexable page has',
-          detail: `${otherPages(others.length)} have exactly the same visible text.`,
+          detail: `${otherPages(others.length, 'has', 'have')} exactly the same visible text.`,
         },
       }),
     );

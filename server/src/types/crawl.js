@@ -76,6 +76,9 @@ export {};
  * @property {HttpProbe|null} http_probe   Null when the site is not https or the probe was not possible.
  * @property {PageRecord[]} pages      In fetch order, which is deterministic.
  * @property {string[]} robots_blocked URLs skipped because robots.txt disallows them (max 200).
+ * @property {string[]} [disallowed_links]  Targets of internal links marked nofollow on the recorded pages that the robots.txt of
+ *   their origin, as read during the crawl, does not allow the crawler to request; sorted, at most 2000. Absent in crawls made
+ *   before rule set 0.1.5.
  * @property {boolean} truncated       True when the page limit, the size limit or the time limit stopped the crawl before the frontier was empty.
  * @property {boolean} [time_limit_reached]  True when the crawl stopped at `LIMITS.crawlMaxMs` with URLs left to fetch; absent otherwise.
  * @property {CrawlBlock|null} blocked Set when the crawl had to stop.

@@ -327,7 +327,8 @@ test('only the 20 newest crawl files are kept', async () => {
     const job = await manager.start({ url: S });
     await manager.wait(job.id, 10_000);
   }
-  const files = (await readdir(path.join(dataDir, 'crawls'))).sort();
+  // The ids of deleted crawls are remembered in pruned-ids.txt, which is not a crawl.
+  const files = (await readdir(path.join(dataDir, 'crawls'))).filter((name) => name.endsWith('.json')).sort();
   assert.equal(files.length, 20);
   assert.equal(files.at(-1), 'c-keep-022.json');
   assert.equal(files.includes('c-keep-001.json'), false);

@@ -80,6 +80,8 @@ export const siteRoutes = {
         '<a href="/missing">A page that does not exist</a>',
         '<a href="/private/secret">A private page</a>',
         '<a href="/files/guide.pdf">Download the guide</a>',
+        // A script that opens a page: uncrawlable. The menu toggle after it opens no page and is not counted.
+        '<a href="javascript:goTo(\'catalog\')">The catalog</a>',
         '<a href="javascript:void(0)">Open the menu</a>',
         '</nav>',
       ].join('\n'),

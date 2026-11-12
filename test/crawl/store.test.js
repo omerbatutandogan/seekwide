@@ -95,7 +95,8 @@ test('the folder keeps 20 crawls with their measurements and deletes a measureme
 
   await store.save(makeCrawl({ id: 'c-21' }));
   const names = (await readdir(dir)).sort();
-  assert.equal(names.filter((name) => !name.endsWith('.vitals.json')).length, 20);
+  // The ids of deleted crawls are remembered in pruned-ids.txt, which is not a crawl.
+  assert.equal(names.filter((name) => name.endsWith('.json') && !name.endsWith('.vitals.json')).length, 20);
   assert.equal(names.includes('c-01.json'), false, 'the oldest crawl is deleted');
   assert.equal(names.includes('c-01.vitals.json'), false, 'and its measurement with it');
   assert.equal(names.includes('c-gone.vitals.json'), false, 'a measurement without its crawl is deleted');

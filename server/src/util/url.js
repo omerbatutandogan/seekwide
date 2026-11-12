@@ -49,6 +49,51 @@ function stripTrackingParams(query) {
   return kept.join('&');
 }
 
+const UNRESERVED = /^[A-Za-z0-9._~-]$/;
+
+/** A `%` that does not start an escape. */
+const LONE_PERCENT = /%(?![0-9a-fA-F]{2})/;
+
+/**
+ * Percent escapes of unreserved characters (letters, digits, `-`, `.`, `_`,
+ * `~`) decoded, and the hex digits of every other escape upper-cased. RFC 3986
+ * (6.2.2.1 and 6.2.2.2) makes both forms of such a URL equivalent, and RFC
+ * 9309 (2.2.2) compares robots.txt paths this way. In a text with a `%` that
+ * starts no escape nothing is decoded, because a decoded digit after it would
+ * make a new escape (`%%37E` would become `%7E`); so applying this twice gives
+ * what applying it once does.
+ * @param {string} text
+ * @returns {string}
+ */
+export function normalizeEscapes(text) {
+  if (LONE_PERCENT.test(text)) return text.replace(/%[0-9a-fA-F]{2}/g, (escape) => escape.toUpperCase());
+  return text.replace(/%[0-9a-fA-F]{2}/g, (escape) => {
+    const char = String.fromCharCode(Number.parseInt(escape.slice(1), 16));
+    return UNRESERVED.test(char) ? char : escape.toUpperCase();
+  });
+}
+
+/** Characters that may be written as typed or percent-encoded in a path, and that browsers leave as they are written. */
+const LEFT_AS_TYPED = /%(?:21|27|28|29|2A)/gi;
+
+/**
+ * True when two normalized URLs name the same page as far as a canonical link
+ * is concerned: equal once the escapes of `!`, `'`, `(`, `)` and `*` are
+ * decoded. Browsers send these characters as they are written, so a page
+ * linked as `/Today's_article` and a canonical to `/Today%27s_article` are one
+ * page; RFC 3986 does not require the two to be equal, so `normalizeUrl` keeps
+ * them apart.
+ * @param {string} a
+ * @param {string} b
+ * @returns {boolean}
+ */
+export function sameCanonicalTarget(a, b) {
+  if (a === b) return true;
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const plain = (/** @type {string} */ url) => url.replace(LEFT_AS_TYPED, (escape) => String.fromCharCode(Number.parseInt(escape.slice(1), 16)));
+  return plain(a) === plain(b);
+}
+
 /**
  * The longest URL the plugin works with, in characters. Longer ones are treated
  * like URLs that are not http(s): never requested, never matched against
@@ -66,7 +111,8 @@ const MAX_RAW_URL_LENGTH = 8 * MAX_URL_LENGTH;
  * - lower-cases the scheme and host and drops default ports (done by `URL`)
  * - removes the fragment and any credentials
  * - removes known tracking parameters; other parameters keep order and encoding
- * - upper-cases the hex digits of percent escapes, so `%c3%a7` and `%C3%A7` are one URL
+ * - upper-cases the hex digits of percent escapes, so `%c3%a7` and `%C3%A7` are one URL,
+ *   and decodes the escapes of unreserved characters, so `%7Euser` and `~user` are one URL
  *
  * Trailing slashes and letter case in the path are left alone: those are real
  * differences that the audit needs to see.
@@ -99,7 +145,7 @@ export function normalizeUrl(raw, base) {
     url.search = '';
   }
   if (url.href.length > MAX_URL_LENGTH) return null;
-  return url.href.replace(/%[0-9a-fA-F]{2}/g, (escape) => escape.toUpperCase());
+  return normalizeEscapes(url.href);
 }
 
 /**

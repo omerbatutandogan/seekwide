@@ -1,21 +1,24 @@
 /** @import { CheckDef, CheckResult } from '../../types.js' */
 
 import { clip } from '../../util/strings.js';
-import { GENERIC_ANCHORS, normalizeAnchorText } from './generic-anchors.js';
+import { DOC_LINKS, LAST_VERIFIED, empty, generic } from './anchor-text.js';
 import { linkSelector } from './helpers.js';
 
-const LAST_VERIFIED = '2026-11-12';
-const DOC_LINKS = 'https://developers.google.com/search/docs/crawling-indexing/links-crawlable';
-
-/**
- * Schemes whose URL is not a web address a crawler can send a request to: a
- * script to run (`javascript:`, `vbscript:`) or a document carried inside the
- * link (`data:`). Google asks for an href that resolves to such an address.
- * Schemes that hand the link to another program (`mailto:`, `tel:`) open no
- * page and are not counted.
- */
-const NOT_A_WEB_ADDRESS = new Set(['javascript', 'vbscript', 'data']);
+/** Schemes whose URL is a script to run, not an address: what it opens, if anything, is in the script. */
+const SCRIPT_SCHEMES = new Set(['javascript', 'vbscript']);
 const SCHEME = /^([a-z][a-z0-9+.-]*):/i;
+/**
+ * Statements of a script URL that open no page: nothing, a no-op, printing,
+ * going back, closing the window, scrolling to the top. Compared lower-cased
+ * and without spaces.
+ */
+const NO_DESTINATION = new Set([
+  '', 'void(0)', 'void0', 'void(null)', 'undefined', 'false', 'returnfalse', 'print()', 'window.print()', 'self.print()',
+  'history.back()', 'window.history.back()', 'history.go(-1)', 'window.history.go(-1)', 'close()', 'window.close()', 'self.close()',
+  'scroll(0,0)', 'scrollto(0,0)', 'window.scroll(0,0)', 'window.scrollto(0,0)',
+]);
+/** A script longer than this is not read for its statements; it counts as one that may open a page. */
+const MAX_SCRIPT_CHARS = 500;
 
 /**
  * The scheme of an href as a browser reads it, lower-cased, or null when it has none.
@@ -33,6 +36,55 @@ export function hrefScheme(href) {
   return match ? match[1].toLowerCase() : null;
 }
 
+/**
+ * True when a `javascript:` or `vbscript:` href opens no page: every statement
+ * of its code, percent-decoded as a browser decodes it, is one of
+ * `NO_DESTINATION` (`javascript:;`, `javascript:void(0)`, `javascript:print()`,
+ * `javascript:history.back()`). Such an element is a control that looks like a
+ * link. Code that does anything else may open a page (`location=…`,
+ * `goTo('products')`).
+ * @param {string} href
+ * @returns {boolean}
+ */
+export function leadsNowhere(href) {
+  const text = href.replace(/[\t\n\r]/g, '').trim();
+  let code = text.slice(text.indexOf(':') + 1);
+  if (code.length > MAX_SCRIPT_CHARS) return false;
+  try {
+    code = decodeURIComponent(code);
+  } catch {
+    // A malformed escape is read as it stands.
+  }
+  return code.split(';').every((statement) => NO_DESTINATION.has(statement.replace(/\s+/g, '').toLowerCase()));
+}
+
+/**
+ * What a link opens when that is not in its href as a web address, or null
+ * when it is (or when it opens nothing). One rule covers every case: Google
+ * asks that an `<a>` element's href resolve to a web address its crawlers can
+ * request.
+ * - `data`: the href carries the document itself.
+ * - `script`: the href is a script that may open a page.
+ * - `onclick`: the href is empty, or a script that opens nothing, and a
+ *   script handler (`onclick`, another inline handler, a framework's click
+ *   binding, a `data-href`) does whatever the link does.
+ * A script that opens nothing on an element without such a handler is a
+ * control that looks like a link (print, back, a menu toggle): it leads to no
+ * page, so it is not a unit (`undefined`).
+ * @param {{href: string, has_onclick: boolean, has_handler?: boolean}} link
+ * @returns {'data'|'script'|'onclick'|null|undefined}
+ */
+export function hiddenDestination(link) {
+  const scheme = hrefScheme(link.href);
+  if (scheme === 'data') return 'data';
+  const script = scheme !== null && SCRIPT_SCHEMES.has(scheme);
+  const nowhere = script && leadsNowhere(link.href);
+  if (script && !nowhere) return 'script';
+  const handled = link.has_onclick || link.has_handler === true;
+  if (nowhere && !handled) return undefined;
+  return (link.href === '' || nowhere) && handled ? 'onclick' : null;
+}
+
 /** @type {CheckDef} */
 const uncrawlable = {
   id: 'links.anchor.uncrawlable',
@@ -40,7 +92,7 @@ const uncrawlable = {
   engine: 'code',
   title: 'Link without a crawlable URL',
   description:
-    'Looks at every <a> element on a page, internal or not, and flags those whose href is a javascript:, vbscript: or data: URL, or that have no href and rely on an onclick handler. Google asks for an href that resolves to a web address its crawlers can request, so the page these open may not be found through the link.',
+    'Looks at every <a> element on a page, internal or not, and flags those whose destination is not in the href as a web address: a data: URL, a javascript: or vbscript: URL whose script may open a page, or no href (or a script that does nothing) with an onclick or other script handler. Google asks for an href that resolves to a web address its crawlers can request, so the page these open may not be found through the link. A script link with no handler that only prints, goes back or does nothing is a control, not a link to a page, and is not counted.',
   severity: 'medium',
   weight: 2,
   impact: 2,
@@ -57,119 +109,27 @@ const uncrawlable = {
     const results = [];
     for (const page of ctx.htmlPages) {
       for (const link of page.links) {
+        const hidden = hiddenDestination(link);
+        if (hidden === undefined) continue;
         const selector = linkSelector(link);
+        if (hidden === null) {
+          results.push({ status: 'pass', url: page.url, selector });
+          continue;
+        }
         const scheme = hrefScheme(link.href);
-        const notAddress = scheme !== null && NOT_A_WEB_ADDRESS.has(scheme);
-        const onclickOnly = link.href === '' && link.has_onclick;
-        if (!notAddress && !onclickOnly) {
-          results.push({ status: 'pass', url: page.url, selector });
-          continue;
-        }
         results.push({
           status: 'fail',
           url: page.url,
           selector,
           line: link.line,
           evidence: {
-            observed: { href: clip(link.href), has_onclick: link.has_onclick },
+            observed: { href: clip(link.href), has_onclick: link.has_onclick, ...(link.has_handler === true ? { has_handler: true } : {}) },
             expected: 'A real URL in the href attribute',
-            detail: notAddress
+            detail: hidden !== 'onclick'
               ? `The href is a ${scheme}: URL.`
-              : 'The link has no href and opens its page through an onclick handler.',
-          },
-        });
-      }
-    }
-    return results;
-  },
-};
-
-/** @type {CheckDef} */
-const empty = {
-  id: 'links.anchor.empty',
-  module: 'links',
-  engine: 'code',
-  title: 'Link with no anchor text',
-  description:
-    'Looks at links that have a URL but no visible text, no image alt text, no aria-label and no title attribute. Visitors, screen readers and Google get no description of where the link goes.',
-  severity: 'medium',
-  weight: 2,
-  impact: 2,
-  effort: 1,
-  confidence: 'confirmed',
-  scope: 'page',
-  requires: [],
-  doc_ref: DOC_LINKS,
-  last_verified: LAST_VERIFIED,
-  recommendation:
-    'Add descriptive text inside the link, or alt text to an image inside it. For an icon-only link, add an aria-label that says where the link goes.',
-  run(ctx) {
-    /** @type {CheckResult[]} */
-    const results = [];
-    for (const page of ctx.htmlPages) {
-      for (const link of page.links) {
-        if (link.url === null) continue;
-        const selector = linkSelector(link);
-        if (link.text.trim() !== '' || link.aria_label !== null || (link.title_attr ?? null) !== null) {
-          results.push({ status: 'pass', url: page.url, selector });
-          continue;
-        }
-        results.push({
-          status: 'fail',
-          url: page.url,
-          selector,
-          line: link.line,
-          evidence: {
-            observed: { text: '', aria_label: null, title_attr: null, target_url: clip(link.url) },
-            expected: 'Visible text, image alt text, an aria-label or a title attribute',
-            detail: `The link to ${clip(link.url)} has no text, no image alt text, no aria-label and no title attribute.`,
-          },
-        });
-      }
-    }
-    return results;
-  },
-};
-
-/** @type {CheckDef} */
-const generic = {
-  id: 'links.anchor.generic',
-  module: 'links',
-  engine: 'code',
-  title: 'Generic link text',
-  description:
-    'Looks at links whose whole text is a generic phrase such as "click here" or "read more", using lists for English, Turkish, German, Spanish and French. Generic text says nothing about the page it links to when read on its own.',
-  severity: 'info',
-  weight: 0,
-  impact: 1,
-  effort: 1,
-  confidence: 'likely',
-  scope: 'page',
-  requires: [],
-  doc_ref: DOC_LINKS,
-  last_verified: LAST_VERIFIED,
-  recommendation:
-    'Replace the text with words that describe the destination, such as the name of the page. Read the link text on its own: it should still make sense.',
-  run(ctx) {
-    /** @type {CheckResult[]} */
-    const results = [];
-    for (const page of ctx.htmlPages) {
-      for (const link of page.links) {
-        if (link.url === null || link.text.trim() === '') continue;
-        const selector = linkSelector(link);
-        if (!GENERIC_ANCHORS.has(normalizeAnchorText(link.text))) {
-          results.push({ status: 'pass', url: page.url, selector });
-          continue;
-        }
-        results.push({
-          status: 'fail',
-          url: page.url,
-          selector,
-          line: link.line,
-          evidence: {
-            observed: { text: clip(link.text), target_url: clip(link.url) },
-            expected: 'Text that describes the page the link goes to',
-            detail: `The link text "${clip(link.text)}" is generic.`,
+              : link.href === ''
+                ? `The link has no href and opens its page through ${link.has_onclick ? 'an onclick handler' : 'a script handler'}.`
+                : `The href is a ${scheme}: URL that does nothing itself, and the link relies on ${link.has_onclick ? 'an onclick handler' : 'a script handler'}.`,
           },
         });
       }

@@ -5,7 +5,7 @@
 
 import { effectiveCanonicalUrls, isNoindex, isRedirectRecord, isUnverifiable } from '../page-helpers.js';
 import { clip } from '../../util/strings.js';
-import { hostKey } from '../../util/url.js';
+import { hostKey, sameCanonicalTarget } from '../../util/url.js';
 import { MAX_LISTED, SELECTOR, describeRef, effectiveRefs } from './canonical-refs.js';
 import { DOCS, SEO } from './common.js';
 
@@ -104,14 +104,16 @@ const targetNotOk = {
     const results = [];
     for (const page of ctx.htmlPages) {
       const urls = effectiveCanonicalUrls(page);
-      if (urls.length !== 1 || urls[0] === page.url) continue;
+      if (urls.length !== 1 || sameCanonicalTarget(urls[0], page.url)) continue;
       const target = ctx.pageByUrl.get(urls[0]);
       // A target the crawler was refused on has no status worth reporting.
       if (!target || (!isRedirectRecord(target) && isUnverifiable(target))) continue;
       /** @type {string[]} */
       const problems = [];
-      if (target.status !== 200) problems.push(`answers HTTP ${target.status}`);
-      if (!target.is_html) problems.push('is not an HTML page');
+      // A redirect has no content of its own, so whether it is HTML says nothing.
+      if (isRedirectRecord(target)) problems.push(`answers HTTP ${target.status} and redirects to ${clip(target.final_url)}`);
+      else if (target.status !== 200) problems.push(`answers HTTP ${target.status}`);
+      if (!target.is_html && !isRedirectRecord(target)) problems.push('is not an HTML page');
       if (isNoindex(target)) problems.push('is set to noindex');
       if (problems.length === 0) {
         results.push({ status: 'pass', url: page.url });

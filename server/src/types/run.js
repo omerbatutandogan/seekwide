@@ -55,9 +55,11 @@ export {};
  * @property {string} created_at        ISO 8601.
  * @property {string} start_url
  * @property {string} site_origin
- * @property {{id: string, pages_crawled: number, html_pages: number, indexable_pages: number, unreadable_pages: number, truncated: boolean, time_limit_reached?: boolean, blocked: CrawlBlock|null, robots_status: string, sitemap_urls: number, max_pages: number, user_agent: string}} crawl
+ * @property {{id: string, pages_crawled: number, html_pages: number, indexable_pages: number, unreadable_pages: number, truncated: boolean, time_limit_reached?: boolean, blocked: CrawlBlock|null, robots_status: string, sitemap_urls: number, max_pages: number, user_agent: string, start_gate?: string, start_shell_words?: number}} crawl
  *   `unreadable_pages` counts records for which `isUnverifiable` is true. `time_limit_reached` is present, and true,
- *   when the crawl stopped at its time limit.
+ *   when the crawl stopped at its time limit. `start_gate` is the login or password page the start URL redirects to,
+ *   and `start_shell_words` the word count of a start page with no link and fewer than 50 words; each is present
+ *   only when it applies (`startPage` in tools/audit-summary.js).
  * @property {string[]} modules_requested
  * @property {Record<string, ModuleScore>} modules
  * @property {CheckStat[]} checks

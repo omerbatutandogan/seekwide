@@ -2,6 +2,7 @@
 
 import { LIMITS, SEVERITIES } from '../config.js';
 import { shortId } from '../util/hash.js';
+import { isRefusedSitemap } from './page-helpers.js';
 import { scoreModules } from './scoring.js';
 
 const SKIP_REASONS = {
@@ -13,6 +14,20 @@ const SKIP_REASONS = {
   field_data: 'Needs field data from the Chrome UX Report. It was not collected.',
   live_site: 'Needs the deployed site: this crawl was of a server on this machine, whose response headers say nothing about the live site.',
 };
+
+/**
+ * Why there are no sitemap URLs when sitemap files were found, or null when
+ * none was found (the plain reason applies) or URLs were read.
+ * @param {CrawlResult} crawl
+ * @returns {string|null}
+ */
+function unreadSitemapReason(crawl) {
+  const { files, urls } = crawl.sitemap;
+  if (urls.length > 0 || files.length === 0) return null;
+  const refused = files.find(isRefusedSitemap);
+  if (refused) return `Needs the URLs of an XML sitemap. The site refused the crawler's request for its sitemap (HTTP ${refused.status}), so none were read.`;
+  return 'Needs the URLs of an XML sitemap. The sitemap files that were found gave none that could be read.';
+}
 
 /**
  * Build the read-only view that checks run against.
@@ -56,6 +71,8 @@ export function buildContext(crawl, extras = {}) {
   const vitals = extras.vitals ?? null;
   /** @type {Record<string, string>} */
   const skipReasons = {};
+  const sitemapReason = unreadSitemapReason(crawl);
+  if (sitemapReason !== null) skipReasons.sitemap = sitemapReason;
   if (vitals !== null) {
     if (vitals.lab.available) capabilities.add('lab_data');
     else if (vitals.lab.reason) skipReasons.lab_data = vitals.lab.reason;
@@ -202,7 +219,8 @@ export function runChecks(checks, ctx, options) {
         weight: check.weight,
         impact: check.impact,
         effort: check.effort,
-        confidence: check.confidence,
+        // A result can lower its finding's confidence to likely (a temporary redirect), never raise it.
+        confidence: failure.confidence === 'likely' ? 'likely' : check.confidence,
         status: 'fail',
         url: failure.url,
         selector: failure.selector ?? null,

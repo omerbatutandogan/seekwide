@@ -4,6 +4,11 @@
 import { originOf } from '../util/url.js';
 
 /** @import { PageRecord } from '../types.js' */
+
+/** Most link targets `disallowedLinks` lists. */
+export const MAX_DISALLOWED_LINKS = 2000;
+/** Most link targets `disallowedLinks` asks robots.txt about; a large file of wildcard rules makes each question cost. */
+export const MAX_DISALLOWED_ASKED = 5000;
 /** @import { Robots } from './requests.js' */
 /** @import { createFrontier } from './frontier.js' */
 
@@ -80,6 +85,32 @@ export function createRecords({ maxPages, maxStoredChars, frontier, crawlable, k
     /** Mark the crawl as truncated when `cutShort` is true; it stays truncated. @param {boolean} cutShort */
     cutShort: (cutShort) => {
       truncated = truncated || cutShort;
+    },
+    /**
+     * Targets of internal links marked nofollow on the kept records that the
+     * robots.txt of their origin does not allow the crawler to request,
+     * sorted, at most `MAX_DISALLOWED_LINKS`. Each target is asked once,
+     * however many links name it, and at most `MAX_DISALLOWED_ASKED` are. A
+     * target on an origin whose robots.txt was never read, or that was not
+     * asked, is not known to be disallowed and is left out.
+     * @returns {string[]}
+     */
+    disallowedLinks: () => {
+      /** @type {Set<string>} */
+      const asked = new Set();
+      /** @type {string[]} */
+      const found = [];
+      for (const page of pages) {
+        for (const link of page.links) {
+          if (!link.internal || link.url === null || !link.rel.includes('nofollow') || asked.has(link.url)) continue;
+          if (asked.size >= MAX_DISALLOWED_ASKED) return found.sort();
+          asked.add(link.url);
+          const known = knownRobots(/** @type {string} */ (originOf(link.url)));
+          if (known !== undefined && !known.isAllowed(link.url)) found.push(link.url);
+          if (found.length >= MAX_DISALLOWED_LINKS) return found.sort();
+        }
+      }
+      return found.sort();
     },
   };
 }

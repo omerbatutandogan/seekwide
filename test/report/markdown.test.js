@@ -79,7 +79,7 @@ test('scope: pages against the budget, truncation, blocks, robots.txt, sitemap a
     'Scope and limits',
   );
   assert.match(limited, /\*\*Page limit reached:\*\* Yes\. The crawl stopped before every URL it found was visited/);
-  assert.match(limited, /\*\*Blocked:\*\* The crawl stopped early: the site answered with a bot challenge and the crawler did not try to get past it at https:\/\/example\.test\/ \(HTTP 403\)\./);
+  assert.match(limited, /\*\*Blocked:\*\* The crawl stopped early at https:\/\/example\.test\/ \(HTTP 403\): the site answered with a bot challenge and the crawler did not try to get past it\./);
   assert.match(limited, /\*\*robots\.txt:\*\* The site has no robots\.txt/);
   assert.match(limited, /\*\*Sitemap:\*\* No URLs found in XML sitemaps\./);
 });

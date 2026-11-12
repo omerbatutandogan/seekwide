@@ -72,10 +72,12 @@ export function duplicateResults(units, keyOf, describe) {
 }
 
 /**
- * "1 other page" / "3 other pages".
+ * "1 other page uses" / "3 other pages use": the count with the verb in agreement.
  * @param {number} count
+ * @param {string} singular  The verb after one page, for example "uses".
+ * @param {string} pluralVerb  The verb after several, for example "use".
  * @returns {string}
  */
-export function otherPages(count) {
-  return count === 1 ? '1 other page' : `${count} other pages`;
+export function otherPages(count, singular, pluralVerb) {
+  return count === 1 ? `1 other page ${singular}` : `${count} other pages ${pluralVerb}`;
 }

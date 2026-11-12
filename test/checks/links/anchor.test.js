@@ -12,13 +12,13 @@ const errorPage = (/** @type {string} */ path, /** @type {Partial<PageRecord>} *
 
 // ───────────── links.anchor.uncrawlable ─────────────
 
-test('links.anchor.uncrawlable fails on javascript: hrefs and onclick-only links', () => {
+test('links.anchor.uncrawlable fails on javascript: hrefs that may open a page and on onclick-only links', () => {
   const home = makePage({
     url: `${SITE}/`,
     links: [
-      makeRawLink({ href: 'javascript:void(0)', has_onclick: false, line: 21 }),
+      makeRawLink({ href: 'javascript:openPage(7)', has_onclick: false, line: 21 }),
       makeRawLink({ href: 'JavaScript:goTo("shop")', has_onclick: true }),
-      makeRawLink({ href: '  javascript:void(0)  ' }),
+      makeRawLink({ href: '  javascript:void(0)  ', has_onclick: true }),
       makeRawLink({ href: '', has_onclick: true, line: 30 }),
       makeRawLink({ href: '', has_onclick: false }),
       makeRawLink({ href: '   ', has_onclick: true }),
@@ -38,11 +38,11 @@ test('links.anchor.uncrawlable fails on javascript: hrefs and onclick-only links
   const findings = findingsFor(result, 'links.anchor.uncrawlable');
   assert.deepEqual(
     findings.map((f) => f.selector),
-    ['a[href="  javascript:void(0)  "]', 'a[href=""]', 'a[href="JavaScript:goTo(\\"shop\\")"]', 'a[href="javascript:void(0)"]'],
+    ['a[href="  javascript:void(0)  "]', 'a[href=""]', 'a[href="JavaScript:goTo(\\"shop\\")"]', 'a[href="javascript:openPage(7)"]'],
   );
-  const scriptLink = findings.find((f) => f.selector === 'a[href="javascript:void(0)"]');
+  const scriptLink = findings.find((f) => f.selector === 'a[href="javascript:openPage(7)"]');
   assert.equal(scriptLink?.line, 21);
-  assert.deepEqual(scriptLink?.evidence.observed, { href: 'javascript:void(0)', has_onclick: false });
+  assert.deepEqual(scriptLink?.evidence.observed, { href: 'javascript:openPage(7)', has_onclick: false });
   assert.equal(scriptLink?.evidence.detail, 'The href is a javascript: URL.');
   const onclick = findings.find((f) => f.selector === 'a[href=""]');
   assert.equal(onclick?.line, 30);
@@ -56,8 +56,8 @@ test('links.anchor.uncrawlable fails on vbscript: and data: hrefs, read as brows
       makeRawLink({ href: 'vbscript:msgbox("hi")', line: 4 }),
       makeRawLink({ href: 'data:text/html;base64,PGgxPmhpPC9oMT4=', line: 5 }),
       makeRawLink({ href: ' DATA:text/plain,x' }),
-      makeRawLink({ href: 'java\nscript:void(0)' }),
-      makeRawLink({ href: '\tjavascript:void(0)' }),
+      makeRawLink({ href: 'java\nscript:location.assign("/a")' }),
+      makeRawLink({ href: '\tjavascript:openPage(2)' }),
     ],
   });
   const { result } = audit([home]);

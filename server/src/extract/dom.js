@@ -15,7 +15,9 @@ export const SVG_NS = 'http://www.w3.org/2000/svg';
  * @property {{name: string, value: string}[]} [attrs]
  * @property {DomNode[]} [childNodes]
  * @property {DomNode|null} [parentNode]
- * @property {string} [value]
+ * @property {string} [value]   Text of a text node.
+ * @property {string} [data]    Text of a comment node.
+ * @property {DomNode} [content]  The inert contents of a `<template>`.
  * @property {{startLine: number}|null} [sourceCodeLocation]
  */
 
@@ -42,6 +44,14 @@ export function attr(node, name) {
     if (attribute.name === name) return attribute.value;
   }
   return null;
+}
+
+/**
+ * @param {DomNode} node
+ * @returns {boolean} True when the element says `aria-hidden="true"` (any letter case).
+ */
+export function isAriaHidden(node) {
+  return attr(node, 'aria-hidden')?.trim().toLowerCase() === 'true';
 }
 
 /**

@@ -106,7 +106,8 @@ function validateStart(options) {
  * keeps Core Web Vitals with a crawl, per page count, and `storedVitals` returns
  * them, or null. The crawl directory is private to the user (0700, files 0600,
  * older files included once it is opened) and keeps the 20 newest crawls, each
- * with its stored measurements (`crawl/store.js`).
+ * with its stored measurements (`crawl/store.js`); `wasPruned` says whether a
+ * crawl was deleted to keep them.
  *
  * @param {{dataDir?: string, fetch?: typeof safeFetch, extract?: Extractor, lookup?: Lookup,
  *          now?: () => Date, sleep?: (ms: number) => Promise<void>, idFactory?: () => string, maxStoredChars?: number}} [deps]
@@ -177,11 +178,13 @@ export function createCrawlManager(deps = {}) {
   const siteOf = new Map();
 
   /**
-   * Check a local start, then create and run the job.
+   * Check a local start, then create and run the job. The job and its site are
+   * stored in the same step, so a call that arrives later finds the site once.
    * @param {ReturnType<typeof validateStart>} input
+   * @param {string} site  `siteKey` of the start URL.
    * @returns {Promise<CrawlJob>}
    */
-  const register = async (input) => {
+  const register = async (input, site) => {
     if (input.allowLoopback) await checkLocalStart(input.startUrl, lookup);
     const id = idFactory ? idFactory() : defaultId(now());
     if (typeof id !== 'string' || !ID_PATTERN.test(id)) throw new Error(`crawl id ${String(id)} is not a safe file name`);
@@ -191,6 +194,7 @@ export function createCrawlManager(deps = {}) {
       id, status: 'running', start_url: input.startUrl, max_pages: input.maxPages, pages_crawled: 0, pages_queued: 0,
       truncated: false, blocked: null, error: null, started_at: now().toISOString(), finished_at: null,
     };
+    siteOf.set(id, site);
     jobs.set(id, { job, done: execute(job, input) });
     return structuredClone(job);
   };
@@ -209,15 +213,15 @@ export function createCrawlManager(deps = {}) {
       if (same || starting.has(site)) {
         throw busy(`A crawl of this site is already running${same ? ` (job ${same.id}, ${same.start_url})` : ''}. Seekwide sends one request at a time to a site: wait for it with crawl_status, then start the next one.`);
       }
-      if (running.length + starting.size >= MAX_RUNNING) {
+      // A site counts once, whether its job is registered already or still starting.
+      const active = new Set([...running.map((job) => siteOf.get(job.id) ?? job.id), ...starting]);
+      if (active.size >= MAX_RUNNING) {
         throw busy(`${MAX_RUNNING} crawls are running already, the most at once. Wait for one of them to finish with crawl_status.`);
       }
       // Held until the job is registered, so that calls arriving while this one awaits are counted too.
       starting.add(site);
       try {
-        const job = await register(input);
-        siteOf.set(job.id, site);
-        return job;
+        return await register(input, site);
       } finally {
         starting.delete(site);
       }
@@ -252,6 +256,15 @@ export function createCrawlManager(deps = {}) {
       const entry = jobs.get(id);
       if (entry && entry.job.status !== 'done' && entry.job.status !== 'blocked') return null;
       return results.get(id) ?? store.load(id);
+    },
+
+    /**
+     * True when a finished crawl's result was deleted from the cache, which keeps the newest 20.
+     * @param {string} id @returns {Promise<boolean>}
+     */
+    async wasPruned(id) {
+      if (typeof id !== 'string' || !ID_PATTERN.test(id)) return false;
+      return store.wasPruned(id);
     },
 
     /**

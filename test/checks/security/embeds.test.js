@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { MIN_PAGES_FOR_RARE } from '../../../server/src/checks/security/embeds.js';
 import { SITE, makePage, makeSecurity } from '../../helpers/factories.js';
 import { audit, findingsFor, statFor } from './support.js';
 
@@ -36,31 +37,49 @@ test(`${FRAME} fails a page with a hidden frame from another site and passes one
   assert.deepEqual(finding.evidence.observed, { hidden_frames: 2, hosts: ['bad.test'], first: { src: 'https://bad.test/x', how: 'zero size' } });
 });
 
-test(`${RARE} lists a script or frame host that only one page uses, on a crawl of five or more pages`, () => {
+/** Pages that load only a shared tag, so that the crawl reaches `MIN_PAGES_FOR_RARE`. @param {number} count @param {import('../../../server/src/types.js').EmbedRecord[]} embeds */
+const filler = (count, embeds) => Array.from({ length: count }, (_, i) => page(`/filler-${i}`, embeds));
+
+test(`${RARE} lists a script or frame host that only one page uses, on a crawl of 50 or more pages`, () => {
   const shared = embed('script', 'https://www.googletagmanager.com/gtag/js');
   const pages = [
     page('/', [shared]),
     page('/a', [shared, embed('script', 'https://odd.test/x.js'), embed('script', 'https://odd.test/y.js')]),
     page('/b', [shared, embed('iframe', 'https://maps.test/embed')]),
     page('/c', [shared, embed('iframe', 'https://maps.test/embed')]),
-    page('/d', [shared]),
+    ...filler(MIN_PAGES_FOR_RARE - 4, [shared]),
   ];
   const result = audit(pages);
   const stat = statFor(result, RARE);
-  assert.deepEqual([stat.applicable, stat.failed], [8, 1]);
+  assert.deepEqual([stat.applicable, stat.failed], [MIN_PAGES_FOR_RARE + 3, 1]);
   const [finding] = findingsFor(result, RARE);
   assert.equal(finding.severity, 'info');
   assert.equal(finding.weight, 0);
   assert.equal(finding.url, `${SITE}/a`);
   assert.equal(finding.selector, 'script[src="https://odd.test/x.js"]');
-  assert.deepEqual(finding.evidence.observed, { host: 'odd.test', tag: 'script', src: 'https://odd.test/x.js', pages_crawled: 5 });
+  assert.deepEqual(finding.evidence.observed, { host: 'odd.test', tag: 'script', src: 'https://odd.test/x.js', pages_crawled: MIN_PAGES_FOR_RARE });
 });
 
-test(`${RARE} has no unit on a crawl of fewer than five pages, and never changes the score`, () => {
-  const small = audit([page('/', []), page('/a', [embed('script', 'https://odd.test/x.js')])]);
-  assert.equal(statFor(small, RARE).applicable, 0);
-  const pages = ['/', '/a', '/b', '/c', '/d'].map((path, i) => page(path, i === 1 ? [embed('script', 'https://odd.test/x.js')] : []));
+test(`${RARE} has no unit on a crawl of fewer than 50 pages, and never changes the score`, () => {
+  // A 25-page crawl: every embed on one page is used by one page, which says nothing (validation of 2026-11-12, fix 12).
+  const pages25 = [page('/', []), page('/a', [embed('iframe', 'https://www.youtube.com/embed/x')]), ...filler(23, [])];
+  assert.equal(statFor(audit(pages25), RARE).applicable, 0);
+  const pages = [page('/', []), page('/a', [embed('script', 'https://odd.test/x.js')]), ...filler(MIN_PAGES_FOR_RARE - 2, [])];
+  assert.equal(findingsFor(audit(pages), RARE).length, 1);
   assert.equal(audit(pages).modules.security.score, 100);
+});
+
+test(`${RARE} leaves out the site's own host and its subdomains, and nothing else`, () => {
+  // Modeled on a blog that embeds a page of its organisation's site in another language (a subdomain).
+  // The same name under another domain, and another tenant of a shared host, are other sites.
+  const pages = [page('/', []), page('/a', [embed('iframe', 'https://it.example.test/widget'), embed('script', 'https://cdn.example.test/x.js'),
+    embed('script', 'https://example.xyz/x.js'), embed('script', 'https://odd.test/x.js')]), ...filler(MIN_PAGES_FOR_RARE - 2, [])];
+  assert.deepEqual(findingsFor(audit(pages), RARE).map((finding) => /** @type {any} */ (finding.evidence.observed).host).sort(), ['example.xyz', 'odd.test']);
+  const tenant = (/** @type {string} */ path, /** @type {import('../../../server/src/types.js').EmbedRecord[]} */ embeds) =>
+    makePage({ url: `https://mysite.host.test${path}`, security: makeSecurity({ embeds }) });
+  const shared = [tenant('/', []), tenant('/a', [embed('script', 'https://evil.host.test/x.js')]), ...Array.from({ length: MIN_PAGES_FOR_RARE - 2 }, (_, i) => tenant(`/f${i}`, []))];
+  const crawl = { start_url: 'https://mysite.host.test/', site_origin: 'https://mysite.host.test', site_host: 'mysite.host.test' };
+  assert.deepEqual(findingsFor(audit(shared, crawl), RARE).map((finding) => /** @type {any} */ (finding.evidence.observed).host), ['evil.host.test']);
 });
 
 test(`${FRAME} and ${RARE} leave out frames and scripts from the deployed site of a local crawl`, () => {

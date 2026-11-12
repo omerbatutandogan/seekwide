@@ -245,6 +245,28 @@ export function enterElement(parent, { tag, hidden, style, line, id = null, reve
 }
 
 /**
+ * Both states at once: what hides content in either place hides it. Used for
+ * content a script moves from one place to another, where a visitor may see
+ * it in either.
+ * @param {HiddenState} first
+ * @param {HiddenState} second
+ * @returns {HiddenState}
+ */
+export function combineStates(first, second) {
+  if (first === second || second === VISIBLE) return first;
+  if (first === VISIBLE) return second;
+  /** @param {readonly Concealment[]} a @param {readonly Concealment[]} b */
+  const merge = (a, b) => b.reduce((list, entry) => (list.includes(entry) ? list : add(list, entry)), a);
+  return {
+    gone: merge(first.gone, second.gone),
+    visibility: merge(first.visibility, second.visibility),
+    fontSize: merge(first.fontSize, second.fontSize),
+    offscreen: merge(first.offscreen, second.offscreen),
+    zeroSize: merge(first.zeroSize, second.zeroSize),
+  };
+}
+
+/**
  * Every element that hides the content, by way of hiding, outermost first; empty when nothing does.
  * @param {HiddenState} state
  * @returns {Concealment[]}

@@ -16,6 +16,11 @@ export {};
  * @property {string[]} rel           Lower-cased `rel` tokens.
  * @property {boolean} internal       True when `url` belongs to the audited site.
  * @property {boolean} has_onclick    True when the element has an `onclick` attribute.
+ * @property {boolean} [has_handler]  True when the element has another inline event handler (`onmousedown`, `ontouchstart`…), a click
+ *   binding of a script framework (`ng-click`, `v-on:click`, `@click`, `x-on:click`, `(click)`, `wire:click`, `hx-get`, `hx-post`), or a
+ *   URL in `data-href`, `data-url` or `data-link`: a script may do what the link does. Absent in crawls made before rule set 0.1.5.
+ * @property {boolean} [aria_hidden]  True when the element, or an element around it, has `aria-hidden="true"`: it is left out of
+ *   what screen readers read, usually as a copy of a link that is named elsewhere. Absent in crawls made before rule set 0.1.5.
  * @property {number|null} line       1-based source line of the element.
  */
 

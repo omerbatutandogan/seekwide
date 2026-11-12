@@ -5,6 +5,7 @@
 /** @import { ToolDeps } from './index.js' */
 
 import { LIMITS } from '../config.js';
+import { FILES_KEPT } from '../crawl/store.js';
 import { ToolError } from '../mcp/stdio.js';
 import { clip } from '../util/strings.js';
 import { normalizeUrl } from '../util/url.js';
@@ -15,11 +16,24 @@ const MAX_WAIT_SECONDS = 25;
 const ERROR_SHOWN = 500;
 
 /**
+ * The error for a job id with no crawl: deleted from the cache, or never started.
+ * @param {ToolDeps['crawlManager']} manager
+ * @param {string} jobId
+ * @returns {Promise<ToolError>}
+ */
+async function missingCrawl(manager, jobId) {
+  if (await manager.wasPruned?.(jobId)) {
+    return new ToolError(`The result of crawl "${jobId}" was removed from the cache: Seekwide keeps only the ${FILES_KEPT} newest crawls. Crawl the site again with crawl_start to inspect its pages.`);
+  }
+  return new ToolError(`No crawl job "${jobId}" was found. Call crawl_start to start a crawl and use the job_id it returns.`);
+}
+
+/**
  * The stored result of a crawl that has finished (`done` or `blocked`).
  * @param {ToolDeps['crawlManager']} manager
  * @param {string} jobId
  * @returns {Promise<CrawlResult>}
- * @throws {ToolError} when the job is running, failed or unknown.
+ * @throws {ToolError} when the job is running, failed, deleted from the cache or unknown.
  */
 export async function finishedCrawl(manager, jobId) {
   checkId(jobId, 'job_id');
@@ -31,9 +45,7 @@ export async function finishedCrawl(manager, jobId) {
     throw new ToolError(`The crawl failed: ${job.error ?? 'no reason was recorded'}. Fix the problem and start a new crawl with crawl_start.`);
   }
   const crawl = await manager.result(jobId);
-  if (!crawl) {
-    throw new ToolError(`No crawl job "${jobId}" was found. Call crawl_start to start a crawl and use the job_id it returns.`);
-  }
+  if (!crawl) throw await missingCrawl(manager, jobId);
   return crawl;
 }
 
@@ -229,7 +241,7 @@ export function crawlTools(deps) {
         let crawl = null;
         if (!job) {
           crawl = await manager.result(jobId);
-          if (!crawl) throw new ToolError(`No crawl job "${jobId}" was found. Call crawl_start to start a crawl and use the job_id it returns.`);
+          if (!crawl) throw await missingCrawl(manager, jobId);
           job = jobFromResult(crawl);
         }
         // A failed job's error and a block can name addresses the site chose, so the answer is clipped and labeled.

@@ -1,8 +1,9 @@
 /** @import { Run } from '../types.js' */
 
-import { CONFIDENCE_LABELS, CONFIDENCE_NOTE, FIXES_NOTE, FIX_OUTCOME_LABELS, RATING_LABELS, SCORE_NOTE, SEVERITY_LABELS, SUGGESTIONS_NOTE, SUMMARY_NOTE } from './copy.js';
+import { CONFIDENCE_NOTE, FIXES_NOTE, FIX_OUTCOME_LABELS, RATING_LABELS, SCORE_NOTE, SEVERITY_LABELS, SUGGESTIONS_NOTE, SUMMARY_NOTE } from './copy.js';
 import { mdCode, mdText, mdUrl } from './escape.js';
 import { plural } from './facts.js';
+import { affectedText, confidenceText } from './findings.js';
 import { buildReport } from './model.js';
 
 /** @typedef {ReturnType<typeof buildReport>} Report */
@@ -19,8 +20,6 @@ function table(header, rows) {
 /** @param {string} severity */
 const severity = (severity) => SEVERITY_LABELS[/** @type {keyof typeof SEVERITY_LABELS} */ (severity)];
 
-/** @param {string} confidence */
-const confidence = (confidence) => CONFIDENCE_LABELS[/** @type {keyof typeof CONFIDENCE_LABELS} */ (confidence)];
 
 /**
  * @param {number|null} value
@@ -137,7 +136,7 @@ function topFixes(r) {
   r.topFixes.forEach((group, index) => {
     lines.push(`### ${index + 1}. ${mdText(group.title)} (${severity(group.severity)})`, '');
     lines.push(`- **Check:** ${mdCode(group.checkId)}`);
-    lines.push(`- **Affected:** ${plural(group.count, 'finding')} · **Confidence:** ${confidence(group.confidence)}`);
+    lines.push(`- **Affected:** ${affectedText(group)} · **Confidence:** ${confidenceText(group)}`);
     if (group.recommendation) lines.push(`- **What to do:** ${mdText(group.recommendation)}`);
     if (group.examples.length > 0) lines.push(`- **Examples:** ${group.examples.map((url) => mdUrl(url)).join(' ')}`);
     if (group.docRef) lines.push(`- **Documentation:** ${mdUrl(group.docRef)}`);
@@ -152,7 +151,7 @@ function allFindings(r) {
   if (r.groups.length === 0) return [...lines, 'No findings.', ''];
   for (const group of r.groups) {
     lines.push(`### ${mdText(group.title)} (${mdCode(group.checkId)})`, '');
-    lines.push(`${severity(group.severity)} · ${confidence(group.confidence)} · ${plural(group.count, 'finding')}`, '');
+    lines.push(`${severity(group.severity)} · ${confidenceText(group)} · ${affectedText(group)}`, '');
     const rows = group.shown.map((f) => [f.url === null ? 'Whole site' : mdUrl(f.url, true), evidenceCell(f)]);
     lines.push(...table(['URL', 'Evidence'], rows), '');
     if (group.more > 0) lines.push(`+${group.more} more ${group.more === 1 ? 'finding' : 'findings'} not shown.`, '');

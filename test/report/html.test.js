@@ -129,7 +129,7 @@ test('scope: budget, truncation, blocks, robots.txt, sitemap and user agent', ()
 
   const limited = textOf(section(renderHtml(makeRun({ crawl: { truncated: true, robots_status: 'unreachable', sitemap_urls: 0, blocked: { reason: 'rate_limited', url: 'https://example.test/x', status: 429 } } })), 'scope'));
   assert.match(limited, /Page limit reached Yes\./);
-  assert.match(limited, /Blocked The crawl stopped early: the site kept answering "too many requests" \(HTTP 429\) at https:\/\/example\.test\/x \(HTTP 429\)\./);
+  assert.match(limited, /Blocked The crawl stopped early at https:\/\/example\.test\/x \(HTTP 429\): the site kept answering "too many requests"\./);
   assert.match(limited, /treated every URL as disallowed/);
   assert.match(limited, /No URLs found in XML sitemaps\./);
 });

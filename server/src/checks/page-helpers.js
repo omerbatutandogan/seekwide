@@ -1,4 +1,4 @@
-/** @import { PageRecord } from '../types.js' */
+/** @import { PageRecord, SitemapFile } from '../types.js' */
 
 // Small questions about a page that several checks ask. Shared so the SEO and
 // links modules answer them the same way.
@@ -67,4 +67,18 @@ export function isUnverifiable(page) {
  */
 export function isRedirectRecord(page) {
   return page.status >= 300 && page.status < 400;
+}
+
+/** Statuses with which a site refuses a client rather than says a file is broken: authentication, forbidden, too many requests. */
+const REFUSALS = new Set([401, 403, 429]);
+
+/**
+ * True for a sitemap file the site refused to give the crawler (401, 403 or
+ * 429). Like a page the crawler was refused on, it says nothing about whether
+ * search engines can read the file, so it is not a unit.
+ * @param {SitemapFile} file
+ * @returns {boolean}
+ */
+export function isRefusedSitemap(file) {
+  return file.type === 'unreachable' && REFUSALS.has(file.status);
 }

@@ -23,13 +23,13 @@ export const SEVERITY_LABELS = Object.freeze({ critical: 'Critical', high: 'High
 
 export const CONFIDENCE_LABELS = Object.freeze({ confirmed: 'Confirmed', likely: 'Likely' });
 
-export const MODULE_LABELS = Object.freeze({ seo: 'SEO', links: 'Links', security: 'Security' });
+export const MODULE_LABELS = Object.freeze({ seo: 'SEO', links: 'Links', security: 'Security', security_headers: 'Security headers' });
 
 export const BLOCK_REASONS = Object.freeze({
   robots_unreachable: 'robots.txt could not be read, so the crawler did not continue',
   robots_disallow: 'robots.txt disallows the start URL',
   bot_challenge: 'the site answered with a bot challenge and the crawler did not try to get past it',
-  rate_limited: 'the site kept answering "too many requests" (HTTP 429)',
+  rate_limited: 'the site kept answering "too many requests"',
 });
 
 export const ROBOTS_STATUS = Object.freeze({
@@ -76,7 +76,8 @@ export const SUGGESTIONS_NOTE =
 export const SUMMARY_NOTE = 'Written summary (interpretation, not scored). The measured facts are in the sections below.';
 
 export const SCORE_NOTE =
-  'A score is the weighted pass rate, from 0 to 100, of the checks that ran; 100 means no scored check found a failure. Coverage is the share of the module\'s checks that ran. Checks that did not run and informational checks do not change a score.';
+  'A score is the weighted pass rate, from 0 to 100, of the checks that ran; 100 means no scored check found a failure. Coverage is the share of the module\'s checks that ran. Checks that did not run and informational checks do not change a score. ' +
+  'The security module has two scores: Security for signs that the site was hacked, and Security headers for the response headers of the start page, which protect visitors and say nothing about a hack.';
 
 export const CONFIDENCE_NOTE = 'Confirmed means a measured fact. Likely means a strong signal that can have a legitimate exception, so review it before acting.';
 

@@ -116,7 +116,7 @@ export async function runCrawl(params, deps, onProgress) {
       started_at: startedAt, finished_at: now().toISOString(),
       options: { max_pages: maxPages, rate_per_sec: ratePerSec, include_subdomains: includeSubdomains, local: loopbackOrigin !== null, ...(deployed === null ? {} : { deployed_origin: deployed, deployed_localized: localized }) },
       robots: robots.summary, sitemap, http_probe: httpProbe, pages: records.pages,
-      robots_blocked: robotsBlocked, truncated: records.truncated(), blocked, user_agent: USER_AGENT,
+      robots_blocked: robotsBlocked, disallowed_links: records.disallowedLinks(), truncated: records.truncated(), blocked, user_agent: USER_AGENT,
       ...(timeUp ? { time_limit_reached: true } : {}),
     };
     return { status: blocked ? 'blocked' : 'done', result };

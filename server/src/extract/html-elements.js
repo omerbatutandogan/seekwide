@@ -8,7 +8,7 @@
 import { LIMITS } from '../config.js';
 import { clip, collapseWhitespace } from '../util/strings.js';
 import { isInternalUrl, normalizeUrl } from '../util/url.js';
-import { MAX_LIST_CHARS, attr, insecureUrl, isHtmlElement, lineOf, textChars, textOf, tokens } from './dom.js';
+import { MAX_LIST_CHARS, attr, insecureUrl, isAriaHidden, isHtmlElement, lineOf, textChars, textOf, tokens } from './dom.js';
 import { parseJsonLd } from './jsonld.js';
 
 /** Script types a browser runs as JavaScript. */
@@ -33,6 +33,23 @@ const LONG_TEXT = 1000;
 /** A link's rel attribute has a few tokens; more are not kept. */
 const MAX_REL_TOKENS = 20;
 const MAX_SOCIAL_KEYS = 50;
+/** Attributes through which a script framework or a delegated handler acts on a click, or reads where a link goes. */
+const CLICK_BINDINGS = new Set(['ng-click', 'data-ng-click', 'v-on:click', '@click', 'x-on:click', '(click)', 'wire:click', 'hx-get', 'hx-post', 'data-href', 'data-url', 'data-link']);
+
+/**
+ * True when an element has an inline event handler other than `onclick`, a
+ * framework's click binding (with or without modifiers, `@click.prevent`), or
+ * a URL in a `data-href`-style attribute.
+ * @param {DomNode} node
+ * @returns {boolean}
+ */
+function hasHandler(node) {
+  return (node.attrs ?? []).some(({ name }) => (name.startsWith('on') && name !== 'onclick' && name.length > 2)
+    || CLICK_BINDINGS.has(name) || CLICK_BINDINGS.has(name.split('.', 1)[0]));
+}
+
+/** Open Graph properties that also give `og.image`, when it has no value yet. */
+const OG_IMAGE_ALIASES = new Set(['og:image:url', 'og:image:secure_url']);
 
 /** Subresource elements checked for mixed content, with the attribute that loads them. */
 const SUBRESOURCE_ATTR = new Map([
@@ -47,6 +64,8 @@ const HEADING_LEVELS = new Map([['h1', 1], ['h2', 2], ['h3', 3], ['h4', 4], ['h5
  * @property {boolean} head  Inside `<head>`.
  * @property {boolean} body  Inside `<body>`.
  * @property {boolean} hidden  Text here is not visible body text.
+ * @property {boolean} replaced  Inside fallback content that React's streaming script replaces on load (react-stream.js).
+ * @property {boolean} ariaHidden  Inside an element with `aria-hidden="true"`.
  */
 
 /**
@@ -62,6 +81,7 @@ const HEADING_LEVELS = new Map([['h1', 1], ['h2', 2], ['h3', 3], ['h4', 4], ['h5
  * @property {boolean} upgradeInsecure  The page upgrades insecure requests.
  * @property {boolean} nextFlight     The page has Next.js App Router data scripts.
  * @property {boolean} bodyTitle      A `<title>` is inside `<body>`.
+ * @property {boolean} [ogImageAlias]  `og.image` came from `og:image:url` or `og:image:secure_url`, so a later `og:image` replaces it.
  */
 
 /**
@@ -143,8 +163,21 @@ export function visitElement(node, frame, state) {
       state.out.viewport = clip(collapseWhitespace(content ?? ''), LIMITS.maxStringLength);
     }
     for (const key of [property, name]) {
-      if (key.startsWith('og:')) setFirst(state.out.og, key.slice(3), content);
-      else if (key.startsWith('twitter:')) setFirst(state.out.twitter, key.slice(8), content);
+      if (key.startsWith('og:')) {
+        const filled = (content ?? '').trim() !== '';
+        // ogp.me: og:image:url is identical to og:image, and og:image:secure_url names the same image over https. Such a
+        // property fills og.image while it has no value, and an og:image with a value that comes later still takes its place.
+        if (key === 'og:image' && filled && state.ogImageAlias) {
+          delete state.out.og.image;
+          state.ogImageAlias = false;
+        }
+        setFirst(state.out.og, key.slice(3), content);
+        if (OG_IMAGE_ALIASES.has(key) && filled && (state.out.og.image ?? '').trim() === '') {
+          delete state.out.og.image;
+          setFirst(state.out.og, 'image', content);
+          state.ogImageAlias = true;
+        }
+      } else if (key.startsWith('twitter:')) setFirst(state.out.twitter, key.slice(8), content);
     }
   } else if (tag === 'link') {
     const rel = tokens(attr(node, 'rel'));
@@ -174,6 +207,8 @@ export function visitElement(node, frame, state) {
         rel: tokens(attr(node, 'rel')).slice(0, MAX_REL_TOKENS).map((token) => clip(token, LIMITS.maxStringLength)),
         internal: url !== null && isInternalUrl(url, state.siteHost, state.includeSubdomains),
         has_onclick: attr(node, 'onclick') !== null,
+        has_handler: hasHandler(node),
+        aria_hidden: frame.ariaHidden || isAriaHidden(node),
         line,
       });
     }
@@ -199,7 +234,7 @@ export function visitElement(node, frame, state) {
         line,
       });
     }
-  } else if (HEADING_LEVELS.has(tag) && hasRoom(state.out.headings, CAPS.headings)) {
+  } else if (HEADING_LEVELS.has(tag) && !frame.replaced && hasRoom(state.out.headings, CAPS.headings)) {
     const level = /** @type {Heading['level']} */ (HEADING_LEVELS.get(tag));
     state.out.headings.push({ level, text: clip(collapseWhitespace(textOf(node, true, LIMITS.maxStringLength)), LIMITS.maxStringLength), line });
   } else if (tag === 'script') {

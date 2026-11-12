@@ -1,7 +1,12 @@
 /** @import { CheckDef, CheckStat, ModuleScore } from '../types.js' */
 
+import { MODULES } from '../config.js';
+
 /**
- * Score each module from its check statistics.
+ * Score each module from its check statistics. A check with a `score_group`
+ * counts toward that score instead of its module's (`SCORE_GROUPS`): the
+ * security module is scored as `security` (signs of a hack) and
+ * `security_headers`, each with its own coverage.
  *
  * score = 100 × Σ(weight × pass rate) / Σ(weight), over checks that ran, looked
  * at one or more units and have a weight above zero. A check's pass rate is
@@ -21,11 +26,12 @@
  */
 export function scoreModules(stats, checks) {
   const weights = new Map(checks.map((check) => [check.id, check.weight]));
+  const groups = new Map(checks.map((check) => [check.id, check.score_group ?? check.module]));
   /** @type {Record<string, {total: number, run: number, skipped: number, weightedPass: number, weightSum: number, failures: boolean}>} */
   const acc = {};
 
   for (const stat of stats) {
-    const m = (acc[stat.module] ??= { total: 0, run: 0, skipped: 0, weightedPass: 0, weightSum: 0, failures: false });
+    const m = (acc[groups.get(stat.id) ?? stat.module] ??= { total: 0, run: 0, skipped: 0, weightedPass: 0, weightSum: 0, failures: false });
     m.total += 1;
     if (stat.status !== 'run') {
       m.skipped += 1;
@@ -55,7 +61,7 @@ export function scoreModules(stats, checks) {
       note: scored
         ? null
         : m.run === 0
-          ? 'None of this module\'s checks could run.'
+          ? (MODULES.includes(name) ? 'None of this module\'s checks could run.' : 'None of the checks behind this score could run.')
           : 'No score: the scored checks had nothing to look at in this crawl.',
     };
   }

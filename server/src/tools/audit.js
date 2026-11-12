@@ -8,7 +8,7 @@ import { LIMITS, MODULES, RULES_VERSION, SCHEMA_VERSION, SEVERITIES, VERSION } f
 import { buildContext, runChecks } from '../checks/engine.js';
 import { onDeployedHost } from '../crawl/deployed.js';
 import { isUnverifiable } from '../checks/page-helpers.js';
-import { runNotes, skippedChecks, topGroups } from './audit-summary.js';
+import { runNotes, skippedChecks, startPage, topGroups } from './audit-summary.js';
 import { VITALS_ARGUMENTS, collectVitals, vitalsOutput } from './audit-vitals.js';
 import { JOB_ID_SCHEMA, PROJECT_DIR_SCHEMA, UNTRUSTED_NOTE, countBy, resolveProjectDir, withStoreErrors } from './common.js';
 import { finishedCrawl } from './crawl.js';
@@ -178,6 +178,7 @@ export function auditTools(deps) {
             sitemap_urls: crawl.sitemap.urls.length,
             max_pages: crawl.options.max_pages,
             user_agent: crawl.user_agent,
+            ...startPage(crawl),
           },
           modules_requested: modules,
           modules: scores,

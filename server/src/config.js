@@ -10,7 +10,7 @@ const pkg = JSON.parse(readFileSync(path.join(PLUGIN_ROOT, 'package.json'), 'utf
 export const VERSION = /** @type {string} */ (pkg.version);
 
 /** Version of the rule set. Bump it whenever a check changes what it reports. */
-export const RULES_VERSION = '0.1.4';
+export const RULES_VERSION = '0.1.5';
 
 /** Version of the JSON written under `.seekwide/`. */
 export const SCHEMA_VERSION = 1;
@@ -56,6 +56,14 @@ export const LIMITS = Object.freeze({
 });
 
 export const MODULES = Object.freeze(['seo', 'links', 'security']);
+
+/**
+ * Scores a module's checks can count toward instead of the module's own, with
+ * the module they belong to. The security headers protect visitors and say
+ * nothing about a hack, so they are scored apart from the signs of one: a clean
+ * site is not read as insecure because of its headers alone.
+ */
+export const SCORE_GROUPS = Object.freeze({ security_headers: 'security' });
 
 export const SEVERITIES = Object.freeze(['critical', 'high', 'medium', 'low', 'info']);
 

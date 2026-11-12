@@ -9,6 +9,8 @@
 // wildcards can be found left to right instead, each at its first place: that
 // answers the same question in one pass over the path per rule.
 
+import { normalizeEscapes } from '../util/url.js';
+
 /**
  * A rule as robots-parser stores it: the pattern with its percent escapes
  * normalized, and whether it allows.
@@ -28,8 +30,11 @@
  * @returns {CompiledRule}
  */
 export function compileRule(rule) {
-  const anchored = rule.pattern.endsWith('$');
-  const body = anchored ? rule.pattern.slice(0, -1) : rule.pattern;
+  // RFC 9309, 2.2.2: a percent-encoded unreserved character is compared as the character itself, in the rule as in the URL.
+  // Precedence keeps the length of the rule as written, as robots-parser and Google's matcher count it.
+  const pattern = normalizeEscapes(rule.pattern);
+  const anchored = pattern.endsWith('$');
+  const body = anchored ? pattern.slice(0, -1) : pattern;
   return { length: rule.pattern.length, allow: rule.allow, pieces: body.split('*'), anchored };
 }
 
@@ -39,7 +44,9 @@ export function compileRule(rule) {
  * must end it.
  *
  * Guarantees: the same answer as robots-parser 3.0.1 for every pattern and
- * path, and at most one pass over the path per piece boundary.
+ * path without escapes of unreserved characters (`compileRule` and `rulePath`
+ * decode those in both, as RFC 9309 asks), and at most one pass over the path
+ * per piece boundary.
  * @param {CompiledRule} rule
  * @param {string} path
  * @returns {boolean}
@@ -106,12 +113,13 @@ export function compiledGroup(parser, agent) {
 }
 
 /**
- * The path robots-parser compares with the rules: path and query of the URL,
- * with the hex digits of percent escapes in upper case.
+ * The path compared with the rules: path and query of the URL, with the hex
+ * digits of percent escapes in upper case and escapes of unreserved
+ * characters decoded, as in the compiled rules.
  * @param {string} url  An absolute http(s) URL.
  * @returns {string}
  */
 export function rulePath(url) {
   const parsed = new URL(url);
-  return (parsed.pathname + parsed.search).replace(/%[0-9a-fA-F]{2}/g, (escape) => escape.toUpperCase());
+  return normalizeEscapes(parsed.pathname + parsed.search);
 }

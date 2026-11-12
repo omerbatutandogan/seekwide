@@ -10,7 +10,13 @@ import { log } from '../log.js';
 
 /** @import { CrawlResult, VitalsData } from '../types.js' */
 
-const FILES_KEPT = 20;
+/** Crawl files kept in one data folder; older ones are deleted. */
+export const FILES_KEPT = 20;
+/** The ids of deleted crawls, one per line, so that a request for one can say it was deleted rather than unknown. */
+const PRUNED_FILE = 'pruned-ids.txt';
+/** Most deleted ids remembered; the oldest are forgotten first. */
+const PRUNED_KEPT = 1000;
+const SAFE_ID = /^[A-Za-z0-9_-]{1,100}$/;
 /** A temporary file this old is left over from a write that never finished. */
 const STALE_TEMP_MS = 24 * 60 * 60 * 1000;
 const VITALS_SUFFIX = '.vitals.json';
@@ -53,7 +59,9 @@ function isVitalsData(value) {
  * other inside this store, so two audits that finish together both keep
  * theirs (there is no lock across processes); only
  * the 20 newest crawl files are kept, each with its measurement file, and a
- * measurement file whose crawl file is gone is deleted with them; a temporary
+ * measurement file whose crawl file is gone is deleted with them; the ids of
+ * deleted crawls are remembered (the newest 1000, in `pruned-ids.txt`), so
+ * `wasPruned` can tell a deleted crawl from one that never existed; a temporary
  * file is deleted once it is a day old. `id` must already be a safe file name.
  *
  * @param {string} crawlsDir
@@ -82,6 +90,27 @@ export function createCrawlStore(crawlsDir) {
     return opened;
   };
 
+  /** @returns {Promise<string[]>} The remembered ids of deleted crawls, oldest first. */
+  const readPruned = async () => {
+    try {
+      const text = await readFile(path.join(crawlsDir, PRUNED_FILE), 'utf8');
+      return text.split('\n').filter((line) => SAFE_ID.test(line)).slice(-PRUNED_KEPT);
+    } catch (error) {
+      if (/** @type {NodeJS.ErrnoException} */ (error).code !== 'ENOENT') log.warn('could not read the ids of deleted crawls', { error: String(error) });
+      return [];
+    }
+  };
+  /** The last write of the deleted ids, so writes of this store follow one another. @type {Promise<void>} */
+  let prunedWrite = Promise.resolve();
+  /** @param {string[]} ids Crawls just deleted. */
+  const rememberPruned = (ids) => {
+    prunedWrite = prunedWrite.catch(() => {}).then(async () => {
+      const known = (await readPruned()).filter((id) => !ids.includes(id));
+      await writeWhole(path.join(crawlsDir, PRUNED_FILE), `${[...known, ...ids].slice(-PRUNED_KEPT).join('\n')}\n`);
+    });
+    return prunedWrite;
+  };
+
   /** Delete all but the newest `FILES_KEPT` crawl files with their measurements, and temporary files older than a day. */
   const prune = async () => {
     const all = await readdir(crawlsDir);
@@ -97,8 +126,10 @@ export function createCrawlStore(crawlsDir) {
     if (names.length > FILES_KEPT) {
       const dated = await Promise.all(names.map(async (name) => ({ name, mtime: (await stat(path.join(crawlsDir, name))).mtimeMs })));
       dated.sort((a, b) => b.mtime - a.mtime || (a.name < b.name ? 1 : -1));
-      await Promise.all(dated.slice(FILES_KEPT).map(({ name }) => unlink(path.join(crawlsDir, name)).catch(() => {})));
+      const removed = await Promise.all(dated.slice(FILES_KEPT).map(({ name }) => unlink(path.join(crawlsDir, name)).then(() => name, () => null)));
       kept = new Set(dated.slice(0, FILES_KEPT).map(({ name }) => name));
+      const ids = removed.filter((name) => name !== null).map((name) => /** @type {string} */ (name).slice(0, -'.json'.length));
+      if (ids.length > 0) await rememberPruned(ids);
     }
     const orphans = all.filter((name) => name.endsWith(VITALS_SUFFIX) && !kept.has(`${name.slice(0, -VITALS_SUFFIX.length)}.json`));
     await Promise.all(orphans.map((name) => unlink(path.join(crawlsDir, name)).catch(() => {})));
@@ -137,6 +168,13 @@ export function createCrawlStore(crawlsDir) {
     async save(result) {
       await writeWhole(path.join(crawlsDir, `${result.id}.json`), JSON.stringify(result));
       await prune();
+    },
+
+    /** True when the crawl was deleted to keep the newest `FILES_KEPT`. @param {string} id @returns {Promise<boolean>} */
+    async wasPruned(id) {
+      await openDir();
+      await prunedWrite.catch(() => {});
+      return (await readPruned()).includes(id);
     },
 
     /** A stored crawl result, or null when there is none or it cannot be read. @param {string} id @returns {Promise<CrawlResult|null>} */

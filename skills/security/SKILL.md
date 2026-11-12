@@ -74,7 +74,7 @@ Lead with one or two sentences: how many pages were crawled, whether the crawl w
 
 Then:
 
-- **Score** and coverage. Coverage is 50% when the header checks were skipped for a local server. A module without a score has `score: null` and a `note` that says why; give that reason instead of a number.
+- **Scores** and coverage. The module has two scores: `security` for signs of a hack, and `security_headers` for the start page's headers. Give them as two lines and do not add them up: missing headers are not a sign of a hack, and a clean site with missing headers has a security score of 100. For a local server the headers score is `null`, because the header checks were skipped. A score of `null` comes with a `note` that says why; give that reason instead of a number.
 - **Signs of a hack** first, by severity: for each, the page, what was found (the hiding element, the terms, the frame's host) and what to check. Do not repeat spam terms or spam URLs more often than needed to identify them.
 - **Security headers** after that, with the header to send.
 - **If signs were found**, what to do: check Search Console's Security issues report, follow Google's help for hacked sites (https://web.dev/articles/hacked), find and remove what adds the content (often a compromised plugin, theme or file on the server), change passwords, update the software, and only then ask Google for a review.

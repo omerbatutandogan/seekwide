@@ -117,7 +117,7 @@ const duplicate = {
         evidence: {
           observed: { pages_with_same_description: others.length + 1 },
           expected: 'A description no other indexable page uses',
-          detail: `${otherPages(others.length)} use the same meta description.`,
+          detail: `${otherPages(others.length, 'uses', 'use')} the same meta description.`,
         },
       }),
     );

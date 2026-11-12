@@ -324,14 +324,14 @@ test('links.internal.redirect passes direct links and skips targets that were no
 
 // ───────────── links.internal.nofollow ─────────────
 
-test('links.internal.nofollow fails when any link to a target on the page has nofollow', () => {
+test('links.internal.nofollow fails only when every link to a page on the page has nofollow', () => {
   const home = makePage({
     url: `${SITE}/`,
     links: [
       makeLink({ url: `${SITE}/a`, href: '/a', line: 5 }),
-      makeLink({ url: `${SITE}/a`, href: '/a?ref=footer', rel: ['noopener', 'nofollow'], line: 40 }),
+      makeLink({ url: `${SITE}/a`, href: '/a#footer', rel: ['noopener', 'nofollow'], line: 40 }),
       makeLink({ url: `${SITE}/b`, href: '/b', rel: ['noopener'] }),
-      makeLink({ url: `${SITE}/not-crawled`, href: '/not-crawled', rel: ['nofollow'] }),
+      makeLink({ url: `${SITE}/not-crawled`, href: '/not-crawled', rel: ['noopener', 'nofollow'], line: 12 }),
       makeLink({ url: 'https://other.test/x', href: 'https://other.test/x', rel: ['nofollow'] }),
     ],
   });
@@ -341,21 +341,19 @@ test('links.internal.nofollow fails when any link to a target on the page has no
   const stat = statFor(result, 'links.internal.nofollow');
   // /a, /b and /not-crawled: no record is needed, external links and non-html pages are not units.
   assert.equal(stat.applicable, 3);
-  assert.equal(stat.failed, 2);
-  assert.equal(stat.passed, 1);
+  assert.equal(stat.failed, 1, '/a is also linked without nofollow');
+  assert.equal(stat.passed, 2);
 
-  const findings = findingsFor(result, 'links.internal.nofollow');
-  const a = findings.find((f) => f.evidence.observed && /** @type {any} */ (f.evidence.observed).target_url === `${SITE}/a`);
-  assert.ok(a);
-  assert.equal(a.selector, 'a[href="/a?ref=footer"]');
-  assert.equal(a.line, 40);
-  assert.deepEqual(a.evidence.observed, {
-    target_url: `${SITE}/a`,
+  const [finding] = findingsFor(result, 'links.internal.nofollow');
+  assert.equal(finding.selector, 'a[href="/not-crawled"]');
+  assert.equal(finding.line, 12);
+  assert.deepEqual(finding.evidence.observed, {
+    target_url: `${SITE}/not-crawled`,
     rel: ['noopener', 'nofollow'],
     nofollow_links: 1,
-    links_to_target: 2,
+    links_to_target: 1,
   });
-  assert.equal(a.evidence.detail, `1 of 2 link(s) to ${SITE}/a on this page have rel="nofollow".`);
+  assert.equal(finding.evidence.detail, `The only link to ${SITE}/not-crawled on this page has rel="nofollow".`);
 });
 
 test('links.internal.nofollow passes links with other rel values', () => {

@@ -52,6 +52,7 @@ function evidenceText(value) {
  * @property {{file: string, line: number|null, route: string|null}|null} source  Repo mode: where the fix belongs.
  * @property {EvidencePart[]} evidence
  * @property {string[]} related
+ * @property {string|null} target  The link target the finding is about (`evidence.observed.target_url`), when it names one.
  * @property {string} recommendation
  * @property {string} docRef
  */
@@ -86,6 +87,7 @@ export function viewFinding(raw) {
     if (value !== undefined && value !== null && value !== '') parts.push({ label, kind, value: evidenceText(value) });
   }
   const url = str(f.url);
+  const observed = obj(evidence.observed);
   return {
     id: str(f.id),
     checkId: str(f.check_id),
@@ -101,6 +103,7 @@ export function viewFinding(raw) {
     source: viewSource(f.source),
     evidence: parts,
     related: (Array.isArray(f.related_urls) ? /** @type {unknown[]} */ (f.related_urls) : []).filter((u) => typeof u === 'string'),
+    target: typeof observed.target_url === 'string' && observed.target_url !== '' ? clip(observed.target_url, EVIDENCE_MAX) : null,
     recommendation: text(f.recommendation),
     docRef: str(f.doc_ref),
   };
@@ -121,8 +124,58 @@ function compareGroups(a, b) {
 }
 
 /**
+ * What the owner fixes for a finding of the links module: the link target, or
+ * the link itself (its selector) when the evidence names no target. A link in
+ * a menu or footer is one fix however many pages repeat it.
+ * @param {FindingView} finding
+ * @returns {string}
+ */
+function fixKey(finding) {
+  return finding.target ?? finding.selector ?? finding.url ?? finding.id;
+}
+
+/**
+ * How many distinct links a group of the links module is about, and on how
+ * many pages, or null for other modules, whose findings are each a fix of
+ * their own page.
+ * @param {FindingView[]} list
+ * @returns {{links: number, pages: number}|null}
+ */
+function distinctLinks(list) {
+  if (list[0]?.module !== 'links') return null;
+  return { links: new Set(list.map(fixKey)).size, pages: new Set(list.map((finding) => finding.url)).size };
+}
+
+/**
+ * "66 findings (3 links on 22 pages)": the count of findings, with what the
+ * owner has to fix when that is fewer.
+ * @param {{count: number, distinct: {links: number, pages: number}|null}} group
+ * @returns {string}
+ */
+export function affectedText(group) {
+  const findings = `${group.count} finding${group.count === 1 ? '' : 's'}`;
+  const { distinct } = group;
+  if (distinct === null || distinct.links >= group.count) return findings;
+  return `${findings} (${distinct.links} link${distinct.links === 1 ? '' : 's'} on ${distinct.pages} page${distinct.pages === 1 ? '' : 's'})`;
+}
+
+/**
+ * The confidence of a group in words: "Likely" when every finding is likely,
+ * "Confirmed" when every one is confirmed, and for a group with both (a check
+ * whose temporary redirects are likely) how many are likely.
+ * @param {{confidence: string, count: number, likely: number}} group
+ * @returns {string}
+ */
+export function confidenceText(group) {
+  if (group.likely === 0 || group.likely === group.count) return group.confidence === 'confirmed' ? 'Confirmed' : 'Likely';
+  return `Likely for ${group.likely} of ${group.count} findings, confirmed for the rest`;
+}
+
+/**
  * One group per check, in report order (severity, impact, effort, check id),
- * each with its findings sorted by URL and selector.
+ * each with its findings sorted by URL and selector, for the links module the
+ * number of distinct links and pages (`distinct`), and the number of likely
+ * findings (`likely`). A group's confidence is likely when any finding is.
  * @param {FindingView[]} findings
  */
 export function groupByCheck(findings) {
@@ -136,20 +189,30 @@ export function groupByCheck(findings) {
   return [...byCheck.values()].map((list) => {
     list.sort((a, b) => compareText(a.url ?? '', b.url ?? '') || compareText(a.selector ?? '', b.selector ?? '') || compareText(a.id, b.id));
     const [first] = list;
-    return { ...first, title: first.title || first.checkId, findings: list, count: list.length };
+    const likely = list.filter((finding) => finding.confidence === 'likely').length;
+    return {
+      ...first, title: first.title || first.checkId, findings: list, count: list.length, distinct: distinctLinks(list),
+      likely, confidence: /** @type {'confirmed'|'likely'} */ (likely > 0 ? 'likely' : 'confirmed'),
+    };
   }).sort(compareGroups);
 }
 
 /**
  * Add what the reports display per group: up to three distinct example URLs,
- * the first `maxUrls` findings, and how many findings are left out.
+ * the first `maxUrls` findings, and how many findings are left out. In a group
+ * of the links module, one finding per distinct link comes first, so the
+ * shown findings name every link before they repeat one.
  * @param {ReturnType<typeof groupByCheck>} groups
  * @param {number} maxUrls
  */
 export function withLimits(groups, maxUrls) {
   return groups.map((group) => {
     const urls = [...new Set(group.findings.map((f) => f.url).filter((u) => u !== null))];
-    const shown = group.findings.slice(0, maxUrls);
+    /** @type {Set<string>} */
+    const seen = new Set();
+    const firsts = group.distinct === null ? [] : group.findings.filter((finding) => !seen.has(fixKey(finding)) && seen.add(fixKey(finding)));
+    const ordered = firsts.length === 0 ? group.findings : [...firsts, ...group.findings.filter((finding) => !firsts.includes(finding))];
+    const shown = ordered.slice(0, maxUrls);
     return { ...group, examples: urls.slice(0, EXAMPLE_URLS), shown, more: group.count - shown.length };
   });
 }

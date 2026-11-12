@@ -1,6 +1,6 @@
 /** @import { CheckDef } from '../types.js' */
 
-import { CAPABILITIES, MODULES, SEVERITIES } from '../config.js';
+import { CAPABILITIES, MODULES, SCORE_GROUPS, SEVERITIES } from '../config.js';
 
 const ID_PATTERN = /^[a-z]+(\.[a-z0-9_]+){2,3}$/;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -23,6 +23,8 @@ export function validateCheckDef(def) {
   need(typeof def.id === 'string' && ID_PATTERN.test(def.id), 'id must look like "module.area.problem"');
   need(MODULES.includes(def.module), `module must be one of ${MODULES.join(', ')}`);
   need(def.id.startsWith(`${def.module}.`), 'id must start with the module name');
+  need(def.score_group === undefined || (Object.hasOwn(SCORE_GROUPS, def.score_group) && SCORE_GROUPS[def.score_group] === def.module),
+    'score_group must be one of SCORE_GROUPS and belong to the check\'s module');
   need(def.engine === 'code', 'engine must be "code"');
   need(text(def.title) && !def.title.endsWith('.'), 'title must be a non-empty string without a trailing period');
   need(text(def.description), 'description is required');

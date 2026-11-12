@@ -129,7 +129,7 @@ test('the factual summary is built from the numbers and states partial coverage'
   assert.match(clean.paragraphs[2], /Scores .*: SEO 78; Links 88\./);
 
   const partial = buildReport(makeRun({ crawl: { truncated: true, blocked: { reason: 'bot_challenge', url: 'https://example.test/', status: 403 } } })).summary.paragraphs.join('\n');
-  assert.match(partial, /stopped early: the site answered with a bot challenge/);
+  assert.match(partial, /stopped early at https:\/\/example\.test\/ \(HTTP 403\): the site answered with a bot challenge/);
   assert.match(partial, /stopped at its limit of 25 pages/);
 
   const none = buildReport(makeRun({ findings: [], crawl: { pages_crawled: 0 } })).summary.paragraphs.join('\n');

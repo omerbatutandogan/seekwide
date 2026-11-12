@@ -23,7 +23,7 @@ const hiddenExternalLink = {
   doc_ref: 'https://developers.google.com/search/docs/essentials/spam-policies',
   last_verified: VERIFIED,
   recommendation:
-    "Open the page source and find the element shown in the evidence. If you did not put these links there, the site may have been hacked: follow Google's help for hacked sites, clean the files or database that add them, and check Search Console's Security issues report. If the links are yours, show them to visitors or remove them.",
+    "Open the page source and find the element shown in the evidence. If the links are yours (a partner's logo, an old menu), show them to visitors or remove them. If nobody on your side put them there, the site may have been hacked: follow Google's help for hacked sites, clean the files or database that add them, and check Search Console's Security issues report.",
   run(ctx) {
     const pages = securedPages(ctx);
     const deployed = deployedSite(ctx);
@@ -55,7 +55,10 @@ const hiddenExternalLink = {
             first: { url: first.url, text: first.text, how: first.how, element: first.element },
           },
           expected: 'Links to other sites that visitors can see, or none',
-          detail: `${links === 1 ? 'A link' : `${links} links`} to ${hosts.length === 1 ? 'another site' : `${hosts.length} other sites`} cannot be seen by visitors, and no visible link on the crawled pages goes to ${hosts.length === 1 ? 'that site' : 'those sites'}. The first goes to ${first.url}: ${hiding}.`,
+          detail: links === 1
+            // One hidden link is as often a leftover of the site's own (a partner's logo in a block no longer shown) as a sign of a hack.
+            ? `One link to another site cannot be seen by visitors, and no visible link on the crawled pages goes to that site. It goes to ${first.url}: ${hiding}. A single hidden link can be the site's own, such as a partner's logo in a block that is no longer shown; check whether someone on your side added it.`
+            : `${links} links to ${hosts.length === 1 ? 'another site' : `${hosts.length} other sites`} cannot be seen by visitors, and no visible link on the crawled pages goes to ${hosts.length === 1 ? 'that site' : 'those sites'}. The first goes to ${first.url}: ${hiding}.`,
         },
       });
     }

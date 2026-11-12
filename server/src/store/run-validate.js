@@ -8,7 +8,7 @@
 // evidence, recommendations) is not checked here; the tools clip it and return
 // it as data.
 
-import { MODULES, SEVERITIES } from '../config.js';
+import { MODULES, SCORE_GROUPS, SEVERITIES } from '../config.js';
 import { originOf } from '../util/url.js';
 
 /** Finding ids are the first 16 hex digits of a SHA-1 (util/hash.js shortId). */
@@ -98,6 +98,9 @@ function findingProblem(finding) {
   return null;
 }
 
+/** @param {string} name @returns {boolean} A module, or a score of its own (`SCORE_GROUPS`) that a module's checks count toward. */
+const isScoreKey = (name) => MODULES.includes(name) || Object.hasOwn(SCORE_GROUPS, name);
+
 /**
  * @param {Record<string, unknown>} crawl
  * @returns {string|null}
@@ -105,6 +108,8 @@ function findingProblem(finding) {
 function crawlProblem(crawl) {
   if (crawl.id !== undefined && (typeof crawl.id !== 'string' || !JOB_ID.test(crawl.id))) return 'crawl.id';
   if (crawl.max_pages !== undefined && crawl.max_pages !== null && !isCount(crawl.max_pages)) return 'crawl.max_pages';
+  if (crawl.start_gate !== undefined && !isStoredUrl(crawl.start_gate)) return 'crawl.start_gate';
+  if (crawl.start_shell_words !== undefined && !isCount(crawl.start_shell_words)) return 'crawl.start_shell_words';
   const blocked = crawl.blocked;
   if (blocked === undefined || blocked === null) return null;
   if (!isObject(blocked)) return 'crawl.blocked';
@@ -153,7 +158,7 @@ export function storedRunProblem(run) {
   const requested = run.modules_requested;
   if (requested !== undefined && !(Array.isArray(requested) && requested.every((name) => MODULES.includes(name)))) return 'modules_requested';
   for (const [name, module] of Object.entries(/** @type {object} */ (run.modules))) {
-    if (!MODULES.includes(name)) return 'modules';
+    if (!isScoreKey(name)) return 'modules';
     const score = /** @type {{score?: unknown}|null} */ (module)?.score;
     if (!isObject(module) || !(score === null || score === undefined || (typeof score === 'number' && Number.isFinite(score)))) return `modules.${name}.score`;
   }
@@ -183,5 +188,5 @@ export function storedRunProblem(run) {
  */
 export function isStoredEntry(entry) {
   if (!isPastDate(entry.created_at) || !isStoredUrl(entry.start_url) || !isCount(entry.findings) || !isObject(entry.scores)) return false;
-  return Object.entries(/** @type {object} */ (entry.scores)).every(([name, score]) => MODULES.includes(name) && (score === null || (typeof score === 'number' && Number.isFinite(score))));
+  return Object.entries(/** @type {object} */ (entry.scores)).every(([name, score]) => isScoreKey(name) && (score === null || (typeof score === 'number' && Number.isFinite(score))));
 }
