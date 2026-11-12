@@ -2,7 +2,7 @@
 
 Site audits for Claude Code that you can re-run and trust. Seekwide crawls a site politely, runs scripted SEO, link, Core Web Vitals, security, image and video checks with evidence for every finding, scores the result the same way every time, and writes a report you can send to a client.
 
-> **Status: alpha (0.1.0-alpha.1).** Four modules work today, `seo`, `links`, `security` and `media`, plus metadata fixes for a project in its own folder. The roadmap further down lists what is planned and not built yet.
+> **Status: 0.1.0, the first release.** Four modules work today, `seo`, `links`, `security` and `media`, plus metadata fixes for a project in its own folder. The roadmap further down lists what is planned and not built yet.
 
 ## What it does today
 

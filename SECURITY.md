@@ -55,4 +55,4 @@ CI installs them with `npm ci --ignore-scripts` from the lockfile, which pins ev
 
 ## Supported versions
 
-Only the latest release gets fixes while the project is in alpha.
+Only the latest release gets fixes while the project is before version 1.0.

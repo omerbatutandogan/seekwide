@@ -2,9 +2,19 @@
 
 Notable changes to Seekwide. Versions follow [semantic versioning](https://semver.org/); the rule set has its own version (`RULES_VERSION`) that changes whenever a check starts reporting something different.
 
-## 0.1.0-alpha.1 (unreleased)
+## 0.1.0 (2026-11-12)
 
-First working version. Rule set 0.1.7.
+First release. Rule set 0.1.7: 77 checks, 62 of them scored, in four modules (`seo` with Core Web Vitals, `links`, `security`, `media`), plus repo mode and `/seekwide:fix`.
+
+Every module was measured on about 20 real sites before this release, with a sample of its findings judged true, false or debatable by a judging agent, and a random fifth of those judged again, blind, by a second one. The sections below "Added" record what those measurements and the reviews changed before the release.
+
+### Known limitations
+
+- It does not run JavaScript; content that appears only after scripts run is not seen.
+- The security module looks only at what the crawler is served. A hack that shows its spam only to Google's crawler is invisible to it, and none of its rules has been tried on a site that is actually hacked yet.
+- A page that defines a React streaming runtime of its own can claim the exemption for React's hidden streaming blocks. Four mitigations were measured; none held without bringing back false alarms on Next.js sites.
+- Core Web Vitals need a Google API key: without one Google refuses the lab test, and real-user data needs the key in any case.
+- Repo mode supports Next.js App Router and plain HTML projects. Windows is covered by CI but has not been used by hand.
 
 Rule set 0.1.1 differs from 0.1.0, which only unreleased builds used, in two ways: a module score is 99 at most when a scored check has a failure, and the `aria-label` of an element inside a link (an SVG logo, an icon, an image) counts as the link's text.
 
