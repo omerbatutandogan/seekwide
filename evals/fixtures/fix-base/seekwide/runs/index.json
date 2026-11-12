@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "runs": [
+    {
+      "run_id": "2026-11-12T04-10-54Z",
+      "created_at": "2026-11-12T04:10:54.408Z",
+      "start_url": "http://localhost:47320/",
+      "scores": {
+        "links": 99,
+        "seo": 89
+      },
+      "findings": 20
+    }
+  ]
+}

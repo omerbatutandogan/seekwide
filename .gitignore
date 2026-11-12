@@ -16,3 +16,12 @@ docs/internal/
 
 # Local Claude Code settings
 .claude/
+
+# Eval results; the history file a scaffold writes into its case folder and
+# the session that Claude Code writes next to it when it resumes; the local
+# path of the dependencies evals/setup.sh installs; pid files of the servers
+# the scaffolds start
+evals/results/
+evals/*/*.jsonl
+evals/.deps-dir
+evals/.servers/

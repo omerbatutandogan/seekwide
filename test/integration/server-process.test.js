@@ -12,7 +12,7 @@ import { after, afterEach, before, test } from 'node:test';
 import { UNTRUSTED_NOTE } from '../../server/src/tools/common.js';
 import { PROFILE_NOTE } from '../../server/src/tools/profile.js';
 import { startServer } from '../helpers/http-server.js';
-import { startProcess as startServerProcess, stopAll } from '../helpers/server-process.js';
+import { killTree, startProcess as startServerProcess, stopAll } from '../helpers/server-process.js';
 
 const FAILING_RUN = fileURLToPath(new URL('../helpers/failing-server-run.js', import.meta.url));
 /** Longest a test run with one failing test may take before it counts as hanging. */
@@ -154,7 +154,7 @@ test('a test that fails while the server runs ends at once and reports the failu
     new Promise((resolve) => { timer = setTimeout(() => resolve(null), RUN_LIMIT_MS); }),
   ]);
   clearTimeout(timer);
-  if (ended === null) process.kill(-(/** @type {number} */ (run.pid)), 'SIGKILL');
+  if (ended === null) killTree(/** @type {number} */ (run.pid));
   assert.ok(ended !== null, `the run was still going after ${RUN_LIMIT_MS} ms:\n${output}`);
   assert.equal(/** @type {{code: number}} */ (ended).code, 1, output);
   assert.match(output, /^not ok 1 - a test that fails while the server runs$/m);

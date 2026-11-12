@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { ToolError } from '../../server/src/mcp/stdio.js';
@@ -98,7 +99,7 @@ describe('audit_run', () => {
 
     assert.equal(result.run_id, run.run_id);
     assert.equal(result.project_dir, PROJECT);
-    assert.deepEqual(result.files, { findings: `${PROJECT}/.seekwide/runs/2026-11-11T14-03-22Z/findings.json` });
+    assert.deepEqual(result.files, { findings: path.join(PROJECT, '.seekwide', 'runs', '2026-11-11T14-03-22Z', 'findings.json') });
     assert.deepEqual(result.totals, {
       findings: 1,
       by_severity: { critical: 0, high: 1, medium: 0, low: 0, info: 0 },
@@ -365,8 +366,9 @@ describe('audit_run', () => {
 
   it('uses project_dir when given and rejects a relative one', async () => {
     const { fake } = setup();
-    const result = await audit(fake).handler({ job_id: 'c-1', project_dir: '/other/project' });
-    assert.equal(result.project_dir, '/other/project');
+    const other = path.resolve('/other/project');
+    const result = await audit(fake).handler({ job_id: 'c-1', project_dir: other });
+    assert.equal(result.project_dir, other);
     await assert.rejects(audit(fake).handler({ job_id: 'c-1', project_dir: 'relative/dir' }), /project_dir must be an absolute path/);
   });
 });

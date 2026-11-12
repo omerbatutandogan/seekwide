@@ -67,7 +67,7 @@ export async function makeRealDirs(dirs, projectDir) {
 /**
  * The text of a stored file, read without following a symbolic link.
  *
- * Guarantees: a missing file throws the ENOENT error of `open`; a link, a
+ * Guarantees: a missing file throws an ENOENT error; a link, a
  * folder, a device or a pipe throws `UNSAFE_STORE`; a file larger than
  * `maxBytes` throws `STORE_FILE_TOO_LARGE`; nothing of such a file is read.
  * @param {string} file        Absolute path.
@@ -77,6 +77,9 @@ export async function makeRealDirs(dirs, projectDir) {
  */
 export async function readStoreFile(file, maxBytes, projectDir) {
   const where = path.relative(projectDir, file);
+  // O_NOFOLLOW refuses a link when the file is opened, but Windows has no such flag: look first, as scan.js does.
+  // A missing file throws lstat's ENOENT, which callers treat like open's.
+  if ((await fs.lstat(file)).isSymbolicLink()) throw unsafe(where, 'a symbolic link');
   let handle;
   try {
     // O_NONBLOCK keeps a named pipe from blocking the open. O_NOFOLLOW does not exist on Windows.

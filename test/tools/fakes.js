@@ -2,11 +2,15 @@
 
 /** @import { CheckDef, CrawlJob, CrawlResult, Run, VitalsData } from '../../server/src/types.js' */
 
+import path from 'node:path';
 import { attachSources, loadProjectSources } from '../../server/src/repo/sources.js';
 import { assertRunId, projectPaths } from '../../server/src/store/project.js';
 import { makeCrawl, makeLink, makePage, makeVitals } from '../helpers/factories.js';
 
-export const PROJECT = '/projects/site';
+// Built with path.resolve, so that it is the absolute path the tools return on Windows too (D:\projects\site).
+export const PROJECT = path.resolve('/projects/site');
+/** A project folder that does not exist, as the tools normalize it on this platform. */
+const MISSING = path.normalize('/missing');
 export const NOW = new Date('2026-11-11T14:03:22.000Z');
 
 /**
@@ -152,7 +156,7 @@ export function makeDeps(seed = {}) {
     /** @param {string} dir */
     async ensureProject(dir) {
       record('ensureProject', [dir]);
-      if (dir.startsWith('/missing')) throw codedError(`The project folder ${dir} does not exist. Check the path or create the folder first.`, 'PROJECT_DIR_NOT_FOUND');
+      if (dir.startsWith(MISSING)) throw codedError(`The project folder ${dir} does not exist. Check the path or create the folder first.`, 'PROJECT_DIR_NOT_FOUND');
       return projectPaths(dir);
     },
     /** @param {Date} date @param {string[]} existing */

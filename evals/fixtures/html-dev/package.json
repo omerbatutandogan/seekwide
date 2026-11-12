@@ -1,0 +1,11 @@
+{
+  "name": "html-dev-site",
+  "private": true,
+  "version": "1.0.0",
+  "description": "A plain HTML site with a dev script.",
+  "scripts": {
+    "predev": "node -e \"console.log('Checking the pages before serving them.')\"",
+    "dev": "node dev-server.mjs",
+    "postdev": "node -e \"console.log('Dev server stopped.')\""
+  }
+}

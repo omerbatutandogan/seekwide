@@ -5,6 +5,7 @@
 import { readFile, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { ToolError } from '../mcp/stdio.js';
+import { entryKind } from '../repo/scan.js';
 
 export const LOGO_MAX_BYTES = 200 * 1024;
 
@@ -87,6 +88,26 @@ function isInside(parent, child) {
 export async function loadLogo(logo, projectDir) {
   const from = SOURCE_NAMES[logo.source];
   const file = path.resolve(projectDir, logo.path);
+  const outsideProject = (/** @type {string} */ project) =>
+    new ToolError(
+      `The logo ${file} named by the project profile is outside the project folder ${project}. ` +
+        'A profile may only point at a logo inside the project; pass logo_path, or use the report logo setting, for a file elsewhere.',
+    );
+  if (logo.source === 'profile') {
+    // A profile can arrive with someone else's repository. Its path is checked before the file is touched, and the
+    // way to it is walked without following a link, so a path such as \\host\share\logo.png on Windows, or a link in
+    // the project that points there, never makes the system contact another machine.
+    const project = await realpath(projectDir).catch(() => path.resolve(projectDir));
+    const lexical = path.resolve(projectDir);
+    if (!isInside(lexical, file) && !isInside(project, file)) throw outsideProject(project);
+    const base = isInside(lexical, file) ? lexical : project;
+    if ((await entryKind(base, path.relative(base, file).split(path.sep).join('/'))) !== 'file') {
+      throw new ToolError(
+        `The logo ${file} named by the project profile is not a file inside the project folder ${project}: it is missing, or a symbolic link is on the way to it. ` +
+          'A profile may only point at a logo inside the project, without links; pass logo_path, or use the report logo setting, for a file elsewhere.',
+      );
+    }
+  }
   let info;
   let real;
   try {
@@ -98,12 +119,7 @@ export async function loadLogo(logo, projectDir) {
   if (!info.isFile()) throw new ToolError(`The logo path ${file} (from ${from}) is not a file. Point it at a PNG, JPEG, WebP or SVG file.`);
   if (logo.source === 'profile') {
     const project = await realpath(projectDir).catch(() => path.resolve(projectDir));
-    if (!isInside(project, real)) {
-      throw new ToolError(
-        `The logo ${file} named by the project profile is outside the project folder ${project}. ` +
-          'A profile may only point at a logo inside the project; pass logo_path, or use the report logo setting, for a file elsewhere.',
-      );
-    }
+    if (!isInside(project, real)) throw outsideProject(project);
   }
   const tooLarge = (/** @type {number} */ size) =>
     new ToolError(`The logo ${file} is ${Math.ceil(size / 1024)} KB; the limit is 200 KB. Use a smaller PNG, JPEG, WebP or SVG file.`);

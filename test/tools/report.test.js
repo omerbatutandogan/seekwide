@@ -103,7 +103,7 @@ describe('report_render', () => {
     const fromProfile = setup({ profile: { report: { logo_path: outsideLogo } } });
     await assert.rejects(fromProfile.render({ formats: ['html'] }), /named by the project profile is outside the project folder/);
     const viaSymlink = setup({ profile: { report: { logo_path: 'link.png' } } });
-    await assert.rejects(viaSymlink.render({ formats: ['html'] }), /outside the project folder/);
+    await assert.rejects(viaSymlink.render({ formats: ['html'] }), /a symbolic link is on the way to it/);
     const viaDots = setup({ profile: { report: { logo_path: '../elsewhere/logo.png' } } });
     await assert.rejects(viaDots.render({ formats: ['html'] }), /outside the project folder/);
 

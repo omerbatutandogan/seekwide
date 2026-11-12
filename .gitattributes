@@ -1,0 +1,7 @@
+# Check out text files with LF line endings on every system, Windows
+# included, so that tests that compare file contents and the generated
+# docs/checks.md see the same bytes everywhere.
+* text=auto eol=lf
+
+*.png binary
+*.ico binary

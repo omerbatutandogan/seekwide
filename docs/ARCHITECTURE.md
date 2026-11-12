@@ -493,6 +493,8 @@ export async function attachSources(findings, crawl, sources)   // → {findings
 
 **Scripts and names from the project.** `dev_server.also_runs` lists the `pre` and `post` scripts of the proposed script (npm and Yarn 1 run them with it), and `script_clipped` says when a script is longer than the 1000 characters shown. A file or folder whose name has a line break, a control character or a direction character is left out of the listing.
 
+**Monorepos** (`workspaces.js`, `detectProject(root, {projectDir, platform})`). A web project can be a folder below the project folder (`source_dir`). Its lock file and `node_modules` are looked for in that folder first and then in each folder above it up to the project folder, never above and never through a symbolic link: npm, Yarn and Bun put both at the workspace root. A folder that is not a supported project itself but declares workspaces (`workspaces` in package.json, as a list or as `{packages}`, or `packages` in `pnpm-workspace.yaml`, read line by line as text) gets `workspace_projects`: the workspace folders that classify as supported, as absolute paths to pass as `source_dir`. Only patterns of plain folder names, with or without a final `/*`, are expanded, one level deep, at most 50 patterns and 50 folders, with the listing rules of `listFiles` (`listDirs` in `scan.js`); `**`, negations, `..`, absolute patterns and patterns through `node_modules` or a dot folder are skipped, and only a `packages` key at the top of the YAML file counts. The patterns are read with string operations, never with a pattern that can backtrack on a long run of one character. The message then says what to do; the folder names stay in the data field. A package.json with a byte order mark is read as npm reads it. The static server is proposed as `python` on Windows and `python3` elsewhere.
+
 ### 4.13 Fixes: `repo/fixes.js`, `repo/verify.js`, `tools/fix.js`
 
 ```js
@@ -575,3 +577,5 @@ export function securityHeaders(result, documentSays)            // → Security
 - Inject `sleep` and `now` so tests are instant and repeatable.
 - Every rule in this document and in `CHECKS-SPEC.md` has a test for the failing case and one for the passing case.
 - Run only your own tests while working (`node --test "test/<area>/**/*.test.js"`), and the whole suite once before you finish.
+- The tests run on Linux, macOS and Windows in CI. Build expected paths with `path.join` or `path.resolve`, never with a literal `/`; a test of something only POSIX has (file modes) is skipped on Windows with the reason, and nothing else is skipped.
+- The skill flows are tested by the eval suite under `evals/` (`claude plugin eval`), which runs a real Claude session and costs tokens; it is run by hand, not in CI. `evals/README.md` says what each case checks and how the suite works around the eval sandbox.

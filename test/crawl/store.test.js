@@ -27,7 +27,8 @@ test('a measurement kept with a crawl is read back by another manager on the sam
   assert.deepEqual((await later.storedVitals('c-1', 5))?.vitals.notes, ['five']);
   assert.equal(await later.storedVitals('c-1', 4), null);
   assert.equal(await later.storedVitals('c-2', 3), null);
-  assert.equal((await stat(path.join(dataDir, 'crawls', 'c-1.vitals.json'))).mode & 0o777, 0o600);
+  // Windows has no POSIX file modes (it reports 0o666); there the ACL of the data folder applies.
+  if (process.platform !== 'win32') assert.equal((await stat(path.join(dataDir, 'crawls', 'c-1.vitals.json'))).mode & 0o777, 0o600);
 });
 
 test('two measurements of one crawl saved at the same time are both kept, in a whole file', async () => {

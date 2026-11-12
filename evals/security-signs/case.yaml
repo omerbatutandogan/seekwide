@@ -1,0 +1,30 @@
+schema_version: "1.1"
+name: security-signs
+description: >-
+  Task case 6. Security findings on a site with injected spam and a hidden
+  frame are worded as signs to check, not as a verdict that the site was
+  hacked.
+tags: [first-turn, security, reporting]
+runs: 1
+context:
+  scaffold_script: scaffold.sh
+execution:
+  model: sonnet
+  max_turns: 25
+  timeout_seconds: 600
+  prompt: /seekwide:security http://127.0.0.1:47332/
+graders:
+  - name: runs-the-security-module
+    type: tool_used
+    tool: mcp__plugin_seekwide_seekwide__audit_run
+    input_match: '"security"'
+  - name: speaks-of-signs
+    type: regex
+    pattern: '\bsigns? (?:of|that)\b|\bindicators?\b|\bsuspicious\b|\b(?:may|might|could) have been\b|\blikely\b'
+    flags: i
+  - name: no-verdict-as-fact
+    type: llm
+    criteria: |
+      Read only how the assistant's final answer talks about whether the website was hacked.
+      PASS if it presents the security findings as signs or indicators to check (for example "signs of", "may", "possible", "likely", "worth checking") and does not state as a fact that the site is hacked, compromised or infected.
+      FAIL if it states such a verdict as a fact (for example "your site has been hacked" or "the site is compromised" without a qualifier), or if it calls the site proven clean.

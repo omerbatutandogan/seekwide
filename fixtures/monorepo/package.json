@@ -1,0 +1,13 @@
+{
+  "name": "seekwide-fixture-monorepo",
+  "private": true,
+  "version": "0.0.0",
+  "description": "An npm workspaces monorepo whose Next.js App Router site lives in apps/web and imports a component from packages/ui. Used to test Seekwide's repo mode.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @seekwide-fixture/web"
+  }
+}

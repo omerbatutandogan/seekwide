@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { ToolError } from '../../server/src/mcp/stdio.js';
@@ -105,8 +106,9 @@ describe('runs_list', () => {
   it('lists runs newest first and clips to 50', async () => {
     const runs = Array.from({ length: 55 }, (_, i) => makeRun(`r${String(i).padStart(2, '0')}`, []));
     const fake = makeDeps({ runs });
-    const result = await tool(fake, 'runs_list').handler({ project_dir: '/x' });
-    assert.equal(result.project_dir, '/x');
+    const dir = path.resolve('/x');
+    const result = await tool(fake, 'runs_list').handler({ project_dir: dir });
+    assert.equal(result.project_dir, dir);
     assert.equal(result.total, 55);
     assert.equal(result.runs.length, 50);
     assert.equal(result.runs[0].run_id, 'r54');

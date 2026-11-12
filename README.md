@@ -100,6 +100,10 @@ What to know:
 - **Core Web Vitals are not measured** for a local site. Its address is never sent to Google.
 - The project folder is the boundary. Symbolic links are not followed, `node_modules` and dot folders are not read, and nothing in the project is imported or executed by the plugin. File paths in the stored run and in the reports are relative to the project folder.
 
+**Monorepos.** When the folder you run the command in is the root of a monorepo (npm, Yarn or Bun `workspaces` in `package.json`, or `pnpm-workspace.yaml`) and not a web project itself, Seekwide lists the workspaces that are supported web projects, and Claude asks which one to audit. The command then runs in that folder, the package manager and the installed dependencies are found at the workspace root too, and files are named as paths from the root (`apps/web/app/pricing/page.jsx`). Workspace patterns of plain folder names, with or without a final `/*`, are expanded; `**` and negations are not.
+
+**Tested with** Next.js 15.5 (`next dev`) and 16.4 (`next dev` and `next start`), JavaScript and TypeScript, `app/` and `src/app/`, and an npm workspaces monorepo; the fixtures for each are under `fixtures/`. Next.js 16.4's `next dev` may write an `AGENTS.md` file into the project; that file comes from Next.js, not from Seekwide. On Windows the static server for a plain HTML folder is proposed as `python`, not `python3`.
+
 ## Fixing findings
 
 `/seekwide:fix` works on a saved audit of the project in the current folder (run `/seekwide:seo` without a URL first). It never works on a site audited by URL only, because then there is no source file to change, and it never fixes something no finding reports.
@@ -266,6 +270,10 @@ claude plugin validate . --strict --profile directory
 ```bash
 node scripts/check-directory-rules.js
 ```
+
+CI runs the tests on Linux, macOS and Windows with Node.js 22 and 26; the type check, the generated docs, the directory rules and `claude plugin validate` run on Linux.
+
+The skill flows (asking before a dev server starts, stopping it, showing diffs before a fix, the wording of suggestions, blocked crawls and security findings) are covered by an eval suite under [`evals/`](evals/README.md), run with `claude plugin eval`. It drives a real Claude session, so it costs tokens and is not part of CI.
 
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) describes the modules and their contracts. [docs/CHECKS-SPEC.md](docs/CHECKS-SPEC.md) specifies every check. See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request, and [SECURITY.md](SECURITY.md) to report a vulnerability.
 

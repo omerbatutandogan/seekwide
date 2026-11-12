@@ -14,16 +14,20 @@ async function makeDir(t) {
 }
 
 test('projectPaths builds every path under <projectDir>/.seekwide', () => {
-  const paths = projectPaths('/work/site');
-  assert.equal(paths.root, '/work/site/.seekwide');
-  assert.equal(paths.gitignore, '/work/site/.seekwide/.gitignore');
-  assert.equal(paths.profile, '/work/site/.seekwide/profile.json');
-  assert.equal(paths.runsDir, '/work/site/.seekwide/runs');
-  assert.equal(paths.index, '/work/site/.seekwide/runs/index.json');
-  assert.equal(paths.runDir('2026-11-11T14-03-22Z'), '/work/site/.seekwide/runs/2026-11-11T14-03-22Z');
-  assert.equal(paths.findingsFile('r1'), '/work/site/.seekwide/runs/r1/findings.json');
-  assert.equal(paths.reportFile('r1', 'md'), '/work/site/.seekwide/runs/r1/report.md');
-  assert.equal(paths.reportFile('r1', 'html'), '/work/site/.seekwide/runs/r1/report.html');
+  // An absolute path on this platform: /work/site here, D:\\work\\site on Windows.
+  const work = path.resolve('/work/site');
+  const paths = projectPaths(work);
+  const under = (/** @type {string[]} */ ...names) => path.join(work, '.seekwide', ...names);
+  assert.equal(paths.root, under());
+  assert.equal(paths.gitignore, under('.gitignore'));
+  assert.equal(paths.profile, under('profile.json'));
+  assert.equal(paths.runsDir, under('runs'));
+  assert.equal(paths.index, under('runs', 'index.json'));
+  assert.equal(paths.runDir('2026-11-11T14-03-22Z'), under('runs', '2026-11-11T14-03-22Z'));
+  assert.equal(paths.findingsFile('r1'), under('runs', 'r1', 'findings.json'));
+  assert.equal(paths.reportFile('r1', 'md'), under('runs', 'r1', 'report.md'));
+  assert.equal(paths.reportFile('r1', 'html'), under('runs', 'r1', 'report.html'));
+  if (path.sep === '/') assert.equal(paths.findingsFile('r1'), '/work/site/.seekwide/runs/r1/findings.json');
 });
 
 test('projectPaths normalizes the project directory and creates nothing', async (t) => {
@@ -53,9 +57,10 @@ test('run ids that are not safe file names are rejected by every path builder', 
 });
 
 test('run ids made of letters, digits, dot, underscore and hyphen are accepted', () => {
-  const paths = projectPaths('/work/site');
+  const work = path.resolve('/work/site');
+  const paths = projectPaths(work);
   for (const id of ['2026-11-11T14-03-22Z', '2026-11-11T14-03-22Z-2', 'run_1', 'a.b-c', 'X'.repeat(128)]) {
-    assert.equal(paths.runDir(id), `/work/site/.seekwide/runs/${id}`);
+    assert.equal(paths.runDir(id), path.join(work, '.seekwide', 'runs', id));
   }
 });
 

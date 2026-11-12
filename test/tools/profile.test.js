@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { ToolError } from '../../server/src/mcp/stdio.js';
@@ -16,8 +17,9 @@ describe('profile_get', () => {
   it('returns a saved profile', async () => {
     const profile = { schema_version: 1, site_url: 'https://example.test/', brand: { name: 'Example' }, updated_at: 'x' };
     const fake = makeDeps({ profile });
-    assert.deepEqual(await tool(fake, 'profile_get').handler({ project_dir: '/p' }), { exists: true, profile, _note: PROFILE_NOTE });
-    assert.deepEqual(fake.calls.readProfile, [['/p']]);
+    const dir = path.resolve('/p');
+    assert.deepEqual(await tool(fake, 'profile_get').handler({ project_dir: dir }), { exists: true, profile, _note: PROFILE_NOTE });
+    assert.deepEqual(fake.calls.readProfile, [[dir]]);
   });
 });
 

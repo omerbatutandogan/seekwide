@@ -173,6 +173,31 @@ export async function listFiles(root, sub = '', limits = {}) {
 }
 
 /**
+ * The names of the folders directly inside `<root>/<relative>`, sorted, at
+ * most `max` of them. Like `listFiles`, it never follows or lists a symbolic
+ * link (also on the way to `relative`), and leaves out `node_modules`, dot
+ * folders and names with a line break, a control or a direction character.
+ * @param {string} root      Absolute real path.
+ * @param {string} relative  Forward-slash path of plain names; '' for `root` itself.
+ * @param {number} max
+ * @returns {Promise<string[]>}
+ */
+export async function listDirs(root, relative, max) {
+  if (relative !== '' && (await entryKind(root, relative)) !== 'dir') return [];
+  let entries;
+  try {
+    entries = await fs.readdir(path.join(root, ...relative.split('/').filter(Boolean)), { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  return entries
+    .filter((entry) => entry.isDirectory() && !isSkippedDir(entry.name) && stripHidden(entry.name) === entry.name && !/[\r\n\t]/.test(entry.name))
+    .map((entry) => entry.name)
+    .sort()
+    .slice(0, max);
+}
+
+/**
  * The bytes of a regular file inside `root`, or null when it is missing, is
  * not a regular file, is larger than `maxBytes`, or a symbolic link is on the
  * way to it. The file is opened without following a link, and what was opened

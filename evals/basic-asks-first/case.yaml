@@ -1,0 +1,47 @@
+schema_version: "1.1"
+name: basic-asks-first
+description: >-
+  Task case 1, first turn. /seekwide:basic in a web project folder: Claude names
+  the dev command and the pre and post scripts it also runs, asks before
+  starting anything, and starts nothing in this turn. Its transcript is the
+  recorded first turn of basic-declined, basic-approved and
+  basic-approved-crawl-fails.
+tags: [first-turn, repo-mode, consent]
+runs: 1
+context:
+  scaffold_script: scaffold.sh
+execution:
+  model: sonnet
+  max_turns: 25
+  timeout_seconds: 600
+  prompt: /seekwide:basic
+graders:
+  - name: detects-the-project
+    type: tool_used
+    tool: mcp__plugin_seekwide_seekwide__project_detect
+  - name: names-the-dev-command
+    type: regex
+    pattern: 'npm run dev'
+  - name: names-the-pre-script
+    type: regex
+    pattern: '\bpredev\b'
+  - name: names-the-post-script
+    type: regex
+    pattern: '\bpostdev\b'
+  - name: asks-before-starting
+    type: regex
+    # A sentence that asks about starting it: it names start, run or launch and ends with a question mark.
+    pattern: '\b(?:start|run|launch)\b[^.!?\n]*\?'
+    flags: i
+  - name: starts-nothing
+    type: tool_used
+    tool: Bash
+    # A quote inside the command is \" in JSON, so the command is read as escaped JSON text.
+    input_match: '"command"\s*:\s*"(?:[^"\\]|\\.)*?(?:\b(?:npm|npx|yarn|pnpm|bun|node|python3?|deno|php|ruby)\b(?![\w./-])|node_modules/\.bin/)'
+    min: 0
+    max: 0
+  - name: crawls-nothing
+    type: tool_used
+    tool: mcp__plugin_seekwide_seekwide__crawl_start
+    min: 0
+    max: 0

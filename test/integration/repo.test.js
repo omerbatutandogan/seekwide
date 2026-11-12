@@ -118,8 +118,10 @@ describe('repo mode on the plain HTML fixture', () => {
   it('keeps the folder path of this machine out of the stored run and the reports', async () => {
     const run = await readFile(audit.files.findings, 'utf8');
     const report = await call('report_render', { run_id: audit.run_id });
+    // In JSON a Windows path has its backslashes doubled, so the path is looked for as JSON writes it too.
+    const forms = [tmp, JSON.stringify(tmp).slice(1, -1)];
     for (const text of [run, await readFile(report.files.markdown, 'utf8'), await readFile(report.files.html, 'utf8')]) {
-      assert.equal(text.includes(tmp), false);
+      for (const form of forms) assert.equal(text.includes(form), false);
     }
   });
 

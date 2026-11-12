@@ -1,0 +1,37 @@
+schema_version: "1.1"
+name: blocked-crawl
+description: >-
+  Task case 5. A crawl that robots.txt blocks is described as blocked, with the
+  reason, and never as a site without problems.
+tags: [first-turn, reporting]
+runs: 1
+context:
+  scaffold_script: scaffold.sh
+execution:
+  model: sonnet
+  max_turns: 25
+  timeout_seconds: 600
+  prompt: /seekwide:basic http://127.0.0.1:47331/
+graders:
+  - name: crawls-the-site
+    type: tool_used
+    tool: mcp__plugin_seekwide_seekwide__crawl_start
+    input_match: '127\.0\.0\.1:47331'
+  - name: says-it-was-blocked
+    type: regex
+    pattern: 'block'
+    flags: i
+  - name: names-robots-txt
+    type: regex
+    pattern: 'robots\.txt'
+    flags: i
+  - name: suggests-allowing-the-crawler
+    type: regex
+    pattern: '(allow|permit|let|add|unblock)[^.\n]{0,80}(seekwide|user.agent|crawler)'
+    flags: i
+  - name: blocked-is-not-clean
+    type: llm
+    criteria: |
+      Read the assistant's final answer about an audit of a website whose robots.txt did not let the crawler in.
+      PASS if it says that the crawl was blocked (by robots.txt) and that the pages could therefore not be checked.
+      FAIL if it presents the site as having no problems, as clean or healthy, or gives scores without saying that the pages were not crawled.
