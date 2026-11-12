@@ -182,7 +182,7 @@ test('a local site that refuses connections, including for robots.txt, fails: no
   await closed.close();
   const { job, result } = await crawl({ url, allowLoopback: true });
   assert.equal(job?.status, 'failed');
-  assert.match(String(job?.error), new RegExp(`^Nothing answered at ${closed.origin.replace(/[.]/g, '\\.')} \\(`));
+  assert.ok(String(job?.error).startsWith(`Nothing answered at ${closed.origin} (`), String(job?.error));
   assert.equal(result, null);
 });
 
