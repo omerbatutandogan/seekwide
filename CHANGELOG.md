@@ -51,6 +51,7 @@ Rule set 0.1.4 differs from 0.1.3 in the first two of these.
 - In a web project in a subfolder of the project folder (a monorepo workspace), the lock file and `node_modules` are also looked for in the folders above it, up to the project folder: the dependencies a workspace root holds were reported as not installed, so Claude proposed an install, and a pnpm, Yarn or Bun lock file at the root was missed, so the dev command was proposed with npm.
 - A `package.json` that starts with a byte order mark, as Windows editors often write it, is read like any other; the project was treated as having none.
 - On Windows the static server for a plain HTML folder is proposed as `python -m http.server`; `python3` is usually not installed there.
+- `/seekwide:fix` reports the scores before the fix as well as after it: the skill now says that the base run's scores are in `runs_list`. In two eval runs Claude had given only the new scores.
 - Tests that compared paths written for macOS and Linux, file modes, a file name with a line break, and a child process started without the variables Windows needs, now run on Windows too; three tests of POSIX file modes are skipped there. `.gitattributes` keeps line endings LF on every checkout.
 
 ### Fixed after a validation on real sites
