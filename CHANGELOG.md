@@ -2,7 +2,11 @@
 
 Notable changes to Seekwide. Versions follow [semantic versioning](https://semver.org/); the rule set has its own version (`RULES_VERSION`) that changes whenever a check starts reporting something different.
 
-## 0.1.1 (unreleased)
+## 0.1.1 (2026-11-13)
+
+Fixes from four independent reviews of 0.1.0 (security, freshness, code quality, product). Rule set 0.1.8. `parse5` is now the only runtime dependency.
+
+Known limits of this release: cancelling an audit stops new requests but not one already in flight, and two parallel audits that finish within the same second can still collide when they save.
 
 ### Security module
 

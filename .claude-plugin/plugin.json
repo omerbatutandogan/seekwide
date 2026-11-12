@@ -1,7 +1,7 @@
 {
   "name": "seekwide",
   "displayName": "Seekwide",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Site audits you can re-run and trust: a polite crawler, scripted SEO, link and Core Web Vitals checks with evidence, repeatable scores and a client-ready report.",
   "author": {
     "name": "omerbatutandogan",
