@@ -6,6 +6,7 @@ import { test } from 'node:test';
 
 import { writeFileAtomic } from '../../server/src/store/fs-util.js';
 import { projectPaths } from '../../server/src/store/project.js';
+import { packRun } from '../../server/src/store/run-file.js';
 import { listRuns, loadRun, newRunId, saveRun } from '../../server/src/store/runs.js';
 import { makeFinding, makeRun } from '../helpers/run-factory.js';
 
@@ -65,7 +66,8 @@ test('saveRun writes findings.json and the index entry, and creates the project 
   const paths = projectPaths(dir);
   assert.equal(saved.runId, 'r1');
   assert.equal(saved.findingsFile, paths.findingsFile('r1'));
-  assert.deepEqual(JSON.parse(await fs.readFile(paths.findingsFile('r1'), 'utf8')), run('r1', '2026-11-11T14:03:22.000Z'));
+  assert.deepEqual(JSON.parse(await fs.readFile(paths.findingsFile('r1'), 'utf8')), packRun(run('r1', '2026-11-11T14:03:22.000Z')));
+  assert.deepEqual(await loadRun(dir, 'r1'), run('r1', '2026-11-11T14:03:22.000Z'));
   assert.equal(await fs.readFile(paths.gitignore, 'utf8'), '*\n');
 
   const index = JSON.parse(await fs.readFile(paths.index, 'utf8'));
@@ -82,14 +84,14 @@ test('saveRun writes findings.json and the index entry, and creates the project 
   assert.deepEqual(saved.entry, index.runs[0]);
 });
 
-test('the index lists runs oldest first, whatever order they were saved in', async (t) => {
+test('the index lists runs in the order they were saved, whatever their dates', async (t) => {
   const dir = await makeDir(t);
   await saveRun(dir, run('b', '2026-11-12T10:00:00.000Z'));
   await saveRun(dir, run('a', '2026-11-10T10:00:00.000Z'));
   await saveRun(dir, run('c', '2026-11-11T10:00:00.000Z'));
-  assert.deepEqual((await listRuns(dir)).map((entry) => entry.run_id), ['a', 'c', 'b']);
-  assert.equal((await loadRun(dir, 'last')).run_id, 'b');
-  assert.equal((await loadRun(dir, 'previous')).run_id, 'c');
+  assert.deepEqual((await listRuns(dir)).map((entry) => entry.run_id), ['b', 'a', 'c']);
+  assert.equal((await loadRun(dir, 'last')).run_id, 'c');
+  assert.equal((await loadRun(dir, 'previous')).run_id, 'a');
 });
 
 test('index entries record a null score for a module that could not be scored', async (t) => {
@@ -224,7 +226,7 @@ test('concurrent saves all reach the index', async (t) => {
   const dir = await makeDir(t);
   const ids = ['a', 'b', 'c', 'd', 'e', 'f'];
   await Promise.all(ids.map((id, n) => saveRun(dir, run(id, `2026-11-0${n + 1}T10:00:00.000Z`))));
-  assert.deepEqual((await listRuns(dir)).map((e) => e.run_id), ids);
+  assert.deepEqual((await listRuns(dir)).map((e) => e.run_id).sort(), ids);
 });
 
 test('saving does not change the run it was given', async (t) => {
@@ -257,12 +259,13 @@ test('writeFileAtomic replaces content in one step and cleans up when it fails',
   assert.deepEqual((await fs.readdir(dir)).sort(), ['a-directory', 'data.json']);
 });
 
-test('the stored file is pretty JSON that ends with a newline', async (t) => {
+test('the stored file is compact JSON that ends with a newline', async (t) => {
   const dir = await makeDir(t);
   await saveRun(dir, run('r1', '2026-11-01T10:00:00.000Z'));
   const text = await fs.readFile(projectPaths(dir).findingsFile('r1'), 'utf8');
   assert.ok(text.endsWith('}\n'));
-  assert.ok(text.includes('\n  "run_id": "r1"'));
+  assert.ok(text.includes('{"schema_version":1,'));
+  assert.equal(text.indexOf('\n'), text.length - 1);
 });
 
 test('a relative project directory is rejected before anything is written', async () => {

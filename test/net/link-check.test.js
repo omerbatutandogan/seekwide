@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { checkExternalLinks } from '../../server/src/net/link-check.js';
+import { createHostGates } from '../../server/src/net/polite.js';
 import { startServer } from '../helpers/http-server.js';
 import { fetchResult } from './fake-fetch.js';
 
@@ -85,12 +86,12 @@ test('refusals, server errors, timeouts, TLS, connection and blocked-address fai
   assert.equal(results.get('https://f.test/')?.reason, 'dns_temporary');
 });
 
-test('de-duplicates, sorts and checks only the first maxLinks; the map is in sorted order', async () => {
+test('de-duplicates in the order given and checks only the first maxLinks; the map is in that order', async () => {
   const { fetch, calls } = scripted(() => ({ status: 200 }));
   const urls = ['https://c.test/', 'https://a.test/2', 'https://a.test/1', 'https://c.test/', 'https://b.test/'];
   const results = await checkExternalLinks(urls, { fetch, sleep: noSleep, maxLinks: 3 });
-  assert.deepEqual([...results.keys()], ['https://a.test/1', 'https://a.test/2', 'https://b.test/']);
-  assert.deepEqual(calls.map((c) => c.url).sort(), ['https://a.test/1', 'https://a.test/2', 'https://b.test/']);
+  assert.deepEqual([...results.keys()], ['https://c.test/', 'https://a.test/2', 'https://a.test/1']);
+  assert.deepEqual(calls.map((c) => c.url).sort(), ['https://a.test/1', 'https://a.test/2', 'https://c.test/']);
 });
 
 test('requests to one host are sequential and perHostDelayMs apart, including the GET retry', async () => {
@@ -98,7 +99,7 @@ test('requests to one host are sequential and perHostDelayMs apart, including th
   const sleeps = [];
   const { fetch, calls } = scripted((url, method) => ({ status: url.endsWith('/bad') && method === 'HEAD' ? 405 : 200 }));
   await checkExternalLinks(['https://a.test/1', 'https://a.test/bad'], {
-    fetch, perHostDelayMs: 750, sleep: async (ms) => { sleeps.push(ms); },
+    fetch, perHostDelayMs: 750, sleep: async (ms) => { sleeps.push(ms); }, hosts: createHostGates(),
   });
   assert.deepEqual(calls.map((c) => `${c.method} ${c.url}`), ['HEAD https://a.test/1', 'HEAD https://a.test/bad', 'GET https://a.test/bad']);
   assert.deepEqual(sleeps, [750, 750, 750], 'robots.txt, then each of the three requests, all paced');
@@ -146,10 +147,10 @@ test('works end to end with safeFetch against a local server', async () => {
     const urls = ['/ok', '/missing', '/head-refused', '/forbidden'].map((p) => `${server.origin}${p}`);
     const results = await checkExternalLinks(urls, { fetchOptions: { allowLoopback: true }, sleep: noSleep });
     assert.deepEqual(Object.fromEntries([...results].map(([u, r]) => [u.replace(server.origin, ''), r.outcome])), {
-      '/forbidden': 'unverifiable', '/head-refused': 'ok', '/missing': 'broken', '/ok': 'ok',
+      '/ok': 'ok', '/missing': 'broken', '/head-refused': 'ok', '/forbidden': 'unverifiable',
     });
     const methods = server.requests.map((r) => `${r.method} ${r.url}`);
-    assert.deepEqual(methods, ['GET /robots.txt', 'HEAD /forbidden', 'GET /forbidden', 'HEAD /head-refused', 'GET /head-refused', 'HEAD /missing', 'GET /missing', 'HEAD /ok']);
+    assert.deepEqual(methods, ['GET /robots.txt', 'HEAD /ok', 'HEAD /missing', 'GET /missing', 'HEAD /head-refused', 'GET /head-refused', 'HEAD /forbidden', 'GET /forbidden']);
   } finally {
     await server.close();
   }
@@ -170,7 +171,7 @@ test('without allowLoopback a loopback link is unverifiable, never fetched', asy
 test('robots.txt is read once per origin, before the first request to it', async () => {
   const { fetch, calls, robotsCalls } = scripted(() => ({ status: 200 }));
   await checkExternalLinks(['https://a.test/1', 'https://a.test/2', 'http://a.test/3', 'https://b.test/'], { fetch, sleep: noSleep, concurrency: 1 });
-  assert.deepEqual(robotsCalls, ['http://a.test/robots.txt', 'https://a.test/robots.txt', 'https://b.test/robots.txt']);
+  assert.deepEqual(robotsCalls, ['https://a.test/robots.txt', 'http://a.test/robots.txt', 'https://b.test/robots.txt']);
   assert.equal(calls.length, 4);
 });
 
@@ -304,7 +305,7 @@ test('a hop to another host waits for that host like its own requests', async ()
   /** @type {number[]} */
   const sleeps = [];
   const { fetch } = chainFetch({ 'https://a.test/x': moved('https://b.test/y'), 'https://b.test/y': { status: 200 }, 'https://b.test/own': { status: 200 } });
-  await checkExternalLinks(['https://a.test/x', 'https://b.test/own'], { fetch, perHostDelayMs: 300, concurrency: 1, sleep: async (ms) => { sleeps.push(ms); } });
+  await checkExternalLinks(['https://a.test/x', 'https://b.test/own'], { fetch, perHostDelayMs: 300, concurrency: 1, sleep: async (ms) => { sleeps.push(ms); }, hosts: createHostGates() });
   // a.test: robots, HEAD x. b.test: robots, HEAD y, HEAD own. One wait before every request to a host after its first.
   assert.deepEqual(sleeps, [300, 300, 300]);
 });

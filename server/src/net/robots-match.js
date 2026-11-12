@@ -1,7 +1,7 @@
 // Evaluation of robots.txt rules in time linear in the path, for the rules
-// robots-parser has read.
+// robots-parse.js has read.
 //
-// robots-parser matches a pattern against a path character by character while
+// robots-parser, which read and matched the rules up to version 0.1.0, matches a pattern against a path character by character while
 // keeping every possible match length, which costs pattern length times path
 // length for each rule. A 500 KiB file of wildcard rules and one long URL then
 // stall the server for minutes. A robots.txt pattern only has `*` (any run of
@@ -11,11 +11,7 @@
 
 import { normalizeEscapes } from '../util/url.js';
 
-/**
- * A rule as robots-parser stores it: the pattern with its percent escapes
- * normalized, and whether it allows.
- * @typedef {{pattern: string, allow: boolean}} StoredRule
- */
+/** @import { RobotsGroup, StoredRule } from './robots-parse.js' */
 
 /**
  * @typedef {Object} CompiledRule
@@ -31,7 +27,7 @@ import { normalizeEscapes } from '../util/url.js';
  */
 export function compileRule(rule) {
   // RFC 9309, 2.2.2: a percent-encoded unreserved character is compared as the character itself, in the rule as in the URL.
-  // Precedence keeps the length of the rule as written, as robots-parser and Google's matcher count it.
+  // Precedence keeps the length of the stored rule, as robots-parser and Google's matcher count it.
   const pattern = normalizeEscapes(rule.pattern);
   const anchored = pattern.endsWith('$');
   const body = anchored ? pattern.slice(0, -1) : pattern;
@@ -43,8 +39,8 @@ export function compileRule(rule) {
  * pieces between wildcards must follow in order, and with `$` the last piece
  * must end it.
  *
- * Guarantees: the same answer as robots-parser 3.0.1 for every pattern and
- * path without escapes of unreserved characters (`compileRule` and `rulePath`
+ * Guarantees: the same answer as robots-parser 3.0.1's matcher (Google's
+ * algorithm) for every pattern and path without escapes of unreserved characters (`compileRule` and `rulePath`
  * decode those in both, as RFC 9309 asks), and at most one pass over the path
  * per piece boundary.
  * @param {CompiledRule} rule
@@ -87,46 +83,12 @@ export function decidingRule(rules, path) {
 }
 
 /**
- * The group of rules robots-parser would apply to `agent`, compiled, or null
- * when the parser does not hold its rules the way version 3.0.1 does.
- * @param {unknown} parser  A robots-parser instance.
- * @param {string} agent    A product token, for example "Seekwide".
- * @returns {CompiledRule[]|null}
+ * The rules of a group, compiled; none for no group.
+ * @param {RobotsGroup|null} group
+ * @returns {CompiledRule[]}
  */
-export function compiledGroup(parser, agent) {
-  return compiledGroupFor(parser, [agent]);
-}
-
-/**
- * The group a crawler with several product tokens follows, compiled: the group
- * of the first token that has one of its own (Google lists them most specific
- * first; one matching token is enough, and only the most specific matching
- * group applies), else the `*` group. Null when the parser does not hold its
- * rules the way version 3.0.1 does.
- * @param {unknown} parser  A robots-parser instance.
- * @param {string[]} agents  Product tokens, most specific first, for example ["Googlebot-Image", "Googlebot"].
- * @returns {CompiledRule[]|null}
- */
-export function compiledGroupFor(parser, agents) {
-  const rules = /** @type {{_rules?: unknown}} */ (parser)._rules;
-  if (rules === null || typeof rules !== 'object') return null;
-  const groups = /** @type {Record<string, unknown>} */ (rules);
-  const keys = agents.map((agent) => {
-    let key = agent.toLowerCase();
-    const slash = key.indexOf('/');
-    if (slash > -1) key = key.slice(0, slash);
-    return key.trim();
-  });
-  const own = keys.find((key) => Object.hasOwn(groups, key));
-  const group = (own === undefined ? groups['*'] : groups[own]) ?? [];
-  if (!Array.isArray(group)) return null;
-  /** @type {CompiledRule[]} */
-  const compiled = [];
-  for (const rule of group) {
-    if (rule === null || typeof rule !== 'object' || typeof rule.pattern !== 'string' || typeof rule.allow !== 'boolean') return null;
-    compiled.push(compileRule(rule));
-  }
-  return compiled;
+export function compileGroup(group) {
+  return group === null ? [] : group.rules.map(compileRule);
 }
 
 /**

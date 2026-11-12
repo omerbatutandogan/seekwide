@@ -38,14 +38,22 @@ Rules of thumb without an official source can only be `info` checks with weight 
 
 ## Checks to run
 
+One command runs every check CI runs, in order, and stops at the first that fails:
+
+```bash
+npm run check
+```
+
+It runs the tests, the strict type check, the check that `docs/checks.md` matches the code, the plugin directory rules, `claude plugin validate` and `npm audit`. It needs Claude Code on your `PATH` and a connection to the npm registry. The same checks, one by one:
+
 ```bash
 npm test
 ```
 
-The code is plain JavaScript with JSDoc types, checked in strict mode. TypeScript is not a dependency of the plugin, so install it without saving:
+The code is plain JavaScript with JSDoc types, checked in strict mode. TypeScript is not a dependency of the plugin, so install it without saving (`npm run check` does this for you):
 
 ```bash
-npm install --no-save --ignore-scripts typescript@5.9.3 @types/node@22.20.5
+npm install --no-save --ignore-scripts typescript@7.0.2 @types/node@22.20.5
 ```
 
 ```bash
@@ -63,3 +71,13 @@ node scripts/check-directory-rules.js
 ```bash
 claude plugin validate . --strict --profile directory
 ```
+
+```bash
+npm audit --omit=dev
+```
+
+The TypeScript version is pinned in three places, which change together: here, `.github/workflows/ci.yml` and `scripts/check.js` (which fails when it and the workflow differ).
+
+## Evals
+
+The skill-flow evals in `evals/` run real Claude sessions and cost tokens; see [evals/README.md](evals/README.md). **Review a pull request's changes under `evals/` before you run them:** a case's `scaffold.sh` runs as a bash script on your machine, outside the eval sandbox, and its recorded transcripts are replayed into a session that may use Bash, Edit and Write.

@@ -384,6 +384,39 @@ describe('JSON-RPC handling and framing', () => {
     assert.equal(h.raw.length, 1);
   });
 
+  it('tells the handler that its call was cancelled, so it stops instead of finishing unseen', async () => {
+    /** @type {AbortSignal|null} */
+    let seen = null;
+    let steps = 0;
+    const working = {
+      name: 'working',
+      title: 'Working',
+      description: 'Works in steps until it is cancelled.',
+      inputSchema: { type: /** @type {const} */ ('object') },
+      /** @param {Record<string, unknown>} args @param {{signal: AbortSignal}} context */
+      handler: async (args, { signal }) => {
+        seen = signal;
+        for (;;) {
+          signal.throwIfAborted();
+          steps += 1;
+          await tick();
+        }
+      },
+    };
+    const h = harness([working]);
+    h.send(call('w1', 'working', {}));
+    await tick();
+    h.send({ jsonrpc: '2.0', method: 'notifications/cancelled', params: { requestId: 'w1', reason: 'user' } });
+    await tick();
+    const stoppedAt = steps;
+    for (let i = 0; i < 5; i += 1) await tick();
+    assert.equal(/** @type {AbortSignal|null} */ (seen)?.aborted, true);
+    assert.ok(steps <= stoppedAt + 1, `${steps} steps after ${stoppedAt}`);
+    const response = await h.request({ jsonrpc: '2.0', id: 'p', method: 'ping' });
+    assert.equal(response.id, 'p');
+    assert.equal(h.raw.length, 1, 'no answer for the cancelled call');
+  });
+
   it('writes only newline-terminated JSON-RPC messages to the output', async () => {
     const h = harness();
     await h.request(call(1, 'crash', {}));

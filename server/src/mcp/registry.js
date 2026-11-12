@@ -14,7 +14,14 @@ import { assertSupportedSchema, isPlainObject, validate } from './schema.js';
  * @property {string} title
  * @property {string} description
  * @property {JsonSchema & {type: 'object'}} inputSchema
- * @property {(args: Record<string, any>) => Promise<unknown>} handler
+ * @property {(args: Record<string, any>, context: ToolContext) => Promise<unknown>} handler
+ */
+
+/**
+ * What a handler gets besides its arguments.
+ * @typedef {Object} ToolContext
+ * @property {AbortSignal} signal  Fires when the client cancels the call (`notifications/cancelled`). A handler
+ *   that sends requests stops sending them, and saves nothing, once it fires.
  */
 
 /**
@@ -43,8 +50,10 @@ function toolErrorResult(text) {
  * Guarantees: every definition is checked before the server starts (name,
  * handler, a supported `inputSchema` of type object, no duplicate names);
  * `call` validates the arguments against the tool's `inputSchema` before the
- * handler runs, sends a `ToolError`'s message unchanged and replaces any other
- * exception with a generic message, logging the detail.
+ * handler runs, passes the call's AbortSignal to it, sends a `ToolError`'s
+ * message unchanged and replaces any other exception with a generic message,
+ * logging the detail; an exception after the call was cancelled is not logged
+ * as a fault (the client gets no answer for a cancelled call).
  *
  * @param {ToolDef[]} tools
  * @throws {TypeError} when a tool definition is invalid or uses an unsupported schema keyword.
@@ -73,8 +82,11 @@ export function createToolRegistry(tools) {
     }));
   }
 
-  /** @param {unknown} params */
-  async function call(params) {
+  /**
+   * @param {unknown} params
+   * @param {AbortSignal} [signal]  Fires when the client cancels the call.
+   */
+  async function call(params, signal = new AbortController().signal) {
     if (!isPlainObject(params) || typeof params.name !== 'string') {
       throw new RpcError(ERROR.INVALID_PARAMS, 'Invalid params: tools/call needs a string "name".');
     }
@@ -90,10 +102,14 @@ export function createToolRegistry(tools) {
       return toolErrorResult(`Invalid arguments for ${tool.name}: ${problems.join('; ')}. Fix the arguments and call ${tool.name} again.`);
     }
     try {
-      const value = await tool.handler(args);
+      const value = await tool.handler(args, { signal });
       return { content: [{ type: 'text', text: JSON.stringify(value ?? null) }] };
     } catch (error) {
       if (error instanceof ToolError) return toolErrorResult(error.message);
+      if (signal.aborted) {
+        log.debug('tool call stopped after it was cancelled', { tool: tool.name });
+        return toolErrorResult('The call was cancelled.');
+      }
       log.error('tool handler failed', { tool: tool.name, error: error instanceof Error ? (error.stack ?? error.message) : String(error) });
       return toolErrorResult(GENERIC_TOOL_ERROR);
     }

@@ -24,7 +24,7 @@ describe('a profile logo outside the project folder', () => {
   it('is refused as outside the project before anything reads the path, even when nothing is there', async () => {
     // A path that does not exist: a refusal that looked at the file first would say it could not be read.
     const missing = path.join(path.dirname(project), 'no-such-folder', 'logo.png');
-    await assert.rejects(loadLogo({ path: missing, source: 'profile' }, project), /named by the project profile is outside the project folder/);
+    await assert.rejects(loadLogo({ path: missing, source: 'profile' }, project), /The logo that report\.logo_path in the project profile names is outside the project folder\. .*Fix or remove report\.logo_path/);
     await assert.rejects(loadLogo({ path: '../no-such-folder/logo.png', source: 'profile' }, project), /outside the project folder/);
   });
 

@@ -38,15 +38,22 @@ export function reusedNote(measuredAt) {
 }
 
 /**
+ * A measurement under way, shared by the audits of one crawl that wait for it.
+ * @typedef {{result: Promise<{vitals: VitalsData, stored: boolean}>, controller: AbortController, waiting: number}} Measurement
+ */
+
+/**
  * Ask Google, or take what is stored for the crawl. A measurement that has
  * values from either source is stored; one that has none (Google refused, a
  * site that is not public) is not, so the next audit asks again.
  * @param {ToolDeps} deps
  * @param {CrawlResult} crawl
  * @param {number} maxPages
+ * @param {AbortSignal} signal  Fires when every audit waiting for the measurement was cancelled: no request to
+ *   Google starts after that, and what was measured is not stored.
  * @returns {Promise<{vitals: VitalsData, stored: boolean}>}  `stored`: taken from an earlier audit.
  */
-async function measureOnce(deps, crawl, maxPages) {
+async function measureOnce(deps, crawl, maxPages, signal) {
   let stored = null;
   try {
     stored = await deps.crawlManager.storedVitals(crawl.id, maxPages);
@@ -58,13 +65,13 @@ async function measureOnce(deps, crawl, maxPages) {
   /** @type {VitalsData} */
   let vitals;
   try {
-    vitals = await deps.measureVitals(crawl, { maxPages });
+    vitals = await deps.measureVitals(crawl, { maxPages, signal });
   } catch (error) {
     log.error('core web vitals measurement failed', { error: error instanceof Error ? (error.stack ?? error.message) : String(error) });
     return { vitals: unavailableVitals(crawl.site_origin, VITALS_FAILED), stored: false };
   }
   vitals = { ...vitals, measured_at: measuredAt };
-  if (vitals.lab.available || vitals.field.available) {
+  if ((vitals.lab.available || vitals.field.available) && !signal.aborted) {
     try {
       await deps.crawlManager.storeVitals(crawl.id, maxPages, vitals, measuredAt);
     } catch (error) {
@@ -87,20 +94,40 @@ async function measureOnce(deps, crawl, maxPages) {
  * @param {ToolDeps} deps
  * @param {CrawlResult} crawl
  * @param {number} maxPages
- * @param {Map<string, Promise<{vitals: VitalsData, stored: boolean}>>} pending  Measurements under way in this
- *   server, by crawl and page count.
+ * @param {Map<string, Measurement>} pending  Measurements under way in this server, by crawl and page count.
+ * @param {AbortSignal} [signal]  Fires when this audit is cancelled. The measurement stops (no new request to
+ *   Google) once every audit waiting for it was cancelled.
  * @returns {Promise<VitalsData>}
  */
-export async function collectVitals(deps, crawl, maxPages, pending) {
+export async function collectVitals(deps, crawl, maxPages, pending, signal) {
   const key = `${crawl.id}\n${maxPages}`;
   let measurement = pending.get(key);
   // Another audit of this crawl is measuring: wait for its numbers instead of asking Google twice.
   const joined = measurement !== undefined;
   if (measurement === undefined) {
-    measurement = measureOnce(deps, crawl, maxPages).finally(() => pending.delete(key));
+    const controller = new AbortController();
+    const result = measureOnce(deps, crawl, maxPages, controller.signal).finally(() => pending.delete(key));
+    measurement = { result, controller, waiting: 0 };
     pending.set(key, measurement);
   }
-  const { vitals, stored } = await measurement;
+  const shared = measurement;
+  shared.waiting += 1;
+  let left = false;
+  const leave = () => {
+    if (left) return;
+    left = true;
+    shared.waiting -= 1;
+    if (shared.waiting === 0 && signal?.aborted) shared.controller.abort(signal.reason);
+  };
+  signal?.addEventListener('abort', leave, { once: true });
+  let outcome;
+  try {
+    outcome = await shared.result;
+  } finally {
+    signal?.removeEventListener('abort', leave);
+    leave();
+  }
+  const { vitals, stored } = outcome;
   const available = vitals.lab.available || vitals.field.available;
   if (!(stored || (joined && available)) || vitals.measured_at === undefined) return { ...vitals, reused: false };
   return { ...vitals, reused: true, notes: [reusedNote(vitals.measured_at), ...vitals.notes] };

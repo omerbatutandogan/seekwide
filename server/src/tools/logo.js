@@ -86,26 +86,23 @@ function isInside(parent, child) {
  * @throws {ToolError} when the file is missing, outside the project (for a profile path), too large or not a supported image.
  */
 export async function loadLogo(logo, projectDir) {
-  const from = SOURCE_NAMES[logo.source];
   const file = path.resolve(projectDir, logo.path);
-  const outsideProject = (/** @type {string} */ project) =>
-    new ToolError(
-      `The logo ${file} named by the project profile is outside the project folder ${project}. ` +
-        'A profile may only point at a logo inside the project; pass logo_path, or use the report logo setting, for a file elsewhere.',
-    );
-  if (logo.source === 'profile') {
-    // A profile can arrive with someone else's repository. Its path is checked before the file is touched, and the
-    // way to it is walked without following a link, so a path such as \\host\share\logo.png on Windows, or a link in
-    // the project that points there, never makes the system contact another machine.
+  // A profile can arrive with someone else's repository, so its path is named by the setting, never quoted.
+  const fromProfile = logo.source === 'profile';
+  const named = fromProfile ? 'The logo that report.logo_path in the project profile names' : `The logo ${file} (from ${SOURCE_NAMES[logo.source]})`;
+  const profileAdvice = 'Fix or remove report.logo_path in the profile; pass logo_path, or use the report logo setting, for a file elsewhere.';
+  const outsideProject = () =>
+    new ToolError(`${named} is outside the project folder. A profile may only point at a logo inside the project. ${profileAdvice}`);
+  if (fromProfile) {
+    // A profile's path is checked before the file is touched, and the way to it is walked without following a link,
+    // so a path such as \\host\share\logo.png on Windows, or a link in the project that points there, never makes the
+    // system contact another machine.
     const project = await realpath(projectDir).catch(() => path.resolve(projectDir));
     const lexical = path.resolve(projectDir);
-    if (!isInside(lexical, file) && !isInside(project, file)) throw outsideProject(project);
+    if (!isInside(lexical, file) && !isInside(project, file)) throw outsideProject();
     const base = isInside(lexical, file) ? lexical : project;
     if ((await entryKind(base, path.relative(base, file).split(path.sep).join('/'))) !== 'file') {
-      throw new ToolError(
-        `The logo ${file} named by the project profile is not a file inside the project folder ${project}: it is missing, or a symbolic link is on the way to it. ` +
-          'A profile may only point at a logo inside the project, without links; pass logo_path, or use the report logo setting, for a file elsewhere.',
-      );
+      throw new ToolError(`${named} is not a file inside the project folder: it is missing, or a symbolic link is on the way to it. ${profileAdvice}`);
     }
   }
   let info;
@@ -114,21 +111,21 @@ export async function loadLogo(logo, projectDir) {
     info = await stat(file);
     real = await realpath(file);
   } catch {
-    throw new ToolError(`The logo file ${file} (from ${from}) could not be read. Check the path, or leave the logo out to render without one.`);
+    throw new ToolError(`${named} could not be read. Check the path, or leave the logo out to render without one.`);
   }
-  if (!info.isFile()) throw new ToolError(`The logo path ${file} (from ${from}) is not a file. Point it at a PNG, JPEG, WebP or SVG file.`);
-  if (logo.source === 'profile') {
+  if (!info.isFile()) throw new ToolError(`${named} is not a file. Point it at a PNG, JPEG, WebP or SVG file.`);
+  if (fromProfile) {
     const project = await realpath(projectDir).catch(() => path.resolve(projectDir));
-    if (!isInside(project, real)) throw outsideProject(project);
+    if (!isInside(project, real)) throw outsideProject();
   }
   const tooLarge = (/** @type {number} */ size) =>
-    new ToolError(`The logo ${file} is ${Math.ceil(size / 1024)} KB; the limit is 200 KB. Use a smaller PNG, JPEG, WebP or SVG file.`);
+    new ToolError(`${named} is ${Math.ceil(size / 1024)} KB; the limit is 200 KB. Use a smaller PNG, JPEG, WebP or SVG file.`);
   if (info.size > LOGO_MAX_BYTES) throw tooLarge(info.size);
   const bytes = await readFile(real);
   if (bytes.length > LOGO_MAX_BYTES) throw tooLarge(bytes.length);
   const type = detectImageType(bytes, real);
   if (type === null) {
-    throw new ToolError(`The logo ${file} is not a PNG, JPEG, WebP or SVG image (an SVG needs a .svg name and an <svg> root element). Convert it to one of those formats.`);
+    throw new ToolError(`${named} is not a PNG, JPEG, WebP or SVG image (an SVG needs a .svg name and an <svg> root element). Convert it to one of those formats.`);
   }
   return `data:${type};base64,${bytes.toString('base64')}`;
 }

@@ -6,8 +6,8 @@
 
 import { LIMITS, MODULES, RULES_VERSION, SCHEMA_VERSION, SEVERITIES, VERSION } from '../config.js';
 import { buildContext, runChecks } from '../checks/engine.js';
-import { onDeployedHost } from '../crawl/deployed.js';
 import { isUnverifiable } from '../checks/page-helpers.js';
+import { externalLinkUrls } from './audit-links.js';
 import { runNotes, skippedChecks, startPage, topGroups } from './audit-summary.js';
 import { MEDIA_ARGUMENTS, collectImageFiles, imageFilesNotes } from './audit-media.js';
 import { VITALS_ARGUMENTS, collectVitals, vitalsOutput } from './audit-vitals.js';
@@ -18,33 +18,9 @@ import { SOURCE_DIR_SCHEMA, auditSources } from './project.js';
 
 const TOP_GROUPS = 10;
 
-export const BLOCKED_SCORE_NOTE = 'The crawl was blocked before any page could be read, so there is nothing to score.';
+export { externalLinkUrls };
 
-/**
- * URLs for the external link check, de-duplicated and sorted: the external link
- * targets on the crawled HTML pages (status 200), plus the `final_url` of every
- * record whose redirect chain leaves the site. Every URL on the host of the
- * deployed site of a local crawl (`options.deployed_origin`) is left out,
- * whatever its scheme or port, with or without "www.".
- * @param {CrawlResult} crawl
- * @returns {string[]}
- */
-export function externalLinkUrls(crawl) {
-  const urls = new Set();
-  // A local crawl that knows where the project is deployed never has that address contacted: its pages
-  // name it, and a request there would say nothing about the project being audited.
-  const deployed = crawl.options.deployed_origin;
-  /** @param {string} url */
-  const onDeployedSite = (url) => Boolean(deployed) && onDeployedHost(url, /** @type {string} */ (deployed));
-  for (const page of crawl.pages) {
-    if (page.final_external) urls.add(page.final_url);
-    if (page.status !== 200 || !page.is_html) continue;
-    for (const link of page.links) {
-      if (link.url !== null && !link.internal) urls.add(link.url);
-    }
-  }
-  return [...urls].filter((url) => !onDeployedSite(url)).sort();
-}
+export const BLOCKED_SCORE_NOTE = 'The crawl was blocked before any page could be read, so there is nothing to score.';
 
 const SAVE_ATTEMPTS = 3;
 
@@ -121,7 +97,9 @@ export function auditTools(deps) {
         required: ['job_id'],
         additionalProperties: false,
       },
-      async handler(args) {
+      async handler(args, context) {
+        // Fires when the client cancels the call: no request starts after that, and nothing is saved.
+        const signal = context?.signal;
         const projectDir = resolveProjectDir(args.project_dir, deps.defaultProjectDir);
         // Fail on a bad project folder before spending time on link checks.
         await withStoreErrors(() => deps.ensureProject(projectDir));
@@ -132,7 +110,7 @@ export function auditTools(deps) {
         // A re-audit after fixes. A base run that cannot be compared fails here too.
         const fixRequest = await fixBase(deps, projectDir, crawl, args.verify_fixes);
 
-        // External links are checked only for the links module (README, REVIEW-FIXES R7).
+        // External links are checked only for the links module (README, "Network and data").
         const linksRequested = modules.includes('links');
         const checkOutbound = linksRequested && (args.check_outbound_links ?? true);
         const external = checkOutbound ? externalLinkUrls(crawl) : [];
@@ -145,13 +123,14 @@ export function auditTools(deps) {
         /** @type {Promise<Map<string, OutboundResult>|null>} */
         const links = Promise.resolve(!checkOutbound ? null : external.length === 0
           ? new Map()
-          : deps.checkExternalLinks(external, { maxLinks: LIMITS.maxOutboundChecks, concurrency: LIMITS.outboundConcurrency }));
+          : deps.checkExternalLinks(external, { maxLinks: LIMITS.maxOutboundChecks, concurrency: LIMITS.outboundConcurrency, ...(signal ? { signal } : {}) }));
         /** @type {[Map<string, OutboundResult>|null, VitalsData|null, Awaited<ReturnType<typeof collectImageFiles>>]} */
         const [outbound, vitals, images] = await Promise.all([
           links,
-          checkVitals ? collectVitals(deps, crawl, args.core_web_vitals_pages ?? LIMITS.vitalsPagesDefault, pendingVitals) : null,
-          links.catch(() => null).then(() => collectImageFiles(deps, crawl, { requested: mediaRequested, check: args.check_image_files ?? true })),
+          checkVitals ? collectVitals(deps, crawl, args.core_web_vitals_pages ?? LIMITS.vitalsPagesDefault, pendingVitals, signal) : null,
+          links.catch(() => null).then(() => collectImageFiles(deps, crawl, { requested: mediaRequested, check: args.check_image_files ?? true, signal })),
         ]);
+        signal?.throwIfAborted();
 
         const ctx = buildContext(crawl, { outbound, vitals, imageFiles: images.files, imageFilesReason: images.reason });
         const date = deps.now();
@@ -199,6 +178,7 @@ export function auditTools(deps) {
           image_files: images.summary,
         };
         run.fixes = fixVerification(deps, fixRequest, run, crawl);
+        signal?.throwIfAborted();
         const saved = await saveWithNewId(deps, projectDir, run, date);
 
         return {

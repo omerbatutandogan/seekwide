@@ -11,7 +11,11 @@
 import { firstNonEmpty, isUnverifiable } from '../checks/page-helpers.js';
 import { SEVERITIES } from '../config.js';
 import { plainPath } from './fix-common.js';
+import { clip } from '../util/strings.js';
 import { FIXABLE_CHECKS } from './fixes.js';
+
+/** Characters of a URL from the saved base run put into a sentence. */
+const URL_SHOWN = 200;
 
 const MAX_REPLACEMENTS = 5;
 
@@ -61,7 +65,8 @@ function partnerDoubt(finding, pages) {
     return !page || page.status !== 200 || !page.is_html || !page.indexability.indexable || firstNonEmpty(page[values]) === null;
   });
   if (absent.length === 0) return null;
-  return `${absent.length === 1 ? 'A page' : `${absent.length} pages`} this one shared the value with ${absent.length === 1 ? 'was' : 'were'} not compared again in the re-audit (${absent[0]}${absent.length > 1 ? ', ...' : ''}): not crawled, not indexable, or without a value of ${absent.length === 1 ? 'its' : 'their'} own. The duplicate may be gone only because there was less to compare with.`;
+  // The URL comes from the saved base run: clipped, so a long one cannot fill the sentence.
+  return `${absent.length === 1 ? 'A page' : `${absent.length} pages`} this one shared the value with ${absent.length === 1 ? 'was' : 'were'} not compared again in the re-audit (${clip(absent[0], URL_SHOWN)}${absent.length > 1 ? ', ...' : ''}): not crawled, not indexable, or without a value of ${absent.length === 1 ? 'its' : 'their'} own. The duplicate may be gone only because there was less to compare with.`;
 }
 
 /**

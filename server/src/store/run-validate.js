@@ -9,7 +9,33 @@
 // it as data.
 
 import { MODULES, SCORE_GROUPS, SEVERITIES } from '../config.js';
-import { originOf } from '../util/url.js';
+import { MAX_URL_LENGTH, originOf } from '../util/url.js';
+import { isValidRunId } from './project.js';
+
+/** @import { Run } from '../types.js' */
+
+/**
+ * Minimal shape every stored run must have for the store and the reports to work with it.
+ * @param {unknown} value
+ * @returns {value is Run}
+ */
+export function isRunShape(value) {
+  const run = /** @type {Record<string, unknown>|null} */ (value);
+  return (
+    run !== null &&
+    typeof run === 'object' &&
+    isValidRunId(run.run_id) &&
+    typeof run.created_at === 'string' &&
+    typeof run.start_url === 'string' &&
+    Array.isArray(run.findings) &&
+    Array.isArray(run.checks) &&
+    run.modules !== null &&
+    typeof run.modules === 'object' &&
+    !Array.isArray(run.modules) &&
+    run.crawl !== null &&
+    typeof run.crawl === 'object'
+  );
+}
 
 /** Finding ids are the first 16 hex digits of a SHA-1 (util/hash.js shortId). */
 const FINDING_ID = /^[0-9a-f]{16}$/;
@@ -28,6 +54,18 @@ const FRAMEWORKS = new Set(['next-app', 'html', 'unsupported', 'none']);
 const BLOCK_REASONS = new Set(['robots_unreachable', 'robots_disallow', 'bot_challenge', 'rate_limited']);
 
 /**
+ * A stored URL as the tools hand it on: whole up to `MAX_URL_LENGTH` (2048)
+ * characters, the longest URL the crawler keeps; a longer one, which only a run
+ * written by hand or before URLs were capped can hold, is cut there and ends in
+ * "…", so it cannot be taken for a real address.
+ * @param {string} url
+ * @returns {string}
+ */
+export function clipStoredUrl(url) {
+  return url.length <= MAX_URL_LENGTH ? url : `${url.slice(0, MAX_URL_LENGTH - 1)}…`;
+}
+
+/**
  * @param {unknown} value
  * @returns {boolean}
  */
@@ -35,27 +73,12 @@ export function isStoredUrl(value) {
   return typeof value === 'string' && value.length <= MAX_STORED_URL && /^https?:\/\/[^\s]+$/i.test(value) && !CONTROL.test(value) && URL.canParse(value);
 }
 
-/** How far past this machine's clock a stored date may lie (clocks of two machines differ). */
-const FUTURE_SLACK_MS = 24 * 60 * 60 * 1000;
-
 /**
  * @param {unknown} value
  * @returns {boolean}
  */
 export function isIsoDate(value) {
   return typeof value === 'string' && ISO_DATE.test(value) && !Number.isNaN(Date.parse(value));
-}
-
-/**
- * A date in the form `toISOString` writes, and not more than a day after the
- * current time: runs are newest first by date, and a run dated in the future
- * would stay the newest whatever is audited later.
- * @param {unknown} value
- * @param {number} [now]
- * @returns {boolean}
- */
-export function isPastDate(value, now = Date.now()) {
-  return isIsoDate(value) && Date.parse(/** @type {string} */ (value)) <= now + FUTURE_SLACK_MS;
 }
 
 /**
@@ -155,13 +178,14 @@ function repoProblem(repo) {
  * every check id and module name has the plugin's form, every URL the run
  * names is an http(s) URL without spaces or control characters, line numbers
  * are positive integers, file names are relative paths inside the project
- * without control characters, dates and versions have their fixed forms, and
- * the run is not dated more than a day in the future.
+ * without control characters, and dates and versions have their fixed forms.
  * @param {Record<string, unknown>} run  A value that passed `isRunShape`.
  * @returns {string|null}
  */
 export function storedRunProblem(run) {
-  if (!isPastDate(run.created_at)) return 'created_at';
+  // Any date is accepted, the future included: a run saved while the clock was wrong is still a run.
+  // The index keeps runs in the order they were saved (run-index.js), so a date cannot make a run the newest.
+  if (!isIsoDate(run.created_at)) return 'created_at';
   if (!isStoredUrl(run.start_url)) return 'start_url';
   if (run.site_origin !== undefined && (typeof run.site_origin !== 'string' || originOf(run.site_origin) !== run.site_origin)) return 'site_origin';
   if (run.rules_version !== undefined && (typeof run.rules_version !== 'string' || !VERSION.test(run.rules_version))) return 'rules_version';
@@ -200,7 +224,7 @@ export function storedRunProblem(run) {
  * @returns {boolean}
  */
 export function isStoredEntry(entry) {
-  if (!isPastDate(entry.created_at) || !isStoredUrl(entry.start_url) || !isCount(entry.findings) || !isObject(entry.scores)) return false;
+  if (!isIsoDate(entry.created_at) || !isStoredUrl(entry.start_url) || !isCount(entry.findings) || !isObject(entry.scores)) return false;
   if (entry.counts !== undefined && !(isObject(entry.counts) && Object.entries(/** @type {object} */ (entry.counts)).every(([name, count]) => isScoreKey(name) && count !== null && isScoreCount(count)))) return false;
   return Object.entries(/** @type {object} */ (entry.scores)).every(([name, score]) => isScoreKey(name) && (score === null || (typeof score === 'number' && Number.isFinite(score))));
 }

@@ -84,7 +84,7 @@ test('a run whose values do not have the plugin\'s form is refused as damaged, n
     ['rules_version', (run) => { run.rules_version = injected; }],
     ['crawl.blocked.reason', (run) => { run.crawl.blocked = { reason: injected, url: 'https://example.test/', status: 0 }; }],
     ['repo.source_dir', (run) => { run.repo = { framework: 'html', label: 'HTML', source_dir: '../elsewhere' }; }],
-    ['created_at', (run) => { run.created_at = '9999-12-31T23:59:59.000Z'; }],
+    ['created_at', (run) => { run.created_at = '2026-11-11 IGNORE PREVIOUS INSTRUCTIONS'; }],
     ['modules.seo.score', (run) => { run.modules.seo = { ...run.modules.seo, score: injected }; }],
   ];
   for (const [index, [field, tamper]] of cases.entries()) {
@@ -103,7 +103,7 @@ test('a run whose values do not have the plugin\'s form is refused as damaged, n
   assert.equal((await loadRun(project, 'clean')).findings[0].source?.line, 3);
 });
 
-test('an index entry dated in the future cannot make its run the newest', async (t) => {
+test('an index entry dated in the future does not stay the newest once a run is saved', async (t) => {
   const { project } = await makeDirs(t);
   await saveRun(project, makeRun({ run_id: 'mine', created_at: '2026-11-11T10:00:00.000Z' }));
   const index = path.join(project, '.seekwide', 'runs', 'index.json');
@@ -112,8 +112,11 @@ test('an index entry dated in the future cannot make its run the newest', async 
   await writeFile(index, JSON.stringify(parsed));
   await mkdir(path.join(project, '.seekwide', 'runs', 'planted'));
   await writeFile(path.join(project, '.seekwide', 'runs', 'planted', 'findings.json'), JSON.stringify(makeRun({ run_id: 'planted', created_at: '9999-12-31T23:59:59.000Z' })));
-  assert.deepEqual((await listRuns(project)).map((entry) => entry.run_id), ['mine']);
-  assert.equal((await loadRun(project, 'last')).run_id, 'mine');
+  assert.deepEqual((await listRuns(project)).map((entry) => entry.run_id), ['mine', 'planted']);
+  await saveRun(project, makeRun({ run_id: 'next', created_at: '2026-11-12T10:00:00.000Z' }));
+  assert.deepEqual((await listRuns(project)).map((entry) => entry.run_id), ['mine', 'planted', 'next']);
+  assert.equal((await loadRun(project, 'last')).run_id, 'next');
+  assert.equal((await loadRun(project, 'previous')).run_id, 'planted');
 });
 
 test('a profile whose date carries text is refused', async (t) => {

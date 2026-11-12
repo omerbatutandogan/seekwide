@@ -13,9 +13,11 @@ import { deployedOriginOf } from '../crawl/deployed.js';
 import { ToolError } from '../mcp/stdio.js';
 import { classifyAddress } from '../net/ip.js';
 import { FIXABLE_CHECKS, planFixes } from '../repo/fixes.js';
+import { RepoError } from '../repo/scan.js';
 import { verifyFixes } from '../repo/verify.js';
+import { InputError } from '../util/errors.js';
+import { PLAIN_HOST_MESSAGE, hasPlainHost } from '../util/plain-host.js';
 import { PROJECT_DIR_SCHEMA, UNTRUSTED_NOTE, checkId, resolveProjectDir, runRefSchema, withStoreErrors } from './common.js';
-import { openSources } from './project.js';
 
 const SUPPORTED = ['next-app', 'html'];
 const MAX_FINDING_IDS = 200;
@@ -76,7 +78,16 @@ export const VERIFY_FIXES_SCHEMA = Object.freeze({
  * @throws {TypeError} when the value is not an http or https URL.
  */
 export function publicOrigin(value, localOrigin) {
-  const origin = deployedOriginOf(value);
+  let origin;
+  try {
+    origin = deployedOriginOf(value);
+  } catch (error) {
+    // deployedOriginOf checks the address it is given; its TypeError is about that value.
+    if (error instanceof TypeError) throw new InputError(error.message);
+    throw error;
+  }
+  // The address goes into fix instructions and suggested code: only a plain host name is accepted.
+  if (!hasPlainHost(origin)) throw new InputError(PLAIN_HOST_MESSAGE);
   const host = new URL(origin).hostname.replace(/^\[|\]$/g, '').replace(/\.$/, '');
   // An IP address that is not public (loopback, private, unspecified) is not where a site is deployed.
   const privateIp = net.isIP(host) !== 0 && classifyAddress(host) !== 'public';
@@ -189,7 +200,17 @@ export function fixTools(deps) {
         if (typeof repo.source_dir !== 'string' || path.isAbsolute(repo.source_dir)) {
           throw new ToolError(`Run ${loaded.run_id} does not say where the web project is. Audit the project again and plan the fixes from the new run.`);
         }
-        const sources = await openSources(deps, projectDir, path.join(projectDir, repo.source_dir));
+        let sources;
+        try {
+          sources = await deps.loadProjectSources(projectDir, path.join(projectDir, repo.source_dir));
+        } catch (error) {
+          // The folder comes from the saved run, which a repository can bring: it is named by its field, never quoted.
+          if (!(error instanceof RepoError)) throw error;
+          throw new ToolError(
+            `Run ${loaded.run_id} names a source folder (repo.source_dir) that is missing, not a folder, or outside the project. ` +
+            'Audit the project again and plan the fixes from the new run.',
+          );
+        }
         if (sources.detection.framework !== repo.framework) {
           throw new ToolError(
             `Run ${loaded.run_id} audited another kind of project than the folder now holds (${sources.detection.label}). Audit the project again and plan the fixes from the new run.`,
@@ -207,7 +228,7 @@ export function fixTools(deps) {
           try {
             siteUrl = publicOrigin(named, loaded.site_origin);
           } catch (error) {
-            if (!(error instanceof TypeError)) throw error;
+            if (!(error instanceof InputError)) throw error;
             throw new ToolError(args.site_url === undefined
               ? 'site_url in the project profile is not an http or https URL. Pass site_url to fix_plan, or correct the profile with profile_set.'
               : `site_url cannot be used: ${error.message}`);

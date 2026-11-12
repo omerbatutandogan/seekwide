@@ -3,6 +3,7 @@ import { test } from 'node:test';
 
 import { USER_AGENT } from '../../server/src/config.js';
 import { IMAGE_ACCEPT, checkImageFiles, fileSize } from '../../server/src/net/image-check.js';
+import { createHostGates } from '../../server/src/net/polite.js';
 import { startServer } from '../helpers/http-server.js';
 import { fakeFetch, fetchResult } from './fake-fetch.js';
 
@@ -140,7 +141,7 @@ test('requests to one host are paced, at least the crawl-delay of its robots.txt
     'https://b.test/robots.txt': ROBOTS_OPEN,
     'https://b.test/1.jpg': image('image/jpeg', 10),
   });
-  await checkImageFiles([`${A}/1.jpg`, `${A}/2.jpg`, 'https://b.test/1.jpg'], { fetch, sleep, perHostDelayMs: 500 });
+  await checkImageFiles([`${A}/1.jpg`, `${A}/2.jpg`, 'https://b.test/1.jpg'], { fetch, sleep, perHostDelayMs: 500, hosts: createHostGates() });
   // a.test: robots.txt, then 1.jpg and 2.jpg each 10 s (the cap) after the one before; b.test: its image 500 ms after its robots.txt.
   assert.deepEqual(waits.sort((x, y) => x - y), [500, 10_000, 10_000]);
 });
@@ -151,7 +152,7 @@ test('no request starts after the deadline; the rest is not checked', async () =
   const results = await checkImageFiles([`${A}/1.jpg`, `${A}/2.jpg`, `${A}/3.jpg`], {
     fetch, now: () => clock, deadlineMs: 5000, sleep: async (ms) => {
       clock += ms * 3;
-    }, perHostDelayMs: 1000,
+    }, perHostDelayMs: 1000, hosts: createHostGates(),
   });
   assert.deepEqual([...results.values()].map((r) => r.outcome), ['ok', 'not_checked', 'not_checked']);
   assert.deepEqual(calls.map((call) => call.url), [`${A}/robots.txt`, `${A}/1.jpg`]);

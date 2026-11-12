@@ -3,14 +3,15 @@
 // nothing from another address (ARCHITECTURE.md 4.5, steps 6 and 11).
 
 import { LIMITS } from '../config.js';
-import { loadRobots } from '../net/robots.js';
+import { SHARED_HOST_GATES, hostOf } from '../net/polite.js';
+import { SHARED_ROBOTS, readRobots } from '../net/robots-cache.js';
 import { originOf } from '../util/url.js';
 import { isBotChallenge, RETRY_AFTER_MAX_MS, retryAfterMs } from './challenge.js';
 
 /** @import { FetchResult } from '../types.js' */
 /** @import { safeFetch } from '../net/safe-fetch.js' */
-
-/** @typedef {Awaited<ReturnType<typeof loadRobots>>} Robots */
+/** @import { HostGates } from '../net/polite.js' */
+/** @import { Robots, RobotsCache } from '../net/robots-cache.js' */
 
 /**
  * The request functions of one crawl.
@@ -20,11 +21,16 @@ import { isBotChallenge, RETRY_AFTER_MAX_MS, retryAfterMs } from './challenge.js
  * `max(1000 / ratePerSec, crawl-delay)` once a robots.txt with a crawl-delay
  * was read (capped at `LIMITS.crawlDelayMaxSec`); with `loopbackOrigin`, a URL
  * on any other origin is refused with `blocked_address` before anything is
- * sent; robots.txt is read once per origin.
+ * sent; robots.txt is read once per origin, always from the site, and left in
+ * `robotsCache` for the image and link checks of later audits (a public site
+ * only). Every request also passes the host gate of `hosts`, which spaces it
+ * from the requests other crawls and audits send to that host.
  *
- * @param {{fetch: typeof safeFetch, now: () => Date, sleep: (ms: number) => Promise<void>, ratePerSec: number, loopbackOrigin: string|null}} options
+ * @param {{fetch: typeof safeFetch, now: () => Date, sleep: (ms: number) => Promise<void>, ratePerSec: number, loopbackOrigin: string|null,
+ *          hosts?: HostGates, robotsCache?: RobotsCache}} options
  */
-export function createRequests({ fetch, now, sleep, ratePerSec, loopbackOrigin }) {
+export function createRequests({ fetch, now, sleep, ratePerSec, loopbackOrigin, hosts = SHARED_HOST_GATES, robotsCache = SHARED_ROBOTS }) {
+  const owner = Symbol('crawl');
   const baseDelayMs = 1000 / ratePerSec;
   let delayMs = baseDelayMs;
   let requests = 0;
@@ -51,7 +57,8 @@ export function createRequests({ fetch, now, sleep, ratePerSec, loopbackOrigin }
     }
     if (requests > 0) await sleep(waitMs);
     requests += 1;
-    const result = await fetch(url, { ...options, allowLoopback: loopbackOrigin ?? false });
+    const sent = await hosts.through(hostOf(url), { owner, gapMs: delayMs, sleep }, () => fetch(url, { ...options, allowLoopback: loopbackOrigin ?? false }));
+    const result = /** @type {FetchResult} */ (sent);
     lastErrors.set(url, result.error);
     return result;
   };
@@ -74,7 +81,8 @@ export function createRequests({ fetch, now, sleep, ratePerSec, loopbackOrigin }
   const robotsFor = async (origin) => {
     let robots = robotsByOrigin.get(origin);
     if (!robots) {
-      robots = await loadRobots(origin, { fetch: politeFetch });
+      const read = await robotsCache.get({ origin, fetch, shared: loopbackOrigin === null, fresh: true }, () => readRobots(origin, politeFetch));
+      robots = read.robots;
       robotsByOrigin.set(origin, robots);
       const crawlDelaySec = Math.min(robots.summary.crawl_delay_sec ?? 0, LIMITS.crawlDelayMaxSec);
       delayMs = Math.max(delayMs, baseDelayMs, crawlDelaySec * 1000);

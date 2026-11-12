@@ -78,7 +78,9 @@ const STORE_ERROR_ADVICE = {
   RUN_CORRUPT: 'Call runs_list to pick another run.',
   INVALID_PROFILE: 'Fix these fields and call profile_set again.',
   UNSAFE_STORE: 'Tell the user; do not remove anything yourself.',
-  STORE_FILE_TOO_LARGE: 'Tell the user; the file may have come with the repository.',
+  STORE_FILE_TOO_LARGE: 'Tell the user. For a run, audit the site again: this version saves only runs it can read back.',
+  RUN_TOO_LARGE: 'Nothing was saved. Audit fewer modules, or crawl fewer pages (crawl_start max_pages) and audit that crawl.',
+  RUN_INVALID: 'Nothing was saved. Tell the user; this is a bug in the plugin.',
 };
 
 /**
@@ -154,9 +156,8 @@ export function clipValue(value, depth = 0) {
 
 /**
  * A stored finding as a tool returns it: every text field clipped like
- * `clipValue`, its URL whole (URLs are at most `MAX_URL_LENGTH` characters,
- * and a clipped one would name another page) and up to
- * `LIMITS.maxRelatedUrls` related URLs.
+ * `clipValue`, its URL as the store gives it (at most 2048 characters, see
+ * `clipStoredUrl`) and up to `LIMITS.maxRelatedUrls` related URLs.
  * @param {Record<string, unknown>} finding
  * @returns {Record<string, unknown>}
  */

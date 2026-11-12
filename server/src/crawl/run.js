@@ -1,9 +1,9 @@
-// One crawl, start to finish (ARCHITECTURE.md 4.5, with docs/internal/REVIEW-FIXES.md R2 to R5 and R9).
+// One crawl, start to finish (ARCHITECTURE.md 4.5).
 
 import { LIMITS, SCHEMA_VERSION, USER_AGENT } from '../config.js';
 import { loadSitemaps } from '../net/sitemap.js';
 import { isInternalUrl, looksLikeHtmlUrl, originOf } from '../util/url.js';
-import { createChainFollower, recordsForChain } from './chain.js';
+import { asksFirst, createChainFollower, recordsForChain } from './chain.js';
 import { localizeRecord, localizeUrls } from './deployed.js';
 import { createFrontier } from './frontier.js';
 import { probeHttp } from './probe.js';
@@ -13,9 +13,13 @@ import { createRequests } from './requests.js';
 /** @import { CrawlBlock, CrawlResult, FetchResult, HttpProbe, PageRecord, SitemapSummary } from '../types.js' */
 /** @import { safeFetch } from '../net/safe-fetch.js' */
 /** @import { Chain, Extractor } from './chain.js' */
+/** @import { HostGates } from '../net/polite.js' */
+/** @import { RobotsCache } from '../net/robots-cache.js' */
 
 const MAX_ROBOTS_BLOCKED = 200;
 const STRIKES = 3;
+/** URLs ending in .js, .json, .xml or .txt asked about with HEAD in one crawl (crawl/chain.js `asksFirst`). */
+const MAX_ASKED = 50;
 /** Fetch errors after which no HTTP answer came back: the connection was refused or cut, or nothing answered in time. */
 const NO_ANSWER = new Set(['connection_error', 'timeout']);
 /** What to check when a server on this machine does not answer. */
@@ -40,6 +44,8 @@ const DEV_SERVER_HINT = ' Check that the dev server is running and that the port
  * @property {Extractor} extract
  * @property {() => Date} now
  * @property {(ms: number) => Promise<void>} sleep
+ * @property {HostGates} [hosts]  The host gates every request passes; defaults to the process's (net/polite.js).
+ * @property {RobotsCache} [robotsCache]  Where robots.txt files read are shared; defaults to the process's.
  * @property {number} [maxStoredChars]  Characters the page records of one crawl may hold in all; defaults
  *   to `MAX_STORED_CHARS`.
  * @property {number} [maxDurationMs]  How long the crawl may take, by `now`; defaults to `LIMITS.crawlMaxMs`.
@@ -95,7 +101,9 @@ export async function runCrawl(params, deps, onProgress) {
   };
   /** Pages, robots.txt Sitemap lines and sitemap entries that named the deployed origin. */
   let localized = 0;
-  const { politeFetch, fetchPage, robotsFor, knownRobots, lastError } = createRequests({ fetch, now, sleep, ratePerSec, loopbackOrigin });
+  const { politeFetch, fetchPage, robotsFor, knownRobots, lastError } = createRequests({
+    fetch, now, sleep, ratePerSec, loopbackOrigin, ...(deps.hosts ? { hosts: deps.hosts } : {}), ...(deps.robotsCache ? { robotsCache: deps.robotsCache } : {}),
+  });
 
   /** @type {string[]} */
   const robotsBlocked = [];
@@ -146,8 +154,10 @@ export async function runCrawl(params, deps, onProgress) {
     robotsBlockedSet.add(url);
     robotsBlocked.push(url);
   };
-  /** @param {string} url */
-  const crawlable = (url) => isInternalUrl(url, host, includeSubdomains) && looksLikeHtmlUrl(url);
+  /** A URL that may be a page: one that looks like one, or one the crawler asks about first (`asksFirst`). @param {string} url */
+  const crawlable = (url) => isInternalUrl(url, host, includeSubdomains) && (looksLikeHtmlUrl(url) || asksFirst(url));
+  /** URLs asked about with HEAD so far; at most `MAX_ASKED`, so a site full of .json links costs a few requests only. */
+  let asked = 0;
   const records = createRecords({ maxPages, maxStoredChars: deps.maxStoredChars ?? MAX_STORED_CHARS, frontier, crawlable, knownRobots });
 
   const followChain = createChainFollower({
@@ -243,6 +253,10 @@ export async function runCrawl(params, deps, onProgress) {
     if (!(await robotsFor(/** @type {string} */ (originOf(url)))).isAllowed(url)) {
       noteRobotsBlocked(url);
       continue;
+    }
+    if (asksFirst(url)) {
+      if (asked >= MAX_ASKED) continue;
+      asked += 1;
     }
     const chain = /** @type {Chain} */ (await followChain(url, 'page'));
     /** @type {PageRecord['discovered_via']} */

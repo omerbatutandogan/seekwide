@@ -22,16 +22,16 @@ jobs:
         node: [22, 26]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ matrix.node }}
           cache: npm
 
-      # The two runtime dependencies need no install scripts, so none are run.
+      # The runtime dependency needs no install scripts, so none are run.
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
@@ -42,11 +42,11 @@ jobs:
   checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
@@ -54,16 +54,18 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
+      # Any known vulnerability fails the build, whatever its level, as SECURITY.md says.
       - name: Check dependencies for known vulnerabilities
-        run: npm audit --omit=dev --audit-level=moderate
+        run: npm audit --omit=dev
 
       # TypeScript is a development tool only, so it is installed here and not
       # listed in package.json: Claude Code installs the plugin's dependencies
       # on every user's machine. Exact versions, so a new release cannot change
-      # what CI runs.
+      # what CI runs. scripts/check.js (npm run check) pins the same versions and
+      # fails when the two differ.
       - name: Type-check
         run: |
-          npm install --no-save --ignore-scripts typescript@5.9.3 @types/node@22.20.5
+          npm install --no-save --ignore-scripts typescript@7.0.2 @types/node@22.20.5
           npx tsc -p jsconfig.json
 
       - name: Check that docs/checks.md matches the code
@@ -75,11 +77,11 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
 

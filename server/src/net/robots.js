@@ -1,80 +1,51 @@
 // robots.txt loading and evaluation for one origin.
 
-import robotsParser from 'robots-parser';
-
 import { PRODUCT_TOKEN } from '../config.js';
 import { normalizeUrl, originOf } from '../util/url.js';
-import { compiledGroup, compiledGroupFor, decidingRule, rulePath } from './robots-match.js';
+import { followRedirects } from './polite.js';
+import { compileGroup, decidingRule, rulePath } from './robots-match.js';
+import { agentToken, groupFor, parseRobotsTxt } from './robots-parse.js';
 import { safeFetch } from './safe-fetch.js';
 
 /** @import { RobotsSummary } from '../types.js' */
-
-/**
- * The parts of a robots-parser instance this module uses.
- * @typedef {{isAllowed(url: string, ua?: string): boolean|undefined, getCrawlDelay(ua?: string): number|undefined, getSitemaps(): string[]}} RobotsRules
- */
+/** @import { ParsedRobots } from './robots-parse.js' */
 
 /** Google and RFC 9309 read at least 500 KiB of a robots.txt file; rules after that are ignored. */
 const MAX_ROBOTS_BYTES = 500 * 1024;
 const PROBE_PATH = '/seekwide-probe-path';
 /** RFC 9309 2.3.1.2 and Google: follow at least five redirects, then treat the file as absent. */
 const MAX_ROBOTS_REDIRECTS = 5;
-const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 /**
- * A function that says whether `agent` may fetch a URL of the file's origin.
- * The rules robots-parser read are evaluated by `robots-match.js`, in time
- * linear in the path; robots-parser's own matcher is used only if its rules
- * are not held the way the pinned version holds them.
- * @param {RobotsRules} parser
- * @param {string} agent
- * @returns {(url: string) => boolean}
- */
-function rulesFor(parser, agent) {
-  const group = compiledGroup(parser, agent);
-  if (group === null) return (url) => parser.isAllowed(url, agent) !== false;
-  return (url) => decidingRule(group, rulePath(url))?.allow ?? true;
-}
-
-/**
- * The product tokens the file names in its `User-agent` lines, lower-cased,
- * with what follows a `/` dropped, as robots-parser reads them. robots-parser
- * keeps no group for a token whose group has no rule at all; RFC 9309 gives
- * such a crawler no restriction.
- * @param {string} text
- * @returns {Set<string>}
- */
-function namedAgents(text) {
-  /** @type {Set<string>} */
-  const names = new Set();
-  for (const line of text.split('\n')) {
-    const colon = line.indexOf(':');
-    if (colon === -1 || line.slice(0, colon).trim().toLowerCase() !== 'user-agent') continue;
-    const value = line.slice(colon + 1).split('#', 1)[0].trim().toLowerCase();
-    names.add(value.split('/', 1)[0].trim());
-  }
-  return names;
-}
-
-/**
- * A function that says whether a crawler with several product tokens (most
- * specific first) may fetch a URL of the file's origin. A token the file
- * names in a group without rules is allowed everything.
- * @param {RobotsRules} parser
+ * A function that says whether a crawler with these product tokens (most
+ * specific first) may fetch a URL of the file's origin: the group of the first
+ * token that has one, else the `*` group. Rules are evaluated by
+ * `robots-match.js`, in time linear in the path.
+ * @param {ParsedRobots} parsed
  * @param {string[]} agents
- * @param {Set<string>} named  Tokens the file's `User-agent` lines name (`namedAgents`).
  * @returns {(url: string) => boolean}
  */
-function rulesForTokens(parser, agents, named) {
-  const groups = /** @type {{_rules?: Record<string, unknown>}} */ (/** @type {unknown} */ (parser))._rules ?? {};
-  for (const agent of agents) {
-    const key = agent.toLowerCase().split('/', 1)[0].trim();
-    if (Object.hasOwn(groups, key)) break;
-    if (named.has(key)) return () => true;
-  }
-  const group = compiledGroupFor(parser, agents);
-  if (group === null) return (url) => parser.isAllowed(url, agents[0]) !== false;
+function rulesFor(parsed, agents) {
+  const group = compileGroup(groupFor(parsed, agents));
   return (url) => decidingRule(group, rulePath(url))?.allow ?? true;
+}
+
+/**
+ * As `rulesFor`, for another crawler: a token the file names in a group that
+ * has no rule at all, before any token with rules, is allowed everything
+ * (RFC 9309). The crawler's own token keeps the reading of version 0.1.0, where
+ * such a group fell back to `*`.
+ * @param {ParsedRobots} parsed
+ * @param {string[]} agents
+ * @returns {(url: string) => boolean}
+ */
+function rulesForTokens(parsed, agents) {
+  for (const agent of agents) {
+    const token = agentToken(agent);
+    if (parsed.groups.has(token)) break;
+    if (parsed.named.has(token)) return () => true;
+  }
+  return rulesFor(parsed, agents);
 }
 
 /**
@@ -126,21 +97,12 @@ export async function loadRobots(siteOrigin, options = {}) {
     maxRedirects: 0,
     headers: { ...fetchOptions.headers, accept: 'text/plain,*/*;q=0.5' },
   };
-  let current = url;
-  const visited = new Set([url]);
-  let gaveUp = false;
-  let result = await fetch(current, requestOptions);
-  for (let hops = 0; result.error === null && REDIRECT_STATUSES.has(result.status); hops += 1) {
-    const target = normalizeUrl(result.headers.location ?? '', current);
-    if (target === null) break;
-    if (visited.has(target) || hops + 1 > MAX_ROBOTS_REDIRECTS) {
-      gaveUp = true;
-      break;
-    }
-    visited.add(target);
-    current = target;
-    result = await fetch(current, requestOptions);
-  }
+  const chain = await followRedirects(url, { maxHops: MAX_ROBOTS_REDIRECTS, request: (target) => fetch(target, requestOptions) });
+  if (chain.kind === 'stopped' || chain.kind === 'unsent') throw new TypeError('loadRobots: a robots.txt request must be sent');
+  const current = chain.url;
+  const { result } = chain;
+  // A loop, or more than five redirects, means the file is absent; a redirect without a usable Location is a failure.
+  const gaveUp = chain.kind === 'loop' || chain.kind === 'too_many';
 
   /** @type {RobotsSummary} */
   const summary = {
@@ -174,17 +136,16 @@ export async function loadRobots(siteOrigin, options = {}) {
   }
 
   const text = (result.body ?? Buffer.alloc(0)).toString('utf8').replace(/^\uFEFF/, '');
-  // robots-parser is CommonJS; its type declaration does not describe the default import correctly.
-  const parser = /** @type {RobotsRules} */ (/** @type {any} */ (robotsParser)(url, text));
+  const parsed = parseRobotsTxt(text);
 
-  const delay = parser.getCrawlDelay(productToken);
+  const delay = groupFor(parsed, [productToken])?.crawlDelay;
   summary.crawl_delay_sec = typeof delay === 'number' && Number.isFinite(delay) && delay >= 0 ? delay : null;
-  summary.disallows_all = disallowsAll(rulesFor(parser, '*'), origin);
-  summary.disallows_all_googlebot = disallowsAll(rulesFor(parser, 'Googlebot'), origin);
-  const allows = rulesFor(parser, productToken);
+  summary.disallows_all = disallowsAll(rulesFor(parsed, ['*']), origin);
+  summary.disallows_all_googlebot = disallowsAll(rulesFor(parsed, ['Googlebot']), origin);
+  const allows = rulesFor(parsed, [productToken]);
 
   const seen = new Set();
-  for (const raw of parser.getSitemaps()) {
+  for (const raw of parsed.sitemaps) {
     const normalized = normalizeUrl(raw, url);
     if (normalized === null || seen.has(normalized)) continue;
     seen.add(normalized);
@@ -193,8 +154,6 @@ export async function loadRobots(siteOrigin, options = {}) {
 
   /** @type {Map<string, (url: string) => boolean>} */
   const byAgents = new Map();
-  /** @type {Set<string>|null} Read on the first question about another crawler, not for the crawler's own. */
-  let named = null;
   return {
     summary,
     isAllowed: (target) => !sameOrigin(target) || allows(target),
@@ -204,8 +163,7 @@ export async function loadRobots(siteOrigin, options = {}) {
       const key = agents.join('\n');
       let rules = byAgents.get(key);
       if (!rules) {
-        named ??= namedAgents(text);
-        rules = rulesForTokens(parser, agents, named);
+        rules = rulesForTokens(parsed, agents);
         byAgents.set(key, rules);
       }
       return rules(target);

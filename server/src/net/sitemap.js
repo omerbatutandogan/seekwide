@@ -4,6 +4,7 @@ import zlib from 'node:zlib';
 
 import { LIMITS } from '../config.js';
 import { isInternalUrl, normalizeUrl } from '../util/url.js';
+import { followRedirects } from './polite.js';
 import { safeFetch } from './safe-fetch.js';
 import { scanSitemap } from './sitemap-scan.js';
 
@@ -18,7 +19,6 @@ const MAX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024;
 /** At most this many sitemap files are listed in the summary, read or not; an index can name thousands. */
 const MAX_LISTED_FILES = 100;
 const ACCEPT = 'application/xml,text/xml;q=0.9,*/*;q=0.5';
-const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 const EXTERNAL_ERROR = 'On another host; not read';
 const DISALLOWED_ERROR = 'robots.txt does not allow this request or could not be read; not read';
 
@@ -63,20 +63,25 @@ function bodyText(body) {
  * @returns {Promise<Fetched>}
  */
 async function fetchOnSite(url, onSite, allowed, request) {
-  let current = url;
-  const seen = new Set([url]);
-  for (let hops = 0; ; hops += 1) {
-    const result = await request(current);
-    if (result.error !== null || !REDIRECT_STATUSES.has(result.status)) return { kind: 'response', result };
-    const target = normalizeUrl(result.headers.location ?? '', current);
-    if (target === null) return { kind: 'failed', status: result.status, error: 'redirect without a valid http(s) Location' };
-    if (seen.has(target)) return { kind: 'failed', status: result.status, error: 'redirect_loop: the redirects go round in a circle' };
-    if (hops + 1 > LIMITS.maxRedirects) return { kind: 'failed', status: result.status, error: `too_many_redirects: more than ${LIMITS.maxRedirects} redirects` };
-    if (!onSite(target)) return { kind: 'external' };
-    if (!(await allowed(target))) return { kind: 'disallowed' };
-    seen.add(target);
-    current = target;
-  }
+  /** @type {import('./polite.js').RedirectOutcome<Fetched>} */
+  const chain = await followRedirects(url, {
+    maxHops: LIMITS.maxRedirects,
+    request,
+    before: async (target, hop) => {
+      if (hop === 0) return undefined;
+      if (!onSite(target)) return { kind: 'external' };
+      return (await allowed(target)) ? undefined : { kind: 'disallowed' };
+    },
+  });
+  if (chain.kind === 'stopped') return chain.value;
+  if (chain.kind === 'response') return { kind: 'response', result: chain.result };
+  if (chain.kind === 'unsent') throw new TypeError('loadSitemaps: every sitemap request is sent');
+  const errors = {
+    invalid: 'redirect without a valid http(s) Location',
+    loop: 'redirect_loop: the redirects go round in a circle',
+    too_many: `too_many_redirects: more than ${LIMITS.maxRedirects} redirects`,
+  };
+  return { kind: 'failed', status: chain.result.status, error: errors[chain.kind] };
 }
 
 /**

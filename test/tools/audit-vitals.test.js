@@ -24,7 +24,9 @@ function setup(vitalsFor = (call) => makeVitals({ pages: [{ url: 'https://exampl
   const fake = makeDeps({ jobs: [jobFor(crawl), jobFor(other)], results: [crawl, other] });
   let call = 0;
   fake.deps.measureVitals = async (measured, options) => {
-    (fake.calls.measureVitals ??= []).push([measured.id, options]);
+    const { signal, ...rest } = options;
+    assert.ok(signal instanceof AbortSignal);
+    (fake.calls.measureVitals ??= []).push([measured.id, rest]);
     call += 1;
     return vitalsFor(call);
   };

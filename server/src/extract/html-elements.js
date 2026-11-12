@@ -26,7 +26,7 @@ const NEXT_FLIGHT_PREFIX = 1024;
 export const MAX_LINKS = 5000;
 export const MAX_IMAGES = 2000;
 export const MAX_MIXED_CONTENT = 20;
-/** Per-page caps on lists, in document order (REVIEW-FIXES R8). */
+/** Per-page caps on lists, in document order (ARCHITECTURE.md 4.6). */
 export const CAPS = Object.freeze({
   titles: 20, meta_descriptions: 20, canonicals: 20, hreflang: 500, headings: 500, jsonld: 100, meta_robots: 50,
 });

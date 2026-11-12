@@ -15,7 +15,7 @@ const KEPT_HEADERS = [
   'strict-transport-security', 'content-security-policy', 'server',
 ];
 
-/** Most robots tokens kept from `X-Robots-Tag` headers (REVIEW-FIXES R8). */
+/** Most robots tokens kept from `X-Robots-Tag` headers (ARCHITECTURE.md 4.6). */
 export const MAX_HEADER_ROBOTS_TOKENS = 50;
 
 /** Rules that look like `name: value` but are not user-agent prefixes. */
