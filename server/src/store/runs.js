@@ -1,10 +1,10 @@
 /** @import { Run, RunIndexEntry } from '../types.js' */
 
-import fs from 'node:fs/promises';
 import { storeError } from './errors.js';
-import { toJsonFile, writeFileAtomic } from './fs-util.js';
-import { assertRunId, ensureProject, projectPaths } from './project.js';
+import { STORE_LIMITS, readStoreFile, toJsonFile, writeFileAtomic } from './fs-util.js';
+import { assertRunId, assertStoreDirs, ensureProject, ensureRunDir, projectPaths } from './project.js';
 import { entryFromRun, isRunShape, readIndex, serialize, writeIndex } from './run-index.js';
+import { storedRunProblem } from './run-validate.js';
 
 /**
  * Run id for an audit started at `date`: "2026-11-11T14-03-22Z", then
@@ -48,7 +48,7 @@ export async function saveRun(projectDir, run) {
     if (runs.some((existing) => existing.run_id === run.run_id)) {
       throw storeError('RUN_EXISTS', `Run ${run.run_id} is already stored. Runs are never overwritten; use a new run id.`);
     }
-    await fs.mkdir(runDir, { recursive: true });
+    await ensureRunDir(paths, run.run_id);
     await writeFileAtomic(findingsFile, toJsonFile(run));
     await writeIndex(paths, [...runs, entry]);
   });
@@ -68,8 +68,11 @@ function describeKnown(runs) {
 /**
  * Load a stored run by id, or by reference: 'last' is the newest run and
  * 'previous' the one before it. Throws `RUN_NOT_FOUND` when there is no such
- * run, `INVALID_RUN_ID` for an id that is not a safe file name, and
- * `RUN_CORRUPT` when the stored file is damaged.
+ * run, `INVALID_RUN_ID` for an id that is not a safe file name, `UNSAFE_STORE`
+ * when a folder or file on the way is a symbolic link, `STORE_FILE_TOO_LARGE`
+ * for a file larger than any run the plugin writes, and `RUN_CORRUPT` when the
+ * stored file is damaged or a value the tools rely on does not have the form
+ * the plugin writes (`storedRunProblem`).
  * @param {string} projectDir
  * @param {string} ref
  * @returns {Promise<Run>}
@@ -92,9 +95,10 @@ export async function loadRun(projectDir, ref) {
     assertRunId(ref);
   }
 
+  await assertStoreDirs(paths, runId);
   let text;
   try {
-    text = await fs.readFile(paths.findingsFile(runId), 'utf8');
+    text = await readStoreFile(paths.findingsFile(runId), STORE_LIMITS.runBytes, paths.projectDir);
   } catch (error) {
     if (/** @type {NodeJS.ErrnoException} */ (error).code !== 'ENOENT') throw error;
     throw storeError('RUN_NOT_FOUND', `Run ${runId} was not found in ${paths.root}. ${describeKnown(await readIndex(paths))}`);
@@ -107,6 +111,10 @@ export async function loadRun(projectDir, ref) {
   }
   if (!isRunShape(run) || run.run_id !== runId) {
     throw storeError('RUN_CORRUPT', `Run ${runId} is damaged: its findings.json does not describe this run. Run the audit again.`);
+  }
+  const problem = storedRunProblem(/** @type {Record<string, unknown>} */ (/** @type {unknown} */ (run)));
+  if (problem !== null) {
+    throw storeError('RUN_CORRUPT', `Run ${runId} is damaged: ${problem} in its findings.json does not have the form the plugin writes. Run the audit again.`);
   }
   return run;
 }

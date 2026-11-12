@@ -3,6 +3,12 @@
 // namespace prefixes) to pull out <loc> values. No XML dependency.
 
 const ENTITIES = /** @type {Record<string, string>} */ ({ amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" });
+/** A sitemap nests four or five elements deep; deeper nesting is not a sitemap and would only cost memory. */
+const MAX_DEPTH = 16;
+/** The protocol allows 50,000 entries per file; the rest of a longer file is ignored. */
+const MAX_LOCS = 50_000;
+/** A <loc> longer than this cannot become a usable URL, so its text is not kept. */
+const MAX_LOC_CHARS = 16 * 1024;
 
 /**
  * @param {string} text
@@ -42,7 +48,9 @@ function splitName(qname) {
  * a direct child of a `url` (or `sitemap`) element under the root, with the
  * same namespace prefix as the root. Other `loc` elements such as `image:loc`
  * are ignored. When `partial` is true the document may end mid-way and unclosed
- * elements are not an error.
+ * elements are not an error. Elements nested more than `MAX_DEPTH` deep make
+ * the document invalid; at most `MAX_LOCS` values are kept, and the text of a
+ * `loc` longer than `MAX_LOC_CHARS` is replaced by an empty string.
  *
  * @param {string} xml
  * @param {{partial?: boolean}} [options]
@@ -59,6 +67,7 @@ export function scanSitemap(xml, { partial = false } = {}) {
   let rootSeen = false;
   /** @type {string[]|null} */
   let capture = null;
+  let captured = 0;
   let pos = 0;
 
   /** @param {string} message */
@@ -68,9 +77,10 @@ export function scanSitemap(xml, { partial = false } = {}) {
     const lt = xml.indexOf('<', pos);
     const textEnd = lt === -1 ? xml.length : lt;
     if (textEnd > pos) {
-      const text = xml.slice(pos, textEnd);
-      if (capture) capture.push(decodeEntities(text));
-      else if (stack.length === 0 && text.trim() !== '') {
+      if (capture) {
+        captured += textEnd - pos;
+        if (captured <= MAX_LOC_CHARS) capture.push(decodeEntities(xml.slice(pos, textEnd)));
+      } else if (stack.length === 0 && xml.slice(pos, textEnd).trim() !== '') {
         return invalid(rootSeen ? 'content after the root element' : 'not an XML document');
       }
     }
@@ -85,7 +95,10 @@ export function scanSitemap(xml, { partial = false } = {}) {
     if (xml.startsWith('<![CDATA[', lt)) {
       const end = xml.indexOf(']]>', lt + 9);
       if (end === -1) return partial ? { type, locs, error: null } : invalid('unterminated CDATA section');
-      if (capture) capture.push(xml.slice(lt + 9, end));
+      if (capture) {
+        captured += end - lt - 9;
+        if (captured <= MAX_LOC_CHARS) capture.push(xml.slice(lt + 9, end));
+      }
       pos = end + 3;
       continue;
     }
@@ -108,8 +121,9 @@ export function scanSitemap(xml, { partial = false } = {}) {
         return invalid(`mismatched closing tag </${raw.slice(1).trim()}>`);
       }
       if (capture && name.local === 'loc' && stack.length === 2) {
-        locs.push(capture.join('').trim());
+        if (locs.length < MAX_LOCS) locs.push(captured > MAX_LOC_CHARS ? '' : capture.join('').trim());
         capture = null;
+        captured = 0;
       }
       continue;
     }
@@ -130,6 +144,7 @@ export function scanSitemap(xml, { partial = false } = {}) {
     }
 
     if (selfClosing) continue;
+    if (stack.length >= MAX_DEPTH) return invalid(`elements nested more than ${MAX_DEPTH} deep`);
     const entryName = type === 'urlset' ? 'url' : 'sitemap';
     if (
       stack.length === 2 && name.local === 'loc' && name.prefix === rootPrefix &&

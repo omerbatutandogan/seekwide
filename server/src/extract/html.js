@@ -9,13 +9,19 @@ import { LIMITS } from '../config.js';
 import { sha1Hex } from '../util/hash.js';
 import { clip, collapseWhitespace } from '../util/strings.js';
 import { isInternalUrl, normalizeUrl } from '../util/url.js';
-import { HTML_NS, SVG_NS, attr, findBaseUrl, insecureUrl, isHtmlElement, lineOf, textOf, tokens } from './dom.js';
+import { HTML_NS, MAX_LIST_CHARS, SVG_NS, attr, findBaseUrl, insecureUrl, isHtmlElement, lineOf, parsedPart, textChars, textOf, tokens } from './dom.js';
 import { parseJsonLd } from './jsonld.js';
 
 /** Script types a browser runs as JavaScript. */
 const SCRIPT_TYPES = new Set(['', 'text/javascript', 'module']);
-/** How the inline data scripts of a Next.js App Router page begin. */
-const NEXT_FLIGHT = /^\s*\(?\s*self\.__next_f\s*(=|\.push\()/;
+/**
+ * How the inline data scripts of a Next.js App Router page begin. Written so
+ * that no two quantifiers can match the same run of spaces: a script of spaces
+ * followed by anything else is rejected in linear time.
+ */
+const NEXT_FLIGHT = /^\s*(?:\(\s*)?self\.__next_f\s*(=|\.push\()/;
+/** Only the start of a script is tested; a data script begins with its marker. */
+const NEXT_FLIGHT_PREFIX = 1024;
 
 export const MAX_LINKS = 5000;
 export const MAX_IMAGES = 2000;
@@ -25,6 +31,9 @@ export const CAPS = Object.freeze({
   titles: 20, meta_descriptions: 20, canonicals: 20, hreflang: 500, headings: 500, jsonld: 100, meta_robots: 50,
 });
 const LONG_TEXT = 1000;
+/** A link's rel attribute has a few tokens; more are not kept. */
+const MAX_REL_TOKENS = 20;
+
 const MAX_SOCIAL_KEYS = 50;
 
 /** Elements whose text is not part of the visible body text. */
@@ -115,12 +124,20 @@ function setFirst(target, key, value) {
  * @returns {HtmlFields}
  */
 export function extractHtml(html, context) {
-  const document = /** @type {DomNode} */ (/** @type {unknown} */ (parse(html, { sourceCodeLocationInfo: true })));
+  const markup = parsedPart(html);
+  const document = /** @type {DomNode} */ (/** @type {unknown} */ (parse(markup, { sourceCodeLocationInfo: true })));
   const baseUrl = findBaseUrl(document, context.responseUrl);
   const https = context.responseUrl.startsWith('https:');
   let upgradeInsecure = context.upgradeInsecure ?? false;
   let nextFlight = false;
   let bodyTitle = false;
+  /** Characters held by the link, image and hreflang lists so far (`MAX_LIST_CHARS`). */
+  let listChars = 0;
+  /** @template {object} T @param {T[]} list @param {T} entry */
+  const keep = (list, entry) => {
+    list.push(entry);
+    listChars += textChars(entry);
+  };
 
   /** @type {HtmlFields} */
   const out = {
@@ -179,31 +196,31 @@ export function extractHtml(html, context) {
         out.canonicals.push({ href: clip(href, LIMITS.maxStringLength), url, source: 'html', in_head: frame.head, line });
       }
       const lang = attr(node, 'hreflang')?.trim();
-      if (rel.includes('alternate') && lang && href !== null && hasRoom(out.hreflang, CAPS.hreflang)) {
-        out.hreflang.push({
+      if (rel.includes('alternate') && lang && href !== null && hasRoom(out.hreflang, CAPS.hreflang) && listChars < MAX_LIST_CHARS) {
+        keep(out.hreflang, {
           hreflang: clip(lang, LIMITS.maxStringLength), href: clip(href, LIMITS.maxStringLength),
           url: normalizeUrl(href, baseUrl), source: 'html',
         });
       }
       if (rel.includes('stylesheet')) addMixed(href);
     } else if (tag === 'a') {
-      if (out.links.length < MAX_LINKS) {
+      if (out.links.length < MAX_LINKS && listChars < MAX_LIST_CHARS) {
         const href = attr(node, 'href');
         const url = href === null ? null : normalizeUrl(href, baseUrl);
-        out.links.push({
+        keep(out.links, {
           href: clip(href ?? '', LIMITS.maxStringLength),
           url,
           text: clip(collapseWhitespace(textOf(node, true, LIMITS.maxStringLength, true)), LIMITS.maxStringLength),
           aria_label: clip(attr(node, 'aria-label')?.trim() ?? '', LIMITS.maxStringLength) || null,
           title_attr: clip(attr(node, 'title')?.trim() ?? '', LIMITS.maxStringLength) || null,
-          rel: tokens(attr(node, 'rel')),
+          rel: tokens(attr(node, 'rel')).slice(0, MAX_REL_TOKENS).map((token) => clip(token, LIMITS.maxStringLength)),
           internal: url !== null && isInternalUrl(url, context.siteHost, context.includeSubdomains),
           has_onclick: attr(node, 'onclick') !== null,
           line,
         });
       }
     } else if (tag === 'img') {
-      if (out.images.length < MAX_IMAGES) {
+      if (out.images.length < MAX_IMAGES && listChars < MAX_LIST_CHARS) {
         const src = attr(node, 'src');
         const parent = node.parentNode;
         const pictureSrcset = parent && isHtmlElement(parent, 'picture')
@@ -213,7 +230,7 @@ export function extractHtml(html, context) {
           const value = attr(node, name);
           return value === null ? null : clip(value, LIMITS.maxStringLength);
         };
-        out.images.push({
+        keep(out.images, {
           src: clip(src ?? '', LIMITS.maxStringLength),
           url: src === null ? null : normalizeUrl(src, baseUrl),
           alt: optional('alt'),
@@ -230,7 +247,8 @@ export function extractHtml(html, context) {
     } else if (tag === 'script') {
       const type = (attr(node, 'type') ?? '').split(';', 1)[0].trim().toLowerCase();
       // The inline scripts that carry a Next.js App Router page's data ("flight" chunks).
-      if (!nextFlight && attr(node, 'src') === null && SCRIPT_TYPES.has(type) && NEXT_FLIGHT.test(node.childNodes?.[0]?.value ?? '')) nextFlight = true;
+      const start = (node.childNodes?.[0]?.value ?? '').slice(0, NEXT_FLIGHT_PREFIX);
+      if (!nextFlight && attr(node, 'src') === null && SCRIPT_TYPES.has(type) && NEXT_FLIGHT.test(start)) nextFlight = true;
       if (type === 'application/ld+json' && hasRoom(out.jsonld, CAPS.jsonld)) {
         const source = (node.childNodes ?? []).map((child) => child.value ?? '').join('');
         out.jsonld.push(parseJsonLd(source, line));

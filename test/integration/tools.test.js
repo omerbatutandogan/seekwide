@@ -21,6 +21,7 @@ import * as store from '../../server/src/store/index.js';
 import { withStoreErrors } from '../../server/src/tools/common.js';
 import { createTools } from '../../server/src/tools/index.js';
 import { startServer } from '../helpers/http-server.js';
+import { PROFILE_NOTE } from '../../server/src/tools/profile.js';
 
 /** @import { ToolDef } from '../../server/src/mcp/stdio.js' */
 
@@ -249,7 +250,7 @@ describe('the full tool flow on the fixture site', () => {
   });
 
   it('profile_set and profile_get, and the profile brand reaches the report', async () => {
-    assert.deepEqual(await call('profile_get', {}), { exists: false, profile: null });
+    assert.deepEqual(await call('profile_get', {}), { exists: false, profile: null, _note: PROFILE_NOTE });
     const saved = await call('profile_set', {
       profile: { site_url: url('/'), brand: { name: 'Fixture Co' }, business_model: 'ecommerce', report: { brand_name: 'Profile Brand' } },
     });

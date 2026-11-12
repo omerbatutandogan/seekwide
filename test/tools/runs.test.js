@@ -115,7 +115,7 @@ describe('runs_list', () => {
 
   it('returns an empty list for a project without runs', async () => {
     const result = await tool(makeDeps(), 'runs_list').handler({});
-    assert.deepEqual(result, { project_dir: PROJECT, total: 0, runs: [] });
+    assert.deepEqual(result, { project_dir: PROJECT, total: 0, runs: [], _note: UNTRUSTED_NOTE });
   });
 });
 

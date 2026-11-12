@@ -120,15 +120,20 @@ function abortable(promise, signal) {
  * @returns {{headers: Record<string,string>, headerLines: Record<string,string[]>}}
  */
 function collectHeaders(rawHeaders) {
-  /** @type {Record<string,string[]>} */
-  const headerLines = {};
+  // Collected in a Map, and turned into objects with own properties only: a header a server names
+  // "__proto__" or "constructor" is a header like any other.
+  /** @type {Map<string, string[]>} */
+  const lines = new Map();
   for (let i = 0; i + 1 < rawHeaders.length; i += 2) {
     const name = rawHeaders[i].toLowerCase();
-    (headerLines[name] ??= []).push(rawHeaders[i + 1]);
+    const list = lines.get(name);
+    if (list) list.push(rawHeaders[i + 1]);
+    else lines.set(name, [rawHeaders[i + 1]]);
   }
+  /** @type {Record<string,string[]>} */
+  const headerLines = Object.fromEntries(lines);
   /** @type {Record<string,string>} */
-  const headers = {};
-  for (const [name, values] of Object.entries(headerLines)) headers[name] = values.join(', ');
+  const headers = Object.fromEntries([...lines].map(([name, values]) => [name, values.join(', ')]));
   return { headers, headerLines };
 }
 

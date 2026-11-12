@@ -155,10 +155,13 @@ function layoutsAbove(file, appDir, files) {
  * a file only when the finding names it and the project still has it. Nothing
  * is read from the project besides the file listing in `sources`, and nothing
  * is written. `how` and `reason` are the plugin's own words: `reason` is a
- * fixed sentence, and no string of the stored run is part of either. `title`
- * comes from `titles` (the check definitions), never from the run; a file
- * name from the run is passed on only when it is a plain relative path. Text
- * taken from a page appears only under `current` and in URLs and routes.
+ * fixed sentence, `how` holds only fixed text, the deployed origin and line
+ * numbers that are positive integers, and no string of the stored run and no
+ * file name is part of either. `title` comes from `titles` (the check
+ * definitions), never from the run; `file`, `layouts`, `create` and `edit`
+ * name files of the project's listing; a file name from the run elsewhere is
+ * passed on only when it is a plain relative path. Text taken from a page
+ * appears only under `current` and in URLs and routes.
  *
  * @param {{run: Run, sources: ProjectSources, crawl: CrawlResult|null, siteUrl: string|null, titles?: Record<string, string>}} input
  *   `crawl`: the crawl the run was made from, when it is still stored. `siteUrl`: the origin the site is deployed at.
@@ -186,6 +189,8 @@ export function planFixes({ run, sources, crawl, siteUrl, titles = {} }) {
 
   /** @type {FixPlan} */
   const plan = { fixes: [], notFixable: [], outOfScope: {} };
+  /** Counted in a Map, so that no check id can reach Object.prototype. @type {Map<string, number>} */
+  const outOfScope = new Map();
   const titleOf = (/** @type {Finding} */ finding) => (Object.hasOwn(titles, finding.check_id) ? titles[finding.check_id] : finding.check_id);
   /**
    * @param {Finding} finding
@@ -231,7 +236,7 @@ export function planFixes({ run, sources, crawl, siteUrl, titles = {} }) {
       file: null,
       line: null,
       route: null,
-      how: sitemapHow({ next: isNext, sitemapFile: inProject(sitemapFile), robotsFile: robotsFile ? inProject(robotsFile) : null, newRobots: inProject(newRobots), siteUrl }),
+      how: sitemapHow({ next: isNext, hasRobots: robotsFile !== undefined, siteUrl }),
       needs_site_url: true,
       create: [
         { file: inProject(sitemapFile), purpose: 'The XML sitemap, served at /sitemap.xml.' },
@@ -282,14 +287,16 @@ export function planFixes({ run, sources, crawl, siteUrl, titles = {} }) {
       ? finding.related_urls.slice(0, MAX_SHARED).map((url) => ({ url, file: plainPath(byCheckAndUrl.get(`${finding.check_id}\n${url}`)?.source?.file) }))
       : null;
     const needsSiteUrl = fix.type === 'canonical' || (missing !== null && missing.includes('og:image'));
-    const texts = { type: fix.type, action, line: source.line, missing: missing ?? [], canonical, dynamic, sameFile: sharesWith !== null && sharesWith.some((other) => other.file === source.file), siteUrl };
+    const line = Number.isSafeInteger(source.line) && /** @type {number} */ (source.line) > 0 ? source.line : null;
+    const texts = { type: fix.type, action, line, missing: missing ?? [], canonical, dynamic, sameFile: sharesWith !== null && sharesWith.some((other) => other.file === source.file), siteUrl };
     plan.fixes.push({
       ...base(finding),
       type: fix.type,
       action,
       kind: html ? 'html' : 'next-app',
-      file: source.file,
-      line: source.line,
+      // The name as the project's listing has it, not as the stored run spells it.
+      file: inProject(file),
+      line,
       route: typeof source.route === 'string' ? clip(source.route, CURRENT_CLIP) : null,
       how: html ? htmlHow(texts) : nextHow(texts),
       needs_site_url: needsSiteUrl,
@@ -305,9 +312,10 @@ export function planFixes({ run, sources, crawl, siteUrl, titles = {} }) {
     const fix = Object.hasOwn(FIXABLE_CHECKS, finding.check_id) ? FIXABLE_CHECKS[finding.check_id] : null;
     if (fix === null) {
       if (Object.hasOwn(REFUSED_CHECKS, finding.check_id)) refuse(finding, REFUSED_CHECKS[/** @type {keyof typeof REFUSED_CHECKS} */ (finding.check_id)]);
-      else plan.outOfScope[finding.check_id] = (plan.outOfScope[finding.check_id] ?? 0) + 1;
+      else outOfScope.set(finding.check_id, (outOfScope.get(finding.check_id) ?? 0) + 1);
     } else if (fix.type === 'sitemap') planSitemap(finding);
     else planPage(finding, fix);
   }
+  plan.outOfScope = Object.fromEntries(outOfScope);
   return plan;
 }

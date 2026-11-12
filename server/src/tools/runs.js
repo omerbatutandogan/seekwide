@@ -6,13 +6,23 @@
 
 import { LIMITS, MODULES, SEVERITIES } from '../config.js';
 import { ToolError } from '../mcp/stdio.js';
-import { PROJECT_DIR_SCHEMA, UNTRUSTED_NOTE, clipValue, loadBaseRun, resolveProjectDir, runRefSchema, withStoreErrors } from './common.js';
+import { clip } from '../util/strings.js';
+import { PROJECT_DIR_SCHEMA, UNTRUSTED_NOTE, findingForModel, loadBaseRun, resolveProjectDir, runRefSchema, withStoreErrors } from './common.js';
 
 const RUNS_LIST_MAX = 50;
 
 /** @param {Finding} finding */
 function compactFinding(finding) {
-  return { id: finding.id, check_id: finding.check_id, severity: finding.severity, title: finding.title, url: finding.url, selector: finding.selector };
+  return { id: finding.id, check_id: finding.check_id, severity: finding.severity, title: clipText(finding.title), url: finding.url, selector: clipText(finding.selector) };
+}
+
+/**
+ * A stored text field as a tool returns it: clipped, or null when it is not text.
+ * @param {unknown} value
+ * @returns {string|null}
+ */
+function clipText(value) {
+  return typeof value === 'string' ? clip(value, LIMITS.maxStringLength) : null;
 }
 
 /**
@@ -60,8 +70,8 @@ export function runTools(deps) {
         );
         const limit = args.limit ?? 50;
         const offset = args.offset ?? 0;
-        // Evidence can quote page text at length; results carry a clipped copy.
-        const findings = matches.slice(offset, offset + limit).map((finding) => ({ ...finding, evidence: clipValue(finding.evidence) }));
+        // Evidence can quote page text at length, and a saved run can carry anything; results carry a clipped copy.
+        const findings = matches.slice(offset, offset + limit).map((finding) => findingForModel(/** @type {Record<string, unknown>} */ (/** @type {unknown} */ (finding))));
         return {
           run_id: run.run_id,
           total: matches.length,
@@ -84,7 +94,7 @@ export function runTools(deps) {
       async handler(args) {
         const projectDir = resolveProjectDir(args.project_dir, deps.defaultProjectDir);
         const runs = await withStoreErrors(() => deps.listRuns(projectDir));
-        return { project_dir: projectDir, total: runs.length, runs: runs.slice(-RUNS_LIST_MAX).reverse() };
+        return { project_dir: projectDir, total: runs.length, runs: runs.slice(-RUNS_LIST_MAX).reverse(), _note: UNTRUSTED_NOTE };
       },
     },
     {

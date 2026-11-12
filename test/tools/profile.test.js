@@ -3,19 +3,20 @@ import assert from 'node:assert/strict';
 import { ToolError } from '../../server/src/mcp/stdio.js';
 import { createTools } from '../../server/src/tools/index.js';
 import { NOW, PROJECT, makeDeps, toolNamed } from './fakes.js';
+import { PROFILE_NOTE } from '../../server/src/tools/profile.js';
 
 /** @param {ReturnType<typeof makeDeps>} fake @param {string} name */
 const tool = (fake, name) => toolNamed(createTools(fake.deps), name);
 
 describe('profile_get', () => {
   it('reports a missing profile', async () => {
-    assert.deepEqual(await tool(makeDeps(), 'profile_get').handler({}), { exists: false, profile: null });
+    assert.deepEqual(await tool(makeDeps(), 'profile_get').handler({}), { exists: false, profile: null, _note: PROFILE_NOTE });
   });
 
   it('returns a saved profile', async () => {
     const profile = { schema_version: 1, site_url: 'https://example.test/', brand: { name: 'Example' }, updated_at: 'x' };
     const fake = makeDeps({ profile });
-    assert.deepEqual(await tool(fake, 'profile_get').handler({ project_dir: '/p' }), { exists: true, profile });
+    assert.deepEqual(await tool(fake, 'profile_get').handler({ project_dir: '/p' }), { exists: true, profile, _note: PROFILE_NOTE });
     assert.deepEqual(fake.calls.readProfile, [['/p']]);
   });
 });

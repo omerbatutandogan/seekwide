@@ -26,14 +26,14 @@ const NON_PAGE_GET_BYTES = 16 * 1024;
  *   The chain reached a URL that already has a record; its outcome is taken from that record instead of a request.
  */
 
-/** @typedef {Chain | {kind: 'block', reason: 'robots_unreachable'|'robots_disallow', url: string, status: number} | {kind: 'fail', message: string}} ChainOutcome */
+/** @typedef {Chain | {kind: 'block', reason: 'robots_unreachable'|'robots_disallow', url: string, status: number, redirected_to?: string|null} | {kind: 'fail', message: string}} ChainOutcome */
 
 /**
  * @typedef {Object} ChainContext
  * @property {(url: string, method: 'GET'|'HEAD', maxBytes?: number) => Promise<FetchResult>} fetchPage
  *   One request without automatic redirects (paced, 429 retried).
  * @property {(url: string) => PageRecord|undefined} recordOf  The record already made for a URL, if any.
- * @property {(origin: string) => Promise<{summary: {status: string, url: string, http_status: number}, isAllowed: (url: string) => boolean}>} robotsFor
+ * @property {(origin: string) => Promise<{summary: {status: string, url: string, http_status: number}, isAllowed: (url: string) => boolean, refusedRedirect?: string|null}>} robotsFor
  * @property {() => {host: string, includeSubdomains: boolean}} site
  * @property {(url: string) => void} noteRobotsBlocked
  * @property {string|null} loopbackOrigin   Set when auditing a local site: no other origin may be reached.
@@ -110,7 +110,7 @@ export function createChainFollower(ctx) {
         }
         const robots = await ctx.robotsFor(targetOrigin);
         if (robots.summary.status === 'unreachable') {
-          return { kind: 'block', reason: 'robots_unreachable', url: robots.summary.url, status: robots.summary.http_status };
+          return { kind: 'block', reason: 'robots_unreachable', url: robots.summary.url, status: robots.summary.http_status, redirected_to: robots.refusedRedirect ?? null };
         }
         if (!robots.isAllowed(target)) return { kind: 'block', reason: 'robots_disallow', url: target, status: 0 };
       } else {

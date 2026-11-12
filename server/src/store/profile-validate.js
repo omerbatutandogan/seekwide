@@ -1,9 +1,12 @@
 import { normalizeUrl } from '../util/url.js';
-import { collapseWhitespace } from '../util/strings.js';
+import { clip, collapseWhitespace, stripHidden } from '../util/strings.js';
 
 export const BUSINESS_MODELS = Object.freeze(['b2b_saas', 'ecommerce', 'local_service', 'publisher', 'mobile_app', 'international', 'other']);
 
 const TOP_LEVEL = new Set(['schema_version', 'site_url', 'brand', 'business_model', 'markets', 'competitors', 'target_queries', 'report', 'updated_at']);
+/** Unknown keys named in an error, and how much of each name is shown. */
+const MAX_UNKNOWN_NAMED = 5;
+const MAX_KEY_SHOWN = 40;
 const CONTROL_CHARS = /[\u0000-\u001f\u007f]/;
 
 /** @typedef {{field: string, message: string}} FieldError */
@@ -24,8 +27,13 @@ function isPlainObject(value) {
  */
 function rejectUnknown(object, allowed, prefix, errors) {
   const known = new Set(allowed);
-  for (const key of Object.keys(object)) {
-    if (!known.has(key)) errors.push({ field: `${prefix}${key}`, message: 'is not a known profile field' });
+  const unknown = Object.keys(object).filter((key) => !known.has(key));
+  // A profile can come with a repository, so its key names are not repeated at length.
+  for (const key of unknown.slice(0, MAX_UNKNOWN_NAMED)) {
+    errors.push({ field: `${prefix}${clip(stripHidden(key), MAX_KEY_SHOWN)}`, message: 'is not a known profile field' });
+  }
+  if (unknown.length > MAX_UNKNOWN_NAMED) {
+    errors.push({ field: `${prefix}*`, message: `has ${unknown.length - MAX_UNKNOWN_NAMED} more fields that are not known profile fields` });
   }
 }
 
@@ -43,8 +51,10 @@ function cleanText(value, field, errors, { max = 200, collapse = true } = {}) {
     return null;
   }
   const cleaned = collapse ? collapseWhitespace(value) : value.trim();
+  // Tested before cleaning, which would remove them: a control character is refused, not dropped.
+  const spaced = collapse ? value.replace(/\s+/g, ' ') : value;
   if (cleaned === '') errors.push({ field, message: 'must not be empty' });
-  else if (CONTROL_CHARS.test(cleaned)) errors.push({ field, message: 'must not contain control characters' });
+  else if (CONTROL_CHARS.test(spaced)) errors.push({ field, message: 'must not contain control characters' });
   else if (cleaned.length > max) errors.push({ field, message: `must be at most ${max} characters` });
   else return cleaned;
   return null;

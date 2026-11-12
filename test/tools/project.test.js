@@ -59,7 +59,7 @@ describe('project_detect', () => {
     assert.equal(result.source_dir, NEXT_FIXTURE);
     assert.deepEqual([result.framework, result.label, result.supported, result.app_dir], ['next-app', 'Next.js (App Router)', true, 'app']);
     assert.deepEqual(result.dev_server, {
-      command: 'npm run dev', script: 'next dev', default_url: 'http://localhost:3000', package_manager: 'npm', dependencies_installed: false, cwd: NEXT_FIXTURE,
+      command: 'npm run dev', script: 'next dev', script_clipped: false, also_runs: [], default_url: 'http://localhost:3000', package_manager: 'npm', dependencies_installed: false, cwd: NEXT_FIXTURE,
     });
     assert.equal(result.routes_total, 10);
     assert.deepEqual(result.routes, [

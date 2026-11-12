@@ -8,6 +8,9 @@ import { clip } from '../util/strings.js';
  * @typedef {Object} DevServer
  * @property {string|null} command   Command that starts the project's local server, to be proposed to the user; null when none is known.
  * @property {string|null} script    Text of the package.json script that `command` runs, clipped; null when `command` runs no script.
+ * @property {boolean} script_clipped  True when `script`, or a script under `also_runs`, is longer than shown.
+ * @property {{name: string, script: string}[]} also_runs  The `pre` and `post` scripts of that script (for
+ *   example `predev` and `postdev`), clipped: npm and Yarn 1 run them with it. Empty when there are none.
  * @property {string|null} default_url  Address the server normally listens on; the server's own output is authoritative.
  * @property {'npm'|'pnpm'|'yarn'|'bun'|null} package_manager  Null when the project has no package.json.
  * @property {boolean|null} dependencies_installed  Whether a `node_modules` folder exists; null when the project has no package.json.
@@ -63,6 +66,8 @@ const LOCK_FILES = /** @type {const} */ ([
 
 /** The port Python's built-in static server is proposed on; an unassigned one that few tools use. */
 const STATIC_PORT = 4173;
+/** How much of a package.json script is shown; longer ones are clipped and marked. */
+const MAX_SCRIPT_SHOWN = 1000;
 
 /**
  * package.json as data: an object, or null when the file is missing, too
@@ -184,21 +189,40 @@ async function devServer(root, pkg, framework) {
   const script = (name) => (typeof scripts[name] === 'string' && /** @type {string} */ (scripts[name]).trim() !== '' ? /** @type {string} */ (scripts[name]) : null);
   const installed = pkg === null ? null : (await entryKind(root, 'node_modules')) === 'dir';
   const base = { package_manager: manager, dependencies_installed: installed };
+  const none = { script: null, script_clipped: false, also_runs: [] };
+  /**
+   * The script `<manager> run <name>` starts, with the scripts run before and after it.
+   * @param {string} name
+   * @param {string} text
+   */
+  const runs = (name, text) => {
+    const also = [`pre${name}`, `post${name}`].flatMap((hook) => {
+      const hookText = script(hook);
+      return hookText === null ? [] : [{ name: hook, text: hookText }];
+    });
+    const clipped = [text, ...also.map((hook) => hook.text)].some((value) => value.length > MAX_SCRIPT_SHOWN);
+    return {
+      command: `${manager ?? 'npm'} run ${name}`,
+      script: clip(text, MAX_SCRIPT_SHOWN),
+      script_clipped: clipped,
+      also_runs: also.map((hook) => ({ name: hook.name, script: clip(hook.text, MAX_SCRIPT_SHOWN) })),
+    };
+  };
 
   if (framework === 'next-app') {
     const dev = script('dev');
     return dev !== null
-      ? { command: `${manager ?? 'npm'} run dev`, script: clip(dev, 300), default_url: 'http://localhost:3000', ...base }
-      : { command: 'npx next dev', script: null, default_url: 'http://localhost:3000', ...base };
+      ? { ...runs('dev', dev), default_url: 'http://localhost:3000', ...base }
+      : { command: 'npx next dev', ...none, default_url: 'http://localhost:3000', ...base };
   }
   if (framework === 'html') {
     for (const name of ['dev', 'start']) {
       const text = script(name);
-      if (text !== null) return { command: `${manager ?? 'npm'} run ${name}`, script: clip(text, 300), default_url: null, ...base };
+      if (text !== null) return { ...runs(name, text), default_url: null, ...base };
     }
-    return { command: `python3 -m http.server ${STATIC_PORT} --bind 127.0.0.1`, script: null, default_url: `http://127.0.0.1:${STATIC_PORT}`, ...base };
+    return { command: `python3 -m http.server ${STATIC_PORT} --bind 127.0.0.1`, ...none, default_url: `http://127.0.0.1:${STATIC_PORT}`, ...base };
   }
-  return { command: null, script: null, default_url: null, ...base };
+  return { command: null, ...none, default_url: null, ...base };
 }
 
 /**

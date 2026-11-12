@@ -93,12 +93,16 @@ function typeName(type) {
   return /^[aeiou]/.test(type) ? `an ${type}` : `a ${type}`;
 }
 
+/** A message names at most this many characters of an argument's name. */
+const MAX_NAME_IN_MESSAGE = 100;
+
 /**
  * @param {string} path
  * @param {string} key
  */
 function child(path, key) {
-  return path === '' ? key : `${path}.${key}`;
+  const name = path === '' ? key : `${path}.${key}`;
+  return name.length > MAX_NAME_IN_MESSAGE ? `${name.slice(0, MAX_NAME_IN_MESSAGE - 1)}…` : name;
 }
 
 /**
@@ -110,12 +114,16 @@ function sameValue(a, b) {
   return typeof a === 'object' && typeof b === 'object' && JSON.stringify(a) === JSON.stringify(b);
 }
 
+/** At most this many problems are reported for one value, so a huge argument cannot make a huge answer. */
+export const MAX_PROBLEMS = 10;
+
 /**
  * Validate `value` against `schema`.
  * @param {JsonSchema} schema  A schema that passed `assertSupportedSchema`.
  * @param {unknown} value
  * @param {string} [path]  Name of the value in messages; '' for the root arguments object.
- * @returns {string[]} One readable message per problem; empty when the value is valid.
+ * @returns {string[]} One readable message per problem, at most `MAX_PROBLEMS`, each naming at most
+ *   `MAX_NAME_IN_MESSAGE` characters of an argument's name; empty when the value is valid.
  */
 export function validate(schema, value, path = '') {
   /** @type {string[]} */
@@ -147,11 +155,13 @@ export function validate(schema, value, path = '') {
 
   if (Array.isArray(value)) {
     if (schema.maxItems !== undefined && value.length > schema.maxItems) {
+      // Too many items: that is the problem to report, and the items are not looked at one by one.
       errors.push(`${name} must have at most ${schema.maxItems} items (got ${value.length})`);
-    }
-    if (schema.items !== undefined) {
+    } else if (schema.items !== undefined) {
       const items = schema.items;
-      value.forEach((item, index) => errors.push(...validate(items, item, `${name}[${index}]`)));
+      for (let index = 0; index < value.length && errors.length < MAX_PROBLEMS; index += 1) {
+        for (const problem of validate(items, value[index], `${name}[${index}]`)) errors.push(problem);
+      }
     }
   }
 
@@ -160,14 +170,15 @@ export function validate(schema, value, path = '') {
     for (const key of schema.required ?? []) {
       if (!Object.hasOwn(value, key) || value[key] === undefined) errors.push(`${child(path, key)} is required`);
     }
-    for (const [key, item] of Object.entries(value)) {
+    for (const key of Object.keys(value)) {
+      if (errors.length >= MAX_PROBLEMS) break;
       if (Object.hasOwn(properties, key)) {
-        errors.push(...validate(properties[key], item, child(path, key)));
+        for (const problem of validate(properties[key], value[key], child(path, key))) errors.push(problem);
       } else if (schema.additionalProperties === false) {
         errors.push(`${child(path, key)} is not an accepted argument`);
       }
     }
   }
 
-  return errors;
+  return errors.slice(0, MAX_PROBLEMS);
 }

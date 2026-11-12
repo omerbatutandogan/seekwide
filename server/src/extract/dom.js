@@ -167,3 +167,47 @@ export function insecureUrl(raw, baseUrl) {
     return null;
   }
 }
+
+/**
+ * At most this many tags of a document are parsed; the rest is left out, like
+ * the part of a body beyond `LIMITS.maxBodyBytes`. parse5 builds the whole tree
+ * before any list cap applies, and nested formatting tags cost it more than a
+ * kilobyte each, so this bounds the memory one page can take (about 300 MB at
+ * worst, far less for ordinary markup). Ordinary pages have a few thousand.
+ */
+export const MAX_PARSED_TAGS = 200_000;
+
+/**
+ * The start of `html` up to its `MAX_PARSED_TAGS`-th "<", or all of it.
+ * @param {string} html
+ * @returns {string}
+ */
+export function parsedPart(html) {
+  let at = -1;
+  for (let count = 0; count < MAX_PARSED_TAGS; count += 1) {
+    at = html.indexOf('<', at + 1);
+    if (at === -1) return html;
+  }
+  return html.slice(0, at);
+}
+
+/**
+ * Characters the link, image and hreflang lists of one page may hold in all.
+ * Each entry keeps a URL of up to 2048 characters and clipped texts, so the
+ * count caps alone would let one page record grow to many megabytes.
+ */
+export const MAX_LIST_CHARS = 1_000_000;
+
+/**
+ * The characters of the strings an entry holds, those in its lists included.
+ * @param {object} entry
+ * @returns {number}
+ */
+export function textChars(entry) {
+  let total = 0;
+  for (const value of Object.values(entry)) {
+    if (typeof value === 'string') total += value.length;
+    else if (Array.isArray(value)) for (const item of value) if (typeof item === 'string') total += item.length;
+  }
+  return total;
+}

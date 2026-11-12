@@ -9,7 +9,8 @@
 /** @import { RunComparison } from '../store/compare.js' */
 
 import { firstNonEmpty, isUnverifiable } from '../checks/page-helpers.js';
-import { FIXABLE_CHECKS } from './fixes.js';
+import { SEVERITIES } from '../config.js';
+import { FIXABLE_CHECKS, plainPath } from './fixes.js';
 
 const MAX_REPLACEMENTS = 5;
 
@@ -92,11 +93,12 @@ function sitemapDoubt(crawl) {
  * order asked for, each id once; ids the base run does not hold are returned
  * under `unknown` and get no result. Pure: no I/O.
  *
- * @param {{base: Run, run: Run, crawl: CrawlResult, findingIds: string[], comparison: RunComparison}} input
- *   `comparison` is `compareRuns(base, run)`.
+ * @param {{base: Run, run: Run, crawl: CrawlResult, findingIds: string[], comparison: RunComparison, titles?: Record<string, string>}} input
+ *   `comparison` is `compareRuns(base, run)`. `titles`: the title of each check by id, from the check
+ *   definitions; a result's title is never taken from the stored base run.
  * @returns {{verification: FixVerification, unknown: string[]}}
  */
-export function verifyFixes({ base, run, crawl, findingIds, comparison }) {
+export function verifyFixes({ base, run, crawl, findingIds, comparison, titles = {} }) {
   const baseById = new Map(base.findings.map((finding) => [finding.id, finding]));
   const stillThere = new Set(run.findings.map((finding) => finding.id));
   const ran = new Map(run.checks.map((check) => [check.id, check]));
@@ -122,13 +124,15 @@ export function verifyFixes({ base, run, crawl, findingIds, comparison }) {
     } else if (!stat || stat.status !== 'run') {
       verdict = { outcome: 'unverified', detail: `The check did not run in the re-audit${stat?.skip_reason ? `: ${stat.skip_reason}` : '.'}`, replaced_by: [] };
     } else {
-      const site = finding.url === null;
       const fixable = Object.hasOwn(FIXABLE_CHECKS, finding.check_id);
+      // Whether the check looks at the whole site comes from the plugin's own table, never from the stored
+      // finding: a hand-edited run could give a site-wide finding a URL, or a page finding none.
+      const site = fixable ? FIXABLE_CHECKS[finding.check_id].unit === 'site' : finding.url === null;
       // Which pages a check looks at is known only for the checks a fix exists for. For any other check a
       // finding that is gone is never called closed: nothing here can tell whether the check looked again.
       const doubt = !fixable
         ? 'The finding is no longer reported, but this check is outside what a fix verification can confirm: the plugin cannot tell whether the check looked at the same thing again. Compare the two runs and look at the page.'
-        : site ? sitemapDoubt(crawl) : pageDoubt(finding, pages.get(/** @type {string} */ (finding.url))) ?? partnerDoubt(finding, pages);
+        : site ? sitemapDoubt(crawl) : pageDoubt(finding, finding.url === null ? undefined : pages.get(finding.url)) ?? partnerDoubt(finding, pages);
       const area = areaOf(finding.check_id);
       const successors = comparison.added.filter((added) =>
         site
@@ -148,10 +152,10 @@ export function verifyFixes({ base, run, crawl, findingIds, comparison }) {
     results.push({
       finding_id: id,
       check_id: finding.check_id,
-      title: finding.title,
-      severity: finding.severity,
+      title: Object.hasOwn(titles, finding.check_id) ? titles[finding.check_id] : finding.check_id,
+      severity: SEVERITIES.includes(finding.severity) ? finding.severity : 'info',
       url: finding.url,
-      file: finding.source?.file ?? null,
+      file: plainPath(finding.source?.file),
       ...verdict,
     });
   }

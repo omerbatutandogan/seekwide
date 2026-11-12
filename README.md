@@ -71,7 +71,7 @@ To audit a site running on your own machine, give a `localhost` or `127.0.0.1` U
 Run an audit command without a URL (or with `--repo`) inside a web project, and Seekwide audits the project itself:
 
 1. It looks at the folder to see what kind of project it is. **Next.js with the App Router** and **plain HTML** are supported. For anything else it says so in plain words, and you can still audit the site by its address.
-2. Claude proposes the command that starts the project's local server: the project's own `dev` script (for example `npm run dev`), or Python's built-in static server for a plain HTML folder, bound to `127.0.0.1`. **Nothing starts without your approval**: Claude asks you in the conversation first, in every permission mode, because starting a dev server runs the project's code. The plugin's own server never starts or runs anything. If the server is already running, give its `localhost` address and nothing is started.
+2. Claude proposes the command that starts the project's local server: the project's own `dev` script (for example `npm run dev`), or Python's built-in static server for a plain HTML folder, bound to `127.0.0.1`. **Nothing starts without your approval**: the plugin tells Claude to ask you in the conversation first, in every permission mode, because starting a dev server runs the project's code; Claude also shows the scripts that command runs. The plugin's own server never starts or runs anything. If the server is already running, give its `localhost` address and nothing is started.
 3. The local address is crawled like any other site.
 4. Each finding gets `source`: the file, the route and, for plain HTML, the line.
 

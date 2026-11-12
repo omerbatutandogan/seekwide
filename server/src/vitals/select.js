@@ -91,7 +91,8 @@ export function selectVitalsPages(crawl, limit = LIMITS.vitalsPagesDefault) {
   for (const page of crawl.pages) {
     if (!byUrl.has(page.url)) byUrl.set(page.url, page);
   }
-  const candidates = [...byUrl.values()].filter((page) => page.status === 200 && page.is_html && page.indexability.indexable);
+  // A query string can carry a token or a personal value, so a page whose address has one is never sent to Google.
+  const candidates = [...byUrl.values()].filter((page) => page.status === 200 && page.is_html && page.indexability.indexable && !hasQuery(page.url));
 
   /** @type {{url: string, why: string}[]} */
   const selected = [];
@@ -119,4 +120,16 @@ export function selectVitalsPages(crawl, limit = LIMITS.vitalsPagesDefault) {
     }
   }
   return selected.slice(0, limit);
+}
+
+/**
+ * @param {string} url
+ * @returns {boolean}
+ */
+function hasQuery(url) {
+  try {
+    return new URL(url).search !== '';
+  } catch {
+    return true;
+  }
 }

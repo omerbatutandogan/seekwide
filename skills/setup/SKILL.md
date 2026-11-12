@@ -3,7 +3,7 @@ name: setup
 description: Create or update the Seekwide project profile for a site (site URL, brand names, business model, markets, competitors, target queries, report branding), stored in .seekwide/profile.json in the current folder.
 when_to_use: Use when the user starts auditing a new site or client, wants reports branded with their agency's name or logo, or wants to change the saved details of a project.
 argument-hint: "[url]"
-allowed-tools: mcp__plugin_seekwide_seekwide__profile_get, mcp__plugin_seekwide_seekwide__profile_set, mcp__plugin_seekwide_seekwide__runs_list
+allowed-tools: mcp__plugin_seekwide_seekwide__profile_get, mcp__plugin_seekwide_seekwide__runs_list
 ---
 
 # Project setup

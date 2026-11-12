@@ -4,6 +4,7 @@ import robotsParser from 'robots-parser';
 
 import { PRODUCT_TOKEN } from '../config.js';
 import { normalizeUrl, originOf } from '../util/url.js';
+import { compiledGroup, decidingRule, rulePath } from './robots-match.js';
 import { safeFetch } from './safe-fetch.js';
 
 /** @import { RobotsSummary } from '../types.js' */
@@ -21,13 +22,27 @@ const MAX_ROBOTS_REDIRECTS = 5;
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 /**
+ * A function that says whether `agent` may fetch a URL of the file's origin.
+ * The rules robots-parser read are evaluated by `robots-match.js`, in time
+ * linear in the path; robots-parser's own matcher is used only if its rules
+ * are not held the way the pinned version holds them.
  * @param {RobotsRules} parser
- * @param {string} origin
  * @param {string} agent
+ * @returns {(url: string) => boolean}
+ */
+function rulesFor(parser, agent) {
+  const group = compiledGroup(parser, agent);
+  if (group === null) return (url) => parser.isAllowed(url, agent) !== false;
+  return (url) => decidingRule(group, rulePath(url))?.allow ?? true;
+}
+
+/**
+ * @param {(url: string) => boolean} allows
+ * @param {string} origin
  * @returns {boolean}
  */
-function disallowsAll(parser, origin, agent) {
-  return parser.isAllowed(`${origin}/`, agent) === false && parser.isAllowed(`${origin}${PROBE_PATH}`, agent) === false;
+function disallowsAll(allows, origin) {
+  return !allows(`${origin}/`) && !allows(`${origin}${PROBE_PATH}`);
 }
 
 /**
@@ -44,10 +59,13 @@ function disallowsAll(parser, origin, agent) {
  * hop, so the caller's pacing applies to every hop. More than five redirects,
  * or a loop, means 'missing' (RFC 9309 2.3.1.2). Whatever URL the file came
  * from, its rules apply to `siteOrigin`. `http_status` is the last status received.
+ * `refusedRedirect` is the address a redirect led to when that request was
+ * refused as an address that may not be contacted (`blocked_address`), so a
+ * caller can say why the file could not be read; null otherwise.
  *
  * @param {string} siteOrigin  for example "https://example.com"
  * @param {{fetch?: typeof safeFetch, fetchOptions?: Parameters<typeof safeFetch>[1], productToken?: string}} [options]
- * @returns {Promise<{summary: RobotsSummary, isAllowed: (url: string) => boolean}>}
+ * @returns {Promise<{summary: RobotsSummary, isAllowed: (url: string) => boolean, refusedRedirect: string|null}>}
  */
 export async function loadRobots(siteOrigin, options = {}) {
   const origin = typeof siteOrigin === 'string' ? originOf(siteOrigin) : null;
@@ -91,6 +109,7 @@ export async function loadRobots(siteOrigin, options = {}) {
   };
 
   const status = result.status;
+  const refusedRedirect = current !== url && result.error?.code === 'blocked_address' ? current : null;
   if (gaveUp) {
     summary.status = 'missing';
   } else if (result.error === null && status >= 200 && status < 300) {
@@ -103,10 +122,10 @@ export async function loadRobots(siteOrigin, options = {}) {
   const sameOrigin = (target) => originOf(target) === origin;
 
   if (summary.status === 'unreachable') {
-    return { summary, isAllowed: (target) => !sameOrigin(target) };
+    return { summary, isAllowed: (target) => !sameOrigin(target), refusedRedirect };
   }
   if (summary.status === 'missing') {
-    return { summary, isAllowed: () => true };
+    return { summary, isAllowed: () => true, refusedRedirect: null };
   }
 
   const text = (result.body ?? Buffer.alloc(0)).toString('utf8').replace(/^\uFEFF/, '');
@@ -115,8 +134,9 @@ export async function loadRobots(siteOrigin, options = {}) {
 
   const delay = parser.getCrawlDelay(productToken);
   summary.crawl_delay_sec = typeof delay === 'number' && Number.isFinite(delay) && delay >= 0 ? delay : null;
-  summary.disallows_all = disallowsAll(parser, origin, '*');
-  summary.disallows_all_googlebot = disallowsAll(parser, origin, 'Googlebot');
+  summary.disallows_all = disallowsAll(rulesFor(parser, '*'), origin);
+  summary.disallows_all_googlebot = disallowsAll(rulesFor(parser, 'Googlebot'), origin);
+  const allows = rulesFor(parser, productToken);
 
   const seen = new Set();
   for (const raw of parser.getSitemaps()) {
@@ -128,6 +148,7 @@ export async function loadRobots(siteOrigin, options = {}) {
 
   return {
     summary,
-    isAllowed: (target) => !sameOrigin(target) || parser.isAllowed(target, productToken) !== false,
+    isAllowed: (target) => !sameOrigin(target) || allows(target),
+    refusedRedirect: null,
   };
 }

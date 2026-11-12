@@ -45,7 +45,7 @@ npm test
 The code is plain JavaScript with JSDoc types, checked in strict mode. TypeScript is not a dependency of the plugin, so install it without saving:
 
 ```bash
-npm install --no-save typescript@5.9.3 @types/node@22
+npm install --no-save --ignore-scripts typescript@5.9.3 @types/node@22.20.5
 ```
 
 ```bash

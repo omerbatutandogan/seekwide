@@ -1,11 +1,11 @@
 /** @import { Profile } from '../types.js' */
 
-import fs from 'node:fs/promises';
 import { SCHEMA_VERSION } from '../config.js';
 import { storeError } from './errors.js';
-import { toJsonFile, writeFileAtomic } from './fs-util.js';
-import { ensureProject, projectPaths } from './project.js';
+import { STORE_LIMITS, readStoreFile, toJsonFile, writeFileAtomic } from './fs-util.js';
+import { assertStoreDirs, ensureProject, projectPaths } from './project.js';
 import { normalizeProfile } from './profile-validate.js';
+import { isIsoDate } from './run-validate.js';
 
 /**
  * @param {import('./profile-validate.js').FieldError[]} errors
@@ -35,10 +35,12 @@ function assemble(fields, updatedAt) {
  * @returns {Promise<Profile|null>}
  */
 export async function readProfile(projectDir) {
-  const { profile: file } = projectPaths(projectDir);
+  const paths = projectPaths(projectDir);
+  const file = paths.profile;
+  await assertStoreDirs(paths);
   let text;
   try {
-    text = await fs.readFile(file, 'utf8');
+    text = await readStoreFile(file, STORE_LIMITS.profileBytes, paths.projectDir);
   } catch (error) {
     if (/** @type {NodeJS.ErrnoException} */ (error).code === 'ENOENT') return null;
     throw error;
@@ -52,7 +54,7 @@ export async function readProfile(projectDir) {
   }
   const { profile, errors } = normalizeProfile(parsed);
   if (profile === null) throw invalidProfile(errors, `${where}. Fix the file or save a new profile`);
-  if (typeof parsed.updated_at !== 'string' || Number.isNaN(Date.parse(parsed.updated_at))) {
+  if (!isIsoDate(parsed.updated_at)) {
     throw invalidProfile([{ field: 'updated_at', message: 'must be an ISO 8601 date' }], `${where}. Fix the file or save a new profile`);
   }
   return assemble(profile, parsed.updated_at);

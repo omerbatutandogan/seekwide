@@ -2,8 +2,12 @@
 
 import fs from 'node:fs/promises';
 import { SCHEMA_VERSION } from '../config.js';
-import { writeFileAtomic, toJsonFile } from './fs-util.js';
-import { isValidRunId } from './project.js';
+import { STORE_LIMITS, readStoreFile, writeFileAtomic, toJsonFile } from './fs-util.js';
+import { assertStoreDirs, isValidRunId } from './project.js';
+import { isStoredEntry, storedRunProblem } from './run-validate.js';
+
+/** A damaged index is rebuilt from at most this many run folders, the newest by name. */
+const MAX_REBUILD_RUNS = 1000;
 
 /**
  * Minimal shape every stored run must have for the store and the reports to work with it.
@@ -70,13 +74,15 @@ function isEntry(value) {
     typeof entry.start_url === 'string' &&
     typeof entry.findings === 'number' &&
     entry.scores !== null &&
-    typeof entry.scores === 'object'
+    typeof entry.scores === 'object' &&
+    isStoredEntry(entry)
   );
 }
 
 /**
  * Rebuild the index from the run folders. Used when `index.json` is missing or
- * damaged; run folders that cannot be read are left out.
+ * damaged; run folders that cannot be read, or whose run is damaged, are left
+ * out, and only the newest `MAX_REBUILD_RUNS` folders by name are read.
  * @param {import('./project.js').ProjectPaths} paths
  * @returns {Promise<RunIndexEntry[]>}
  */
@@ -90,11 +96,13 @@ async function rebuildIndex(paths) {
   }
   /** @type {RunIndexEntry[]} */
   const entries = [];
-  for (const dirent of dirents) {
-    if (!dirent.isDirectory() || !isValidRunId(dirent.name)) continue;
+  const names = dirents.filter((dirent) => dirent.isDirectory() && isValidRunId(dirent.name)).map((dirent) => dirent.name).sort().slice(-MAX_REBUILD_RUNS);
+  for (const name of names) {
     try {
-      const run = JSON.parse(await fs.readFile(paths.findingsFile(dirent.name), 'utf8'));
-      if (isRunShape(run) && run.run_id === dirent.name) entries.push(entryFromRun(run));
+      const run = JSON.parse(await readStoreFile(paths.findingsFile(name), STORE_LIMITS.runBytes, paths.projectDir));
+      if (isRunShape(run) && run.run_id === name && storedRunProblem(/** @type {Record<string, unknown>} */ (/** @type {unknown} */ (run))) === null) {
+        entries.push(entryFromRun(run));
+      }
     } catch {
       // A run folder without a readable findings.json is not a run.
     }
@@ -103,17 +111,22 @@ async function rebuildIndex(paths) {
 }
 
 /**
- * Read the run index, oldest run first. A missing or damaged index is rebuilt
- * from the run folders in memory; nothing is written.
+ * Read the run index, oldest run first. A missing, damaged or oversized index
+ * is rebuilt from the run folders in memory; nothing is written. An entry
+ * dated in the future counts as damage (`isStoredEntry`), so a hand-edited
+ * index cannot make its own run the newest for good. Throws `UNSAFE_STORE`
+ * when `.seekwide`, `runs` or the index is a symbolic link.
  * @param {import('./project.js').ProjectPaths} paths
  * @returns {Promise<RunIndexEntry[]>}
  */
 export async function readIndex(paths) {
+  await assertStoreDirs(paths);
   let text;
   try {
-    text = await fs.readFile(paths.index, 'utf8');
+    text = await readStoreFile(paths.index, STORE_LIMITS.indexBytes, paths.projectDir);
   } catch (error) {
-    if (/** @type {NodeJS.ErrnoException} */ (error).code === 'ENOENT') return rebuildIndex(paths);
+    const code = /** @type {NodeJS.ErrnoException} */ (error).code;
+    if (code === 'ENOENT' || code === 'STORE_FILE_TOO_LARGE') return rebuildIndex(paths);
     throw error;
   }
   try {

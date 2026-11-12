@@ -120,7 +120,8 @@ export function parseLinkHeaders(lines, baseUrl) {
   /** @type {HreflangRef[]} */
   const hreflang = [];
   for (const line of lines) {
-    for (const match of line.matchAll(/<([^>]*)>([^<]*)/g)) {
+    // No "<" inside the brackets, so a run of "<" cannot make the match try every start again.
+    for (const match of line.matchAll(/<([^<>]*)>([^<]*)/g)) {
       const href = match[1].trim();
       const params = linkParams(match[2]);
       const rel = (params.get('rel') ?? '').toLowerCase().split(/\s+/);

@@ -199,6 +199,9 @@ export {};
  * @property {'robots_unreachable'|'robots_disallow'|'bot_challenge'|'rate_limited'} reason
  * @property {string} url
  * @property {number} status
+ * @property {string} [redirected_to]  robots_unreachable only: where robots.txt redirected, when the crawl
+ *   refused to request that address (another origin in a crawl of a site on this machine, or an address
+ *   that is not public).
  */
 
 /**

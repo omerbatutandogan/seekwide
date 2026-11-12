@@ -107,3 +107,15 @@ test('originOf returns null for invalid input', () => {
   assert.equal(originOf('https://example.com:8443/a?b#c'), 'https://example.com:8443');
   assert.equal(originOf('nope'), null);
 });
+
+test('hidden characters: controls, direction overrides and tag characters are removed from page text, tab and line breaks kept by clip', async () => {
+  const { clip, collapseWhitespace, stripHidden } = await import('../../server/src/util/strings.js');
+  const esc = String.fromCodePoint(0x1b);
+  const rlo = String.fromCodePoint(0x202e);
+  const tag = String.fromCodePoint(0xe0049, 0xe0047);
+  const zwj = String.fromCodePoint(0x200d);
+  assert.equal(collapseWhitespace(`Home ${rlo}exe.gpj ${esc}]0;x${String.fromCodePoint(7)} ${tag}`), 'Home exe.gpj ]0;x');
+  assert.equal(clip(`a\tb\nc${esc}${tag}`), 'a\tb\nc');
+  assert.equal(stripHidden(`family 👨${zwj}👩${zwj}👧`), `family 👨${zwj}👩${zwj}👧`, 'a zero-width joiner in an emoji stays');
+  assert.equal(clip('x'.repeat(10) + rlo, 5), 'xxxx…');
+});

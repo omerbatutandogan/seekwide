@@ -3,10 +3,9 @@
 /** @import { ToolDef } from '../mcp/stdio.js' */
 /** @import { ToolDeps } from './index.js' */
 
-import { mkdir } from 'node:fs/promises';
-import path from 'node:path';
 import { ToolError } from '../mcp/stdio.js';
 import { writeFileAtomic } from '../store/fs-util.js';
+import { ensureRunDir } from '../store/project.js';
 import { PROJECT_DIR_SCHEMA, loadBaseRun, resolveProjectDir, runRefSchema, settingValue, withStoreErrors } from './common.js';
 import { loadLogo } from './logo.js';
 
@@ -105,7 +104,8 @@ export function reportTools(deps) {
             throw new ToolError(`The ${format} report could not be rendered: ${error.message} Fix the arguments and call report_render again.`);
           }
           const file = await withStoreErrors(() => paths.reportFile(run.run_id, FILE_FORMATS[format]));
-          await mkdir(path.dirname(file), { recursive: true });
+          // Created when missing; a folder on the way that is a symbolic link is refused, so no report lands outside the project.
+          await withStoreErrors(() => ensureRunDir(paths, run.run_id));
           await writeFileAtomic(file, content);
           files[format] = file;
           bytes[format] = Buffer.byteLength(content, 'utf8');

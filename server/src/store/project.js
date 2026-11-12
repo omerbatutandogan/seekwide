@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { clip } from '../util/strings.js';
 import { storeError } from './errors.js';
+import { assertRealDir, makeRealDirs } from './fs-util.js';
 
 /** Run ids become directory names, so they are restricted to this alphabet. */
 export const RUN_ID_PATTERN = /^[0-9A-Za-z._-]+$/;
@@ -104,6 +105,9 @@ export function projectPaths(projectDir) {
  * `.gitignore` containing `*` so audit output is not committed by accident. An
  * existing `.gitignore` is never touched. The project directory itself must
  * already exist, so a mistyped path fails instead of creating a new folder tree.
+ * `.seekwide` or `runs` that is a symbolic link, or not a folder, throws
+ * `UNSAFE_STORE` and nothing is written: a repository can bring such a link
+ * along, and writing through it would write outside the project.
  * @param {string} projectDir
  * @returns {Promise<ProjectPaths>}
  */
@@ -118,11 +122,38 @@ export async function ensureProject(projectDir) {
   if (!stat?.isDirectory()) {
     throw storeError('PROJECT_DIR_NOT_FOUND', `The project folder ${paths.projectDir} does not exist. Check the path or create the folder first.`);
   }
-  await fs.mkdir(paths.runsDir, { recursive: true });
+  await makeRealDirs([paths.root, paths.runsDir], paths.projectDir);
   try {
     await fs.writeFile(paths.gitignore, '*\n', { flag: 'wx' });
   } catch (error) {
     if (/** @type {NodeJS.ErrnoException} */ (error).code !== 'EEXIST') throw error;
   }
   return paths;
+}
+
+/**
+ * Throws `UNSAFE_STORE` when `.seekwide`, `runs` or, with a run id, that run's
+ * folder exists and is a symbolic link or not a folder. Called before a stored
+ * file is read, so that no file outside the project is read as a run.
+ * @param {ProjectPaths} paths
+ * @param {string} [runId]
+ * @returns {Promise<void>}
+ */
+export async function assertStoreDirs(paths, runId) {
+  const dirs = [paths.root, paths.runsDir, ...(runId === undefined ? [] : [paths.runDir(runId)])];
+  for (const dir of dirs) {
+    if (!(await assertRealDir(dir, paths.projectDir))) return;
+  }
+}
+
+/**
+ * Create the folder of one run inside the store, refusing links on the way.
+ * @param {ProjectPaths} paths  From `ensureProject`.
+ * @param {string} runId
+ * @returns {Promise<string>} The run's folder.
+ */
+export async function ensureRunDir(paths, runId) {
+  const dir = paths.runDir(runId);
+  await makeRealDirs([paths.root, paths.runsDir, dir], paths.projectDir);
+  return dir;
 }

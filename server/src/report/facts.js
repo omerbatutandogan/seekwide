@@ -25,14 +25,27 @@ export function moduleLabel(name) {
 
 /**
  * One sentence that says why the crawl stopped.
- * @param {{reason: string, url: string, status: number}} blocked
+ * @param {{reason: string, url: string, status: number, redirected_to?: string}} blocked
  * @returns {string}
  */
 export function describeBlock(blocked) {
   const reason = Object.hasOwn(BLOCK_REASONS, blocked.reason) ? BLOCK_REASONS[/** @type {keyof typeof BLOCK_REASONS} */ (blocked.reason)] : blocked.reason;
   const at = blocked.url ? ` at ${blocked.url}` : '';
   const status = blocked.status ? ` (HTTP ${blocked.status})` : '';
-  return `The crawl stopped early: ${reason}${at}${status}.`;
+  const redirect = blockedRedirect(blocked);
+  return `The crawl stopped early: ${reason}${at}${status}.${redirect ? ` ${redirect}` : ''}`;
+}
+
+/**
+ * Why robots.txt could not be read when it redirected to an address the crawl
+ * refused, or '' when that is not the case.
+ * @param {{redirected_to?: string}} blocked
+ * @returns {string}
+ */
+export function blockedRedirect(blocked) {
+  if (typeof blocked.redirected_to !== 'string') return '';
+  return `robots.txt redirects to ${blocked.redirected_to}, and the crawl did not follow it there: a crawl of a site on this machine requests nothing from any other address, and no crawl requests an address that is not public. ` +
+    'Serve robots.txt from the audited address itself, or audit the address it redirects to.';
 }
 
 /**

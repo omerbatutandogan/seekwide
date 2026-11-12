@@ -14,6 +14,7 @@ import { JOB_ID_SCHEMA, PROJECT_DIR_SCHEMA, UNTRUSTED_NOTE, countBy, resolveProj
 import { finishedCrawl } from './crawl.js';
 import { VERIFY_FIXES_SCHEMA, fixBase, fixOutput, fixVerification } from './fix.js';
 import { SOURCE_DIR_SCHEMA, auditSources } from './project.js';
+import { blockedRedirect } from '../report/facts.js';
 
 const TOP_GROUPS = 10;
 const EXAMPLE_URLS = 3;
@@ -123,7 +124,8 @@ export function topGroups(findings, limit) {
 function runNotes(crawl, outbound, vitals, repoNotes) {
   const notes = [];
   if (crawl.blocked) {
-    notes.push(`The crawl was stopped (${crawl.blocked.reason}) at ${crawl.blocked.url}. Findings cover only what was fetched before that; the crawler never tries to get past a block.`);
+    const redirect = blockedRedirect(crawl.blocked);
+    notes.push(`The crawl was stopped (${crawl.blocked.reason}) at ${crawl.blocked.url}.${redirect ? ` ${redirect}` : ''} Findings cover only what was fetched before that; the crawler never tries to get past a block.`);
   }
   if (crawl.truncated) {
     notes.push(`The crawl stopped at its page budget (${crawl.options.max_pages} pages), so checks that need a complete crawl were skipped. Crawl again with a larger max_pages for full coverage.`);

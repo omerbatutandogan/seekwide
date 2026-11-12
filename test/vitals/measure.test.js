@@ -271,7 +271,7 @@ test('a client that throws is a bug, not an answer: nothing new is sent and the 
 test('a redirect followed by Google is noted', async () => {
   const fake = clients({ lab: (url) => ({ ok: true, lab: makeLab({ final_url: url === `${SITE}/` ? `${SITE}/home` : null }) }) });
   const vitals = await measureVitals(site(), { apiKey: KEY, ...fake });
-  assert.deepEqual(vitals.notes, [`PageSpeed Insights was redirected from ${SITE}/ to ${SITE}/home and tested that page.`]);
+  assert.deepEqual(vitals.notes, [`PageSpeed Insights was redirected from ${SITE}/ to a page on ${new URL(SITE).host} and tested that page.`]);
 });
 
 test('a crawl that does not say the site is public is never named to Google', async () => {

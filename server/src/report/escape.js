@@ -86,6 +86,8 @@ export function mdText(value) {
   return collapseWhitespace(String(value))
     .replace(/[\\`*_[\]|~]/g, '\\$&')
     .replace(/</g, '&lt;')
+    // GitHub-flavored Markdown turns a bare e-mail address into a mailto: link; an escaped @ stays text.
+    .replace(/@/g, '\\@')
     .replace(/^([#+=>-])/, '\\$1')
     .replace(/^(\d+)([.)])/, '$1\\$2');
 }

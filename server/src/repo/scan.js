@@ -5,6 +5,7 @@
 import { constants } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { stripHidden } from '../util/strings.js';
 
 export const SCAN_LIMITS = Object.freeze({
   /** Files listed per scan. A larger tree is cut and reported as truncated. */
@@ -151,6 +152,9 @@ export async function listFiles(root, sub = '', limits = {}) {
     for (const entry of entries) {
       const child = relative === '' ? entry.name : `${relative}/${entry.name}`;
       if (entry.isSymbolicLink()) continue;
+      // A name with a line break, a control or a direction character is not a page a server answers for,
+      // and could make a file listing read differently from what it is: it is left out.
+      if (stripHidden(entry.name) !== entry.name || /[\r\n\t]/.test(entry.name)) continue;
       if (entry.isDirectory()) {
         if (isSkippedDir(entry.name)) continue;
         if (depth + 1 > maxDepth) truncated = true;

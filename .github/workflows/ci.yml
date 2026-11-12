@@ -8,19 +8,24 @@ on:
 permissions:
   contents: read
 
+# Actions are pinned to full commit SHAs, because a tag can be moved to other
+# code. Dependabot updates the SHA and the version comment together.
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
 
+      # The two runtime dependencies need no install scripts, so none are run.
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Check dependencies for known vulnerabilities
         run: npm audit --omit=dev --audit-level=moderate
@@ -30,10 +35,11 @@ jobs:
 
       # TypeScript is a development tool only, so it is installed here and not
       # listed in package.json: Claude Code installs the plugin's dependencies
-      # on every user's machine.
+      # on every user's machine. Exact versions, so a new release cannot change
+      # what CI runs.
       - name: Type-check
         run: |
-          npm install --no-save typescript@5.9.3 @types/node@22
+          npm install --no-save --ignore-scripts typescript@5.9.3 @types/node@22.20.5
           npx tsc -p jsconfig.json
 
       - name: Check that docs/checks.md matches the code
@@ -45,14 +51,17 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
 
+      # An exact version: an unpinned install would run whatever was published last.
       - name: Install Claude Code
-        run: npm install --global @anthropic-ai/claude-code
+        run: npm install --global @anthropic-ai/claude-code@2.1.322
 
       - name: Validate the plugin manifest and skills
         run: claude plugin validate . --strict --profile directory

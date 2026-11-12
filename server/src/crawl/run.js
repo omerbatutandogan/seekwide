@@ -36,7 +36,17 @@ const STRIKES = 3;
  * @property {Extractor} extract
  * @property {() => Date} now
  * @property {(ms: number) => Promise<void>} sleep
+ * @property {number} [maxStoredChars]  Characters the page records of one crawl may hold in all; defaults
+ *   to `MAX_STORED_CHARS`.
  */
+
+/**
+ * Characters the page records of one crawl may hold, as JSON. A page record is
+ * bounded (about 1.5 MB at most), but a few hundred of them could still exhaust
+ * memory and exceed what one stored file can hold; the crawl stops there as
+ * truncated. Ordinary crawls stay far below it.
+ */
+export const MAX_STORED_CHARS = 150_000_000;
 
 /** @typedef {{status: 'done'|'blocked', result: CrawlResult} | {status: 'failed', error: string}} CrawlOutcome */
 
@@ -61,6 +71,10 @@ const STRIKES = 3;
 export async function runCrawl(params, deps, onProgress) {
   const { startUrl, maxPages, ratePerSec, includeSubdomains, loopbackOrigin, startedAt } = params;
   const { fetch, now, sleep } = deps;
+  const maxStoredChars = deps.maxStoredChars ?? MAX_STORED_CHARS;
+  let storedChars = 0;
+  /** True once the page records reached `maxStoredChars`. */
+  let full = false;
   const deployed = loopbackOrigin !== null && params.deployedOrigin ? params.deployedOrigin : null;
   /** @type {Extractor} */
   const extract = deployed === null || loopbackOrigin === null ? deps.extract : {
@@ -163,9 +177,12 @@ export async function runCrawl(params, deps, onProgress) {
     };
     return { status: blocked ? 'blocked' : 'done', result };
   };
-  /** @param {CrawlBlock['reason']} reason @param {string} url @param {number} status */
-  const block = (reason, url, status) => {
-    blocked = { reason, url, status };
+  /**
+   * @param {CrawlBlock['reason']} reason @param {string} url @param {number} status
+   * @param {string|null} [redirectedTo]  Where robots.txt redirected, when that address was refused.
+   */
+  const block = (reason, url, status, redirectedTo = null) => {
+    blocked = { reason, url, status, ...(redirectedTo === null ? {} : { redirected_to: redirectedTo }) };
     return finish();
   };
   /** @param {string} url @param {NonNullable<FetchResult['error']>} error @returns {CrawlOutcome} */
@@ -199,10 +216,17 @@ export async function runCrawl(params, deps, onProgress) {
   const addRecords = (records) => {
     for (const record of records) {
       if (recorded.has(record.url)) continue;
-      if (pages.length >= maxPages) {
+      if (pages.length >= maxPages || full) {
         truncated = truncated || fetchable(record.url);
         return;
       }
+      const size = JSON.stringify(record).length;
+      if (storedChars + size > maxStoredChars) {
+        full = true;
+        truncated = true;
+        return;
+      }
+      storedChars += size;
       pages.push(record);
       recorded.set(record.url, record);
       frontier.markSeen(record.url);
@@ -231,6 +255,8 @@ export async function runCrawl(params, deps, onProgress) {
   // 1. robots.txt for the start origin. A host that cannot be resolved, or may
   // not be contacted at all, is a failed crawl rather than a robots.txt problem.
   if (robots.summary.status === 'unreachable') {
+    // robots.txt answered with a redirect to an address this crawl may not request: say where it led.
+    if (robots.refusedRedirect !== null) return block('robots_unreachable', robots.summary.url, robots.summary.http_status, robots.refusedRedirect);
     const error = lastErrors.get(robots.summary.url);
     if (error && (error.code === 'blocked_address' || error.code === 'dns_error')) return failure(startUrl, error);
     return block('robots_unreachable', robots.summary.url, robots.summary.http_status);
@@ -240,7 +266,7 @@ export async function runCrawl(params, deps, onProgress) {
   // 2. The start URL. Its redirects may cross origins; the last origin becomes the site.
   const start = await followChain(startUrl, 'start');
   if (start.kind === 'fail') return { status: 'failed', error: start.message };
-  if (start.kind === 'block') return block(start.reason, start.url, start.status);
+  if (start.kind === 'block') return block(start.reason, start.url, start.status, start.redirected_to ?? null);
   if (start.result !== null && start.result.error !== null) return failure(start.finalUrl, start.result.error);
   if (start.result !== null && start.finalUrl !== startUrl) {
     origin = /** @type {string} */ (originOf(start.finalUrl));
@@ -280,6 +306,7 @@ export async function runCrawl(params, deps, onProgress) {
   for (let entry = frontier.next(); entry !== null; entry = frontier.next()) {
     const { url, depth } = entry;
     if (recorded.has(url)) continue;
+    if (full) break;
     if (pages.length >= maxPages) {
       truncated = truncated || remainsFetchable(url);
       break;

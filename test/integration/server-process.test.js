@@ -9,6 +9,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { after, before, test } from 'node:test';
 
+import { UNTRUSTED_NOTE } from '../../server/src/tools/common.js';
+import { PROFILE_NOTE } from '../../server/src/tools/profile.js';
 import { startServer } from '../helpers/http-server.js';
 
 const ENTRY = fileURLToPath(new URL('../../server/src/index.js', import.meta.url));
@@ -113,7 +115,7 @@ test('the server speaks both protocol styles over stdio and exits when stdin clo
   assert.equal(modernList.result.tools.length, 12);
 
   const runs = toolResult(await request({ id: 2, method: 'tools/call', params: { _meta: META, name: 'runs_list', arguments: {} } }));
-  assert.deepEqual(runs, { project_dir: tmp, total: 0, runs: [] });
+  assert.deepEqual(runs, { project_dir: tmp, total: 0, runs: [], _note: UNTRUSTED_NOTE });
 
   // Handshake style (2025-11-25 and earlier).
   const init = await request({ id: 3, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'legacy', version: '1' } } });
@@ -129,7 +131,7 @@ test('the server speaks both protocol styles over stdio and exits when stdin clo
   );
 
   const profile = toolResult(await request({ id: 5, method: 'tools/call', params: { name: 'profile_get', arguments: {} } }));
-  assert.deepEqual(profile, { exists: false, profile: null });
+  assert.deepEqual(profile, { exists: false, profile: null, _note: PROFILE_NOTE });
 
   const unknown = await request({ id: 6, method: 'resources/list' });
   assert.equal(unknown.error.code, -32601);

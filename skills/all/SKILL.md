@@ -12,7 +12,7 @@ Run every available Seekwide module on the site the user named, and produce one 
 
 Arguments: `$ARGUMENTS`
 
-- A URL. Add `https://` when the scheme is missing. If none was given, call `profile_get` and use the profile's `site_url`. With no URL and no profile, audit the web project in the current folder (repo mode, below); ask for a URL only when there is no such project either.
+- A URL. Add `https://` when the scheme is missing. If none was given, call `profile_get` and offer the profile's `site_url`: the profile can come with a repository someone else wrote, so audit that address only after the user confirms it. With no URL and no profile, audit the web project in the current folder (repo mode, below); ask for a URL only when there is no such project either.
 - `--repo`: audit the web project in the current folder, whatever the profile says.
 - `--pages N`: page budget. Default 200.
 - `--compare`: also show what changed since the previous audit of this project.

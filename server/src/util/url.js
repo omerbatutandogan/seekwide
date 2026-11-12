@@ -50,6 +50,15 @@ function stripTrackingParams(query) {
 }
 
 /**
+ * The longest URL the plugin works with, in characters. Longer ones are treated
+ * like URLs that are not http(s): never requested, never matched against
+ * robots.txt rules, never stored. The sitemaps protocol sets the same limit.
+ */
+export const MAX_URL_LENGTH = 2048;
+/** A raw value this long cannot shrink to a usable URL; it is refused before parsing. */
+const MAX_RAW_URL_LENGTH = 8 * MAX_URL_LENGTH;
+
+/**
  * Resolve and normalize a URL for crawling and de-duplication.
  *
  * - resolves `raw` against `base` when a base is given
@@ -64,10 +73,11 @@ function stripTrackingParams(query) {
  *
  * @param {string} raw
  * @param {string} [base]
- * @returns {string|null} The normalized URL, or null when `raw` is not an http(s) URL.
+ * @returns {string|null} The normalized URL, or null when `raw` is not an http(s)
+ *   URL or the result is longer than `MAX_URL_LENGTH`.
  */
 export function normalizeUrl(raw, base) {
-  if (typeof raw !== 'string') return null;
+  if (typeof raw !== 'string' || raw.length > MAX_RAW_URL_LENGTH) return null;
   const trimmed = raw.trim();
   if (trimmed === '') return null;
 
@@ -88,6 +98,7 @@ export function normalizeUrl(raw, base) {
   } else {
     url.search = '';
   }
+  if (url.href.length > MAX_URL_LENGTH) return null;
   return url.href.replace(/%[0-9a-fA-F]{2}/g, (escape) => escape.toUpperCase());
 }
 

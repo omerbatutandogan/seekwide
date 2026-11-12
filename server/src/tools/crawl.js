@@ -11,6 +11,8 @@ import { normalizeUrl } from '../util/url.js';
 import { JOB_ID_SCHEMA, UNTRUSTED_NOTE, checkId, countBy } from './common.js';
 
 const MAX_WAIT_SECONDS = 25;
+/** How much of a failed crawl's error is returned; it can quote an address the site chose. */
+const ERROR_SHOWN = 500;
 
 /**
  * The stored result of a crawl that has finished (`done` or `blocked`).
@@ -195,7 +197,8 @@ export function crawlTools(deps) {
           });
         } catch (error) {
           if (error instanceof TypeError) {
-            throw new ToolError(`The crawl could not start: ${error.message} Check the arguments and call crawl_start again.`);
+            const advice = /** @type {{busy?: boolean}} */ (error).busy ? '' : ' Check the arguments and call crawl_start again.';
+            throw new ToolError(`The crawl could not start: ${error.message}${advice}`);
           }
           throw error;
         }
@@ -227,9 +230,11 @@ export function crawlTools(deps) {
           if (!crawl) throw new ToolError(`No crawl job "${jobId}" was found. Call crawl_start to start a crawl and use the job_id it returns.`);
           job = jobFromResult(crawl);
         }
-        if (job.status !== 'done' && job.status !== 'blocked') return job;
+        // A failed job's error and a block can name addresses the site chose, so the answer is clipped and labeled.
+        const shown = { ...job, ...(typeof job.error === 'string' ? { error: clip(job.error, ERROR_SHOWN) } : {}), _note: UNTRUSTED_NOTE };
+        if (job.status !== 'done' && job.status !== 'blocked') return shown;
         crawl ??= await manager.result(jobId);
-        return crawl ? { ...job, summary: summarize(crawl) } : job;
+        return crawl ? { ...shown, summary: summarize(crawl) } : shown;
       },
     },
     {

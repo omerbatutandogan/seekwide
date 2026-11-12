@@ -9,8 +9,14 @@ import { scanSitemap } from './sitemap-scan.js';
 
 /** @import { FetchResult, SitemapFile, SitemapSummary } from '../types.js' */
 
-/** The sitemap protocol caps an uncompressed file at 50 MB. */
+/**
+ * The sitemap protocol caps an uncompressed file at 50 MB; a compressed file
+ * that unpacks to more is not read. Unpacking costs that much memory at most;
+ * the scanner's limits on nesting and on `loc` values keep the rest bounded.
+ */
 const MAX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024;
+/** At most this many sitemap files are listed in the summary, read or not; an index can name thousands. */
+const MAX_LISTED_FILES = 100;
 const ACCEPT = 'application/xml,text/xml;q=0.9,*/*;q=0.5';
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 const EXTERNAL_ERROR = 'On another host; not read';
@@ -34,8 +40,9 @@ function bodyText(body) {
   if (data.length >= 2 && data[0] === 0x1f && data[1] === 0x8b) {
     try {
       data = zlib.gunzipSync(data, { maxOutputLength: MAX_UNCOMPRESSED_BYTES });
-    } catch {
-      return { error: 'gzip data could not be decompressed' };
+    } catch (error) {
+      if (/** @type {NodeJS.ErrnoException} */ (error).code !== 'ERR_BUFFER_TOO_LARGE') return { error: 'gzip data could not be decompressed' };
+      return { error: `the file unpacks to more than ${MAX_UNCOMPRESSED_BYTES / (1024 * 1024)} MB` };
     }
   }
   return { text: data.toString('utf8').replace(/^﻿/, '') };
@@ -131,10 +138,16 @@ export async function loadSitemaps(sitemapUrls, options = {}) {
     }
   }
 
-  while (queue.length > 0) {
-    const url = /** @type {string} */ (queue[0]);
+  // An index into the queue instead of shift(): an index can name tens of thousands of files.
+  let next = 0;
+  while (next < queue.length) {
+    const url = /** @type {string} */ (queue[next]);
+    if (summary.files.length >= MAX_LISTED_FILES) {
+      summary.truncated = true;
+      break;
+    }
     if (!onSite(url)) {
-      queue.shift();
+      next += 1;
       summary.files.push({ url, status: 0, type: 'external', count: 0, error: EXTERNAL_ERROR });
       continue;
     }
@@ -142,7 +155,7 @@ export async function loadSitemaps(sitemapUrls, options = {}) {
       summary.truncated = true;
       break;
     }
-    queue.shift();
+    next += 1;
     const isGuess = probe && read === 0;
     /** @type {SitemapFile} */
     const file = { url, status: 0, type: 'unreachable', count: 0, error: null };

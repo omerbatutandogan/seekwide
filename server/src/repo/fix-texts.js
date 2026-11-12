@@ -1,6 +1,8 @@
 // The wording of fix instructions. Fixed text written by the plugin. The only
-// values put into it are the deployed origin and file names of the project;
-// nothing a page sent, not even the path of its URL, is ever part of it.
+// values put into it are the deployed origin and line numbers the plugin
+// counted itself. File names are not part of it: they are named by the fields
+// of the fix (file, create, edit), because a repository chooses its own file
+// names. Nothing a page sent, not even the path of its URL, is ever part of it.
 
 /**
  * @typedef {Object} FixTextInput
@@ -18,8 +20,11 @@ const NEED_SITE_URL = 'The deployed address of the site is not known: ask the us
 const SUGGESTION = 'The wording is yours to propose: label it as a suggestion and base it on what the page is about, which you learn by reading this file.';
 const CLIENT_COMPONENT = 'If the file starts with "use client" it cannot export metadata: put the metadata in a layout file in the same folder instead, creating one that only returns its children if there is none.';
 
-/** @param {number|null} line */
-const headAt = (line) => (line === null ? 'inside <head>' : `inside <head> (line ${line})`);
+/**
+ * @param {number|null} line
+ * @returns {string}
+ */
+const headAt = (line) => (Number.isSafeInteger(line) && /** @type {number} */ (line) > 0 ? `inside <head> (line ${line})` : 'inside <head>');
 
 /**
  * How to make a metadata fix in a Next.js App Router page file.
@@ -76,7 +81,8 @@ export function htmlHow({ type, action, line, missing, canonical, siteUrl }) {
       return `The file has more than one ${tag}. Keep one ${headAt(null)} and remove the others. When they differ, ask the user which one to keep.`;
     }
     if (action === 'make_unique') {
-      return `This page has the same ${type === 'title' ? 'title' : 'meta description'} as the pages under shares_with. Change the ${tag} element${line === null ? '' : ` on line ${line}`} to one of its own. ${SUGGESTION}`;
+      const onLine = Number.isSafeInteger(line) && /** @type {number} */ (line) > 0 ? ` on line ${line}` : '';
+      return `This page has the same ${type === 'title' ? 'title' : 'meta description'} as the pages under shares_with. Change the ${tag} element${onLine} to one of its own. ${SUGGESTION}`;
     }
     return `The file has no ${tag} with text. Add one ${headAt(line)}${type === 'title' ? '' : ', as <meta name="description" content="…">'}. ${SUGGESTION}`;
   }
@@ -98,26 +104,27 @@ export function htmlHow({ type, action, line, missing, canonical, siteUrl }) {
 }
 
 /**
- * How to add a sitemap and name it in robots.txt.
- * @param {{next: boolean, sitemapFile: string, robotsFile: string|null, newRobots: string, siteUrl: string|null}} input
+ * How to add a sitemap and name it in robots.txt. The files are named by the
+ * fix's `create` and `edit` entries, not here.
+ * @param {{next: boolean, hasRobots: boolean, siteUrl: string|null}} input
  * @returns {string}
  */
-export function sitemapHow({ next, sitemapFile, robotsFile, newRobots, siteUrl }) {
+export function sitemapHow({ next, hasRobots, siteUrl }) {
   const site = siteUrl ?? 'https://<deployed host>';
   const need = siteUrl === null ? ` ${NEED_SITE_URL}` : '';
   if (next) {
     return [
-      `Create ${sitemapFile}: a file whose default export is a function that returns an array of { url } objects, one per page, each with the full deployed address (${site} plus the path). Next.js serves it at /sitemap.xml.`,
+      `Create the first file under create: a file whose default export is a function that returns an array of { url } objects, one per page, each with the full deployed address (${site} plus the path). Next.js serves it at /sitemap.xml.`,
       'List the pages under sitemap_paths. A route under dynamic_routes has addresses the file names do not show: take them from the data the route itself uses, or ask the user; never make addresses up.',
-      robotsFile === null
-        ? `The project has no robots file. Create ${newRobots}: its default export returns { rules: [{ userAgent: '*', allow: '/' }], sitemap: '${site}/sitemap.xml' }.`
-        : `Then name the sitemap in ${robotsFile}: sitemap: '${site}/sitemap.xml' in a robots.js or robots.ts file, or a line "Sitemap: ${site}/sitemap.xml" in a robots.txt file. Keep the rules that are there.`,
+      hasRobots
+        ? `Then name the sitemap in the file under edit: sitemap: '${site}/sitemap.xml' in a robots.js or robots.ts file, or a line "Sitemap: ${site}/sitemap.xml" in a robots.txt file. Keep the rules that are there.`
+        : `The project has no robots file. Create the second file under create: its default export returns { rules: [{ userAgent: '*', allow: '/' }], sitemap: '${site}/sitemap.xml' }.`,
     ].join(' ') + need;
   }
   return [
-    `Create ${sitemapFile}: an XML <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"> with one <url><loc>…</loc></url> per page under sitemap_paths, each <loc> the full deployed address (${site} plus the path).`,
-    robotsFile === null
-      ? `The project has no robots.txt. Create ${newRobots} with "User-agent: *", "Allow: /" and the line "Sitemap: ${site}/sitemap.xml".`
-      : `Then add the line "Sitemap: ${site}/sitemap.xml" to ${robotsFile}, keeping the rules that are there.`,
+    `Create the first file under create: an XML <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"> with one <url><loc>…</loc></url> per page under sitemap_paths, each <loc> the full deployed address (${site} plus the path).`,
+    hasRobots
+      ? `Then add the line "Sitemap: ${site}/sitemap.xml" to the file under edit, keeping the rules that are there.`
+      : `The project has no robots.txt. Create the second file under create with "User-agent: *", "Allow: /" and the line "Sitemap: ${site}/sitemap.xml".`,
   ].join(' ') + need;
 }
