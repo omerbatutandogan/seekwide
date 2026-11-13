@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { buildContext, runChecks } from '../../../server/src/checks/engine.js';
-import { checks } from '../../../server/src/checks/media/index.js';
-import { selectImageFiles } from '../../../server/src/checks/media/select.js';
+import { buildContext, runChecks } from '../../../plugin/server/src/checks/engine.js';
+import { checks } from '../../../plugin/server/src/checks/media/index.js';
+import { selectImageFiles } from '../../../plugin/server/src/checks/media/select.js';
 import { SITE, makeCrawl } from '../../helpers/factories.js';
 import { NOW, imageFile, mediaImage, mediaPage } from './support.js';
 

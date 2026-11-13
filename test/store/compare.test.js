@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { compareRuns } from '../../server/src/store/compare.js';
+import { compareRuns } from '../../plugin/server/src/store/compare.js';
 import { makeCheckStat, makeFinding, makeRun } from '../helpers/run-factory.js';
 
 const a = makeFinding({ url: 'https://example.test/a' });

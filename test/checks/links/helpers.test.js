@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { distinctInternalTargets, hrefSelector, linkSelector } from '../../../server/src/checks/links/helpers.js';
+import { distinctInternalTargets, hrefSelector, linkSelector } from '../../../plugin/server/src/checks/links/helpers.js';
 import { SITE, makeLink, makePage } from '../../helpers/factories.js';
 
 test('hrefSelector wraps the raw href and leaves ordinary characters alone', () => {

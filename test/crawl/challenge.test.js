@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { isBotChallenge, retryAfterMs } from '../../server/src/crawl/challenge.js';
+import { isBotChallenge, retryAfterMs } from '../../plugin/server/src/crawl/challenge.js';
 import { fetchResult } from '../net/fake-fetch.js';
 
 const URL_ = 'https://site.test/';

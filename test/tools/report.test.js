@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { ToolError } from '../../server/src/mcp/stdio.js';
-import { createTools } from '../../server/src/tools/index.js';
-import { LOGO_MAX_BYTES, detectImageType, hasSvgRoot } from '../../server/src/tools/logo.js';
+import { ToolError } from '../../plugin/server/src/mcp/stdio.js';
+import { createTools } from '../../plugin/server/src/tools/index.js';
+import { LOGO_MAX_BYTES, detectImageType, hasSvgRoot } from '../../plugin/server/src/tools/logo.js';
 import { makeDeps, toolNamed } from './fakes.js';
 
-/** @import { Run } from '../../server/src/types.js' */
+/** @import { Run } from '../../plugin/server/src/types.js' */
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]);
 const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 16]);

@@ -1,14 +1,14 @@
 import path from 'node:path';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { ToolError } from '../../server/src/mcp/stdio.js';
-import { createTools } from '../../server/src/tools/index.js';
-import { topGroups } from '../../server/src/tools/audit-summary.js';
-import { BLOCKED_SCORE_NOTE, externalLinkUrls } from '../../server/src/tools/audit.js';
-import { deployedNotes, namedOrigin } from '../../server/src/tools/audit-deployed.js';
-import { VITALS_FAILED, VITALS_NOT_ASKED } from '../../server/src/tools/audit-vitals.js';
-import { UNTRUSTED_NOTE } from '../../server/src/tools/common.js';
-import { LIMITS, RULES_VERSION, VERSION } from '../../server/src/config.js';
+import { ToolError } from '../../plugin/server/src/mcp/stdio.js';
+import { createTools } from '../../plugin/server/src/tools/index.js';
+import { topGroups } from '../../plugin/server/src/tools/audit-summary.js';
+import { BLOCKED_SCORE_NOTE, externalLinkUrls } from '../../plugin/server/src/tools/audit.js';
+import { deployedNotes, namedOrigin } from '../../plugin/server/src/tools/audit-deployed.js';
+import { VITALS_FAILED, VITALS_NOT_ASKED } from '../../plugin/server/src/tools/audit-vitals.js';
+import { UNTRUSTED_NOTE } from '../../plugin/server/src/tools/common.js';
+import { LIMITS, RULES_VERSION, VERSION } from '../../plugin/server/src/config.js';
 import { makeCrawl, makeField, makeLab, makeLink, makePage, makeRedirect, makeVitals } from '../helpers/factories.js';
 import { NOW, PROJECT, jobFor, makeCheck, makeDeps, sampleCrawl, toolNamed } from './fakes.js';
 

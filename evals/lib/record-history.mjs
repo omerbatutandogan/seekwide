@@ -30,7 +30,9 @@ if (!kept || !name || !/^[a-z0-9-]+$/.test(name)) {
   process.exit(2);
 }
 const evalsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const pluginRoot = path.dirname(evalsDir);
+const repoRoot = path.dirname(evalsDir);
+// The plugin under test is the plugin/ folder, next to evals/.
+const pluginRoot = path.join(repoRoot, 'plugin');
 const root = path.resolve(kept);
 const projects = path.join(root, 'config', 'projects');
 const folder = readdirSync(projects).find((entry) => entry.endsWith('-home-cwd'));
@@ -73,4 +75,4 @@ if (text.includes(home) || new RegExp(`\\b${user}\\b`).test(text)) {
 }
 const target = path.join(evalsDir, 'fixtures', 'recorded', `${name}.jsonl`);
 writeFileSync(target, text);
-console.log(`Wrote ${path.relative(pluginRoot, target)}: ${remaining.length} of ${entries.length} entries, ${Buffer.byteLength(text)} bytes.`);
+console.log(`Wrote ${path.relative(repoRoot, target)}: ${remaining.length} of ${entries.length} entries, ${Buffer.byteLength(text)} bytes.`);

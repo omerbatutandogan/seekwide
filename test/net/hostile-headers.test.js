@@ -3,9 +3,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { parseLinkHeaders } from '../../server/src/extract/headers.js';
-import { mdText } from '../../server/src/report/escape.js';
-import { safeFetch } from '../../server/src/net/safe-fetch.js';
+import { parseLinkHeaders } from '../../plugin/server/src/extract/headers.js';
+import { mdText } from '../../plugin/server/src/report/escape.js';
+import { safeFetch } from '../../plugin/server/src/net/safe-fetch.js';
 import { startServer } from '../helpers/http-server.js';
 
 /** CPU time of this process in milliseconds; a busy machine does not change it. */

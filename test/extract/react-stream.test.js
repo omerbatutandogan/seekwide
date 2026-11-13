@@ -9,7 +9,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { extractHtml } from '../../server/src/extract/html.js';
+import { extractHtml } from '../../plugin/server/src/extract/html.js';
 
 /** React's boundary-completion function, abridged to an empty body. */
 const RUNTIME = '$RC=function(a,b){}';

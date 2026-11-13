@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { MAX_PROBLEMS, validate } from '../../server/src/mcp/schema.js';
+import { MAX_PROBLEMS, validate } from '../../plugin/server/src/mcp/schema.js';
 
 const SCHEMA = {
   type: 'object',

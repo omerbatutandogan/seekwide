@@ -1,15 +1,15 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 
-import { LIMITS } from '../../server/src/config.js';
-import { queryCrux } from '../../server/src/vitals/crux.js';
-import { measureVitals, unavailableVitals } from '../../server/src/vitals/measure.js';
-import { runPagespeed } from '../../server/src/vitals/psi.js';
+import { LIMITS } from '../../plugin/server/src/config.js';
+import { queryCrux } from '../../plugin/server/src/vitals/crux.js';
+import { measureVitals, unavailableVitals } from '../../plugin/server/src/vitals/measure.js';
+import { runPagespeed } from '../../plugin/server/src/vitals/psi.js';
 import { SITE, makeCrawl, makeField, makeLab, makePage } from '../helpers/factories.js';
 import { INVALID_KEY, KEYLESS_PSI, NO_CRUX_DATA, cruxAnswer, psiAnswer, startGoogle } from '../helpers/google-api.js';
 
-/** @import { ApiFailure } from '../../server/src/vitals/google-api.js' */
-/** @import { CrawlResult, FieldRecord, LabMetrics } from '../../server/src/types.js' */
+/** @import { ApiFailure } from '../../plugin/server/src/vitals/google-api.js' */
+/** @import { CrawlResult, FieldRecord, LabMetrics } from '../../plugin/server/src/types.js' */
 
 const KEY = 'AIzaTestKey-123_abc';
 const NO_KEY = 'No Google API key is set, and the Chrome UX Report API requires one. Add a key in the plugin settings to collect field data.';

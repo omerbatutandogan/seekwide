@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-export const ENTRY = fileURLToPath(new URL('../../server/src/index.js', import.meta.url));
+export const ENTRY = fileURLToPath(new URL('../../plugin/server/src/index.js', import.meta.url));
 
 /** Longest wait for one answer; crawl_status may itself wait 25 seconds. */
 export const REQUEST_TIMEOUT_MS = 60_000;

@@ -8,12 +8,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { extractPage } from '../../server/src/extract/page.js';
-import { SHARE_ENDPOINTS, SHARE_SERVICES, isShareLink } from '../../server/src/extract/share-links.js';
-import { siteIdentity } from '../../server/src/util/site-identity.js';
+import { extractPage } from '../../plugin/server/src/extract/page.js';
+import { SHARE_ENDPOINTS, SHARE_SERVICES, isShareLink } from '../../plugin/server/src/extract/share-links.js';
+import { siteIdentity } from '../../plugin/server/src/util/site-identity.js';
 import { makeFetch, makeInput } from './fetch-result.js';
 
-/** @import { PageSecurity } from '../../server/src/types.js' */
+/** @import { PageSecurity } from '../../plugin/server/src/types.js' */
 
 const PAGE = encodeURIComponent('https://example.test/page');
 /** A share link of each endpoint, in the form its share button writes, for the page https://example.test/page. */

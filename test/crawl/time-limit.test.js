@@ -4,11 +4,11 @@
 import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
 
-import { LIMITS } from '../../server/src/config.js';
-import { buildContext, runChecks } from '../../server/src/checks/engine.js';
-import { allChecks } from '../../server/src/checks/registry.js';
-import { runNotes } from '../../server/src/tools/audit-summary.js';
-import { factualSummary } from '../../server/src/report/facts.js';
+import { LIMITS } from '../../plugin/server/src/config.js';
+import { buildContext, runChecks } from '../../plugin/server/src/checks/engine.js';
+import { allChecks } from '../../plugin/server/src/checks/registry.js';
+import { runNotes } from '../../plugin/server/src/tools/audit-summary.js';
+import { factualSummary } from '../../plugin/server/src/report/facts.js';
 import { fakeFetch } from '../net/fake-fetch.js';
 import { makeCrawl } from '../helpers/factories.js';
 import { NOW, crawl, html, removeTempDirs } from './harness.js';

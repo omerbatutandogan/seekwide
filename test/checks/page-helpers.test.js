@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { effectiveCanonicalUrls, firstNonEmpty, isNoindex, isRedirectRecord, isUnverifiable } from '../../server/src/checks/page-helpers.js';
+import { effectiveCanonicalUrls, firstNonEmpty, isNoindex, isRedirectRecord, isUnverifiable } from '../../plugin/server/src/checks/page-helpers.js';
 import { SITE, makePage, makeRedirect } from '../helpers/factories.js';
 
 test('isNoindex reads both the meta and the header reason', () => {

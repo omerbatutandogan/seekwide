@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { createToolDeps } from '../server/src/deps.js';
-import { measureVitals } from '../server/src/vitals/measure.js';
+import { createToolDeps } from '../plugin/server/src/deps.js';
+import { measureVitals } from '../plugin/server/src/vitals/measure.js';
 import { SITE, makeCrawl, makePage, makeVitals } from './helpers/factories.js';
 
 const KEY = 'fake-DepsTestKey-0123456789_abcdefghij';

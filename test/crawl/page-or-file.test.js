@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
 
-import { asksFirst } from '../../server/src/crawl/chain.js';
+import { asksFirst } from '../../plugin/server/src/crawl/chain.js';
 import { startServer } from '../helpers/http-server.js';
 import { crawl, html, removeTempDirs } from './harness.js';
 

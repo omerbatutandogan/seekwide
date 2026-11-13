@@ -5,9 +5,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { compileGroup, compileRule, decidingRule, ruleMatches } from '../../server/src/net/robots-match.js';
-import { groupFor, parseRobotsTxt } from '../../server/src/net/robots-parse.js';
-import { loadRobots } from '../../server/src/net/robots.js';
+import { compileGroup, compileRule, decidingRule, ruleMatches } from '../../plugin/server/src/net/robots-match.js';
+import { groupFor, parseRobotsTxt } from '../../plugin/server/src/net/robots-parse.js';
+import { loadRobots } from '../../plugin/server/src/net/robots.js';
 import { fakeFetch } from './fake-fetch.js';
 
 const ORIGIN = 'https://site.test';

@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { extractPage } from '../../server/src/extract/page.js';
-import { MAX_EMBEDS, MAX_HIDDEN_HOSTS, MAX_TRACKED_HOSTS, MAX_VISIBLE_HOSTS } from '../../server/src/extract/security.js';
-import { LIMITS } from '../../server/src/config.js';
+import { extractPage } from '../../plugin/server/src/extract/page.js';
+import { MAX_EMBEDS, MAX_HIDDEN_HOSTS, MAX_TRACKED_HOSTS, MAX_VISIBLE_HOSTS } from '../../plugin/server/src/extract/security.js';
+import { LIMITS } from '../../plugin/server/src/config.js';
 import { makeFetch, makeInput } from './fetch-result.js';
 
-/** @import { PageSecurity } from '../../server/src/types.js' */
+/** @import { PageSecurity } from '../../plugin/server/src/types.js' */
 
 /** CPU time this process has used, in milliseconds. */
 const cpuMs = () => {
@@ -16,7 +16,7 @@ const cpuMs = () => {
 
 /**
  * @param {string} html
- * @param {Partial<import('../../server/src/types.js').FetchResult>} [result]
+ * @param {Partial<import('../../plugin/server/src/types.js').FetchResult>} [result]
  */
 function page(html, result = {}) {
   return extractPage(makeInput(makeFetch({ html, ...result })));

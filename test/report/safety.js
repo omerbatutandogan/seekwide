@@ -3,7 +3,7 @@
 
 import assert from 'node:assert/strict';
 
-import { compareRuns } from '../../server/src/store/compare.js';
+import { compareRuns } from '../../plugin/server/src/store/compare.js';
 import { makeFinding, makeRun } from '../helpers/run-factory.js';
 
 /** Strings copied from a hostile web page. */

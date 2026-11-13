@@ -6,11 +6,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { createCrawlManager } from '../../server/src/crawl/manager.js';
-import { listFiles } from '../../server/src/repo/scan.js';
+import { createCrawlManager } from '../../plugin/server/src/crawl/manager.js';
+import { listFiles } from '../../plugin/server/src/repo/scan.js';
 import { startServer } from './http-server.js';
 
-/** @import { CrawlResult } from '../../server/src/types.js' */
+/** @import { CrawlResult } from '../../plugin/server/src/types.js' */
 /** @import { Route } from './http-server.js' */
 
 const FIXTURES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'fixtures');

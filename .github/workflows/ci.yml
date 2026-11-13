@@ -30,9 +30,13 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: npm
+          cache-dependency-path: plugin/package-lock.json
 
-      # The runtime dependency needs no install scripts, so none are run.
+      # The runtime dependency needs no install scripts, so none are run. Only
+      # plugin/ ships, so its dependencies are installed there; the repository
+      # root has none.
       - name: Install dependencies
+        working-directory: plugin
         run: npm ci --ignore-scripts
 
       - name: Run tests
@@ -50,19 +54,22 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: plugin/package-lock.json
 
       - name: Install dependencies
+        working-directory: plugin
         run: npm ci --ignore-scripts
 
       # Any known vulnerability fails the build, whatever its level, as SECURITY.md says.
       - name: Check dependencies for known vulnerabilities
+        working-directory: plugin
         run: npm audit --omit=dev
 
-      # TypeScript is a development tool only, so it is installed here and not
-      # listed in package.json: Claude Code installs the plugin's dependencies
-      # on every user's machine. Exact versions, so a new release cannot change
-      # what CI runs. scripts/check.js (npm run check) pins the same versions and
-      # fails when the two differ.
+      # TypeScript is a development tool only, so it is installed here, in the
+      # repository root, and not listed in a package.json: Claude Code installs
+      # the plugin's dependencies on every user's machine. Exact versions, so a
+      # new release cannot change what CI runs. scripts/check.js (npm run check)
+      # pins the same versions and fails when the two differ.
       - name: Type-check
         run: |
           npm install --no-save --ignore-scripts typescript@7.0.2 @types/node@22.20.5
@@ -89,5 +96,8 @@ jobs:
       - name: Install Claude Code
         run: npm install --global @anthropic-ai/claude-code@2.1.322
 
+      - name: Validate the marketplace
+        run: claude plugin validate . --strict
+
       - name: Validate the plugin manifest and skills
-        run: claude plugin validate . --strict --profile directory
+        run: claude plugin validate plugin --strict --profile directory

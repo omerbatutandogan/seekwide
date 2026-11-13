@@ -2,9 +2,10 @@
 # Install what the /seekwide:fix cases need: Next.js and its dependencies for
 # fixtures/next-ts, in a cache folder outside the repository, so that no
 # node_modules folder lands in it. The scaffolds copy that folder into each
-# workspace. Run it once before `claude plugin eval . --scaffold`. The
-# dependency tree is the one fixtures/next-ts/package-lock.json pins, installed
-# with `npm ci` and no install scripts.
+# workspace. Run it once before `claude plugin eval plugin --scaffold`, with
+# evals/ linked into plugin/ (evals/README.md). The dependency tree is the one
+# fixtures/next-ts/package-lock.json pins, installed with `npm ci` and no
+# install scripts.
 #
 # Usage: evals/setup.sh            (cache in ${XDG_CACHE_HOME:-~/.cache}/seekwide-evals)
 #        SEEKWIDE_EVAL_CACHE=/path evals/setup.sh

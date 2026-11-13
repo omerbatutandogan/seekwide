@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
 
-import { LIMITS } from '../../server/src/config.js';
+import { LIMITS } from '../../plugin/server/src/config.js';
 import { startServer } from '../helpers/http-server.js';
 import { crawl, html, removeTempDirs } from './harness.js';
 
-/** @import { PageRecord } from '../../server/src/types.js' */
+/** @import { PageRecord } from '../../plugin/server/src/types.js' */
 
 after(removeTempDirs);
 
@@ -30,7 +30,7 @@ test('every page is requested without automatic redirects and each hop is paced'
   await withSite({ '/': html(['/a']), '/a': { status: 301, redirect: '/b' }, '/b': { status: 302, redirect: '/c' }, '/c': html([]) }, async (origin, server) => {
     /** @type {any[]} */
     const options = [];
-    const { safeFetch } = await import('../../server/src/net/safe-fetch.js');
+    const { safeFetch } = await import('../../plugin/server/src/net/safe-fetch.js');
     /** @type {typeof safeFetch} */
     const fetch = async (url, opts) => {
       options.push({ url, maxRedirects: opts?.maxRedirects });
@@ -288,7 +288,7 @@ function fileRoute(headStatus, getStatus) {
 
 test('when a HEAD for a file is refused, one GET limited to 16 KB gives the real answer', async () => {
   await withSite({ '/': html(['/get']), '/get': { status: 302, redirect: '/files/doc.pdf' }, '/files/doc.pdf': fileRoute(405, 200) }, async (origin, server) => {
-    const { safeFetch } = await import('../../server/src/net/safe-fetch.js');
+    const { safeFetch } = await import('../../plugin/server/src/net/safe-fetch.js');
     /** @type {{url: string, method: string|undefined, maxBytes: number|undefined}[]} */
     const seen = [];
     /** @type {typeof safeFetch} */

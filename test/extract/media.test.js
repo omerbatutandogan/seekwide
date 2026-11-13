@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { LIMITS } from '../../server/src/config.js';
-import { MAX_IMAGES } from '../../server/src/extract/html-elements.js';
-import { MAX_VIDEOS, MAX_VIDEO_EMBEDS, srcsetUrls, styleDeclarations, videoPlatform } from '../../server/src/extract/media.js';
-import { extractPage } from '../../server/src/extract/page.js';
+import { LIMITS } from '../../plugin/server/src/config.js';
+import { MAX_IMAGES } from '../../plugin/server/src/extract/html-elements.js';
+import { MAX_VIDEOS, MAX_VIDEO_EMBEDS, srcsetUrls, styleDeclarations, videoPlatform } from '../../plugin/server/src/extract/media.js';
+import { extractPage } from '../../plugin/server/src/extract/page.js';
 import { makeFetch, makeInput } from './fetch-result.js';
 
-/** @import { ImageRecord, PageRecord } from '../../server/src/types.js' */
+/** @import { ImageRecord, PageRecord } from '../../plugin/server/src/types.js' */
 
 /** CPU time this process has used, in milliseconds. */
 const cpuMs = () => {

@@ -7,16 +7,16 @@ import os from 'node:os';
 import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { buildContext, runChecks } from '../../server/src/checks/engine.js';
-import { allChecks } from '../../server/src/checks/registry.js';
-import { plainPath } from '../../server/src/repo/fix-common.js';
-import { FIXABLE_CHECKS, planFixes } from '../../server/src/repo/fixes.js';
-import { attachSources, loadProjectSources } from '../../server/src/repo/sources.js';
+import { buildContext, runChecks } from '../../plugin/server/src/checks/engine.js';
+import { allChecks } from '../../plugin/server/src/checks/registry.js';
+import { plainPath } from '../../plugin/server/src/repo/fix-common.js';
+import { FIXABLE_CHECKS, planFixes } from '../../plugin/server/src/repo/fixes.js';
+import { attachSources, loadProjectSources } from '../../plugin/server/src/repo/sources.js';
 import { makeCrawl, makePage } from '../helpers/factories.js';
 import { HTML_FIXTURE, NEXT_FIXTURE, crawlLocal, makeTree, startServer, staticRoutes } from '../helpers/repo.js';
 import { makeFinding, makeRun } from '../helpers/run-factory.js';
 
-/** @import { Finding } from '../../server/src/types.js' */
+/** @import { Finding } from '../../plugin/server/src/types.js' */
 
 const LOCAL = 'http://localhost:3000';
 const SITE = 'https://www.example.com';

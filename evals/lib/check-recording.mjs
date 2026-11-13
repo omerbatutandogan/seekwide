@@ -16,7 +16,8 @@ if (!name || !/^[a-z0-9-]+$/.test(name)) {
   process.exit(2);
 }
 const evalsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const pluginRoot = path.dirname(evalsDir);
+// The plugin under test is the plugin/ folder, next to evals/.
+const pluginRoot = path.join(path.dirname(evalsDir), 'plugin');
 const PLACEHOLDER = '__PLUGIN_ROOT__';
 
 /** @type {Record<string, any>[]} */

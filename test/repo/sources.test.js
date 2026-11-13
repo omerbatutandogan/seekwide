@@ -6,13 +6,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { buildContext, runChecks } from '../../server/src/checks/engine.js';
-import { allChecks } from '../../server/src/checks/registry.js';
-import { attachSources, loadProjectSources } from '../../server/src/repo/sources.js';
-import { RepoError } from '../../server/src/repo/scan.js';
+import { buildContext, runChecks } from '../../plugin/server/src/checks/engine.js';
+import { allChecks } from '../../plugin/server/src/checks/registry.js';
+import { attachSources, loadProjectSources } from '../../plugin/server/src/repo/sources.js';
+import { RepoError } from '../../plugin/server/src/repo/scan.js';
 import { HTML_FIXTURE, NEXT_FIXTURE, crawlLocal, makeTree, startServer, staticRoutes } from '../helpers/repo.js';
 
-/** @import { CrawlResult, Finding } from '../../server/src/types.js' */
+/** @import { CrawlResult, Finding } from '../../plugin/server/src/types.js' */
 
 /** @type {string} */
 let dataDir;
@@ -252,7 +252,7 @@ describe('Next.js App Router: the fixture project', () => {
   it('names the metadata file behind a robots.txt finding', async () => {
     const blocked = await startServer(await nextRoutes());
     try {
-      const manager = (await import('../../server/src/crawl/manager.js')).createCrawlManager({ dataDir, sleep: async () => {} });
+      const manager = (await import('../../plugin/server/src/crawl/manager.js')).createCrawlManager({ dataDir, sleep: async () => {} });
       const job = await manager.start({ url: `${blocked.origin}/`, maxPages: 5, allowLoopback: true });
       assert.equal((await manager.wait(job.id, 30_000))?.status, 'blocked');
       const crawl = /** @type {CrawlResult} */ (await manager.result(job.id));

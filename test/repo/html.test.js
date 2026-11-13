@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { extractPage } from '../../server/src/extract/page.js';
-import { anchorLine, htmlAnchors, sameDocument, sourceLine } from '../../server/src/repo/html-lines.js';
-import { isHtmlFile, matchHtmlFile } from '../../server/src/repo/html-routes.js';
+import { extractPage } from '../../plugin/server/src/extract/page.js';
+import { anchorLine, htmlAnchors, sameDocument, sourceLine } from '../../plugin/server/src/repo/html-lines.js';
+import { isHtmlFile, matchHtmlFile } from '../../plugin/server/src/repo/html-routes.js';
 
 const FILES = new Set(['index.html', 'about.html', 'contact/index.html', 'old.htm', 'docs/index.htm', 'robots.txt', 'notes', 'a b.html', 'blog/post.html']);
 /** @param {string} pathname */

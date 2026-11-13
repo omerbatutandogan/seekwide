@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { parseJsonLd } from '../../server/src/extract/jsonld.js';
+import { parseJsonLd } from '../../plugin/server/src/extract/jsonld.js';
 
 /** @param {unknown} data */
 const videos = (data) => parseJsonLd(JSON.stringify(data), 1).videos;

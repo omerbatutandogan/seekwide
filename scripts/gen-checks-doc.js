@@ -10,8 +10,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { allChecks } from '../server/src/checks/registry.js';
-import { RULES_VERSION } from '../server/src/config.js';
+import { allChecks } from '../plugin/server/src/checks/registry.js';
+import { RULES_VERSION } from '../plugin/server/src/config.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TARGET = path.join(ROOT, 'docs', 'checks.md');

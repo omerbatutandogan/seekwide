@@ -36,7 +36,7 @@ claude plugin marketplace add omerbatutandogan/seekwide
 claude plugin install seekwide@seekwide
 ```
 
-Claude Code clones the repository, copies the plugin into its own cache and installs the two dependencies there itself, from `package-lock.json`: the exact versions it pins, with npm from your `PATH` and without running any package's install scripts. Start a new Claude Code session, then audit a site:
+Claude Code clones the repository, copies only the plugin folder, [`plugin/`](plugin), into its own cache and installs the two dependencies there itself, from [`plugin/package-lock.json`](plugin/package-lock.json): the exact versions it pins, with npm from your `PATH` and without running any package's install scripts. Start a new Claude Code session, then audit a site:
 
 ```
 /seekwide:basic https://www.your-site.com
@@ -46,19 +46,19 @@ The agency name, the logo and the Google API key for Core Web Vitals are optiona
 
 ### From a local copy
 
-Both ways below load the plugin in place from your copy, and Claude Code does not install packages into a folder it loads in place. So install the plugin's one small dependency (`parse5`) in that folder first, with the exact versions the lockfile pins:
+The plugin is the `plugin/` folder of the repository. With `--plugin-dir`, Claude Code loads it in place and does not install packages into it, so install the plugin's one small dependency (`parse5`) in `plugin/` first, with the exact versions the lockfile pins:
 
 ```bash
-npm ci --ignore-scripts
+npm ci --ignore-scripts --prefix /path/to/seekwide/plugin
 ```
 
-From a local copy, for one session:
+(Or run `npm ci --ignore-scripts` from inside `plugin/`.) From a local copy, for one session:
 
 ```bash
-claude --plugin-dir /path/to/seekwide
+claude --plugin-dir /path/to/seekwide/plugin
 ```
 
-As an installed plugin, using your copy as its own marketplace:
+As an installed plugin, using your copy as its own marketplace (the marketplace is the root of the repository, and its plugin is `plugin/`). Claude Code then copies `plugin/` into its cache and installs the dependency there itself, as it does for the install from GitHub (tried with Claude Code 2.1.322 on 2026-11-13), so this way needs no `npm ci`:
 
 ```bash
 claude plugin marketplace add /path/to/seekwide
@@ -345,8 +345,10 @@ Seekwide will never pretend to be a search engine's crawler to look for cloaking
 
 ## Development
 
+Only [`plugin/`](plugin) is installed on a user's machine: the server, the skills, the references, the manifest and the lockfile. The tests, fixtures, evals, docs and scripts stay at the root of the repository and are not shipped. The runtime dependencies are installed in `plugin/`; the root `package.json` only holds the scripts.
+
 ```bash
-npm ci
+npm ci --ignore-scripts --prefix plugin
 ```
 
 ```bash
@@ -354,14 +356,18 @@ npm test
 ```
 
 ```bash
-claude plugin validate . --strict --profile directory
+claude plugin validate . --strict
+```
+
+```bash
+claude plugin validate plugin --strict --profile directory
 ```
 
 ```bash
 node scripts/check-directory-rules.js
 ```
 
-CI runs the tests on Linux, macOS and Windows with Node.js 22 and 26; the type check, the generated docs, the directory rules and `claude plugin validate` run on Linux.
+`npm run check` runs every check CI runs. CI runs the tests on Linux, macOS and Windows with Node.js 22 and 26; the type check, the generated docs, the directory rules and `claude plugin validate` run on Linux.
 
 The skill flows (asking before a dev server starts, stopping it, showing diffs before a fix, the wording of suggestions, blocked crawls and security findings) are covered by an eval suite under [`evals/`](evals/README.md), run with `claude plugin eval`. It drives a real Claude session, so it costs tokens and is not part of CI.
 
@@ -373,4 +379,4 @@ The sample reports and the pictures in [`docs/images/`](docs/images) come from [
 
 [MIT](LICENSE)
 
-`server/data/public-suffixes.txt` is a compact copy of the [Public Suffix List](https://publicsuffix.org/) and stays under the [Mozilla Public License 2.0](https://mozilla.org/MPL/2.0/), as its header says.
+`plugin/server/data/public-suffixes.txt` is a compact copy of the [Public Suffix List](https://publicsuffix.org/) and stays under the [Mozilla Public License 2.0](https://mozilla.org/MPL/2.0/), as its header says.

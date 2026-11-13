@@ -1,18 +1,18 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { blocksFraming } from '../../../server/src/checks/security/headers.js';
+import { blocksFraming } from '../../../plugin/server/src/checks/security/headers.js';
 import { SITE, makePage, makeSecurity, makeSecurityHeaders } from '../../helpers/factories.js';
 import { audit, findingsFor, statFor } from './support.js';
 
-/** @import { SecurityHeaders } from '../../../server/src/types.js' */
+/** @import { SecurityHeaders } from '../../../plugin/server/src/types.js' */
 
 const IDS = ['security.headers.csp_missing', 'security.headers.framing_missing', 'security.headers.hsts_missing', 'security.headers.nosniff_missing', 'security.headers.referrer_leaky'];
 
 /**
  * Audit a site whose start page sends these headers.
  * @param {Partial<SecurityHeaders>} headers
- * @param {Partial<import('../../../server/src/types.js').CrawlResult>} [crawl]
+ * @param {Partial<import('../../../plugin/server/src/types.js').CrawlResult>} [crawl]
  */
 const withHeaders = (headers, crawl = {}) => audit([
   makePage({ url: `${SITE}/`, security: makeSecurity({ headers: makeSecurityHeaders(headers) }) }),

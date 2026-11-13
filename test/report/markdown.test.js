@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { renderMarkdown } from '../../server/src/report/markdown.js';
-import { compareRuns } from '../../server/src/store/compare.js';
+import { renderMarkdown } from '../../plugin/server/src/report/markdown.js';
+import { compareRuns } from '../../plugin/server/src/store/compare.js';
 import { SITE, makeField, makeLab, makeVitals } from '../helpers/factories.js';
 import { makeCheckStat, makeFinding, makeRun } from '../helpers/run-factory.js';
 import { PAYLOADS, assertSafeMarkdown, hostileInput } from './safety.js';

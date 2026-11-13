@@ -5,10 +5,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { checkImageFiles } from '../../server/src/net/image-check.js';
-import { checkExternalLinks } from '../../server/src/net/link-check.js';
-import { createHostGates, createPacer, followRedirects, sleep } from '../../server/src/net/polite.js';
-import { createRobotsCache } from '../../server/src/net/robots-cache.js';
+import { checkImageFiles } from '../../plugin/server/src/net/image-check.js';
+import { checkExternalLinks } from '../../plugin/server/src/net/link-check.js';
+import { createHostGates, createPacer, followRedirects, sleep } from '../../plugin/server/src/net/polite.js';
+import { createRobotsCache } from '../../plugin/server/src/net/robots-cache.js';
 import { fakeFetch, fetchResult } from './fake-fetch.js';
 
 /** A virtual clock that a fake sleep moves forward, so waits can be measured without waiting. */

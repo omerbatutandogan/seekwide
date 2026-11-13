@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { escapeHtml, html, mdCode, mdText, mdUrl, raw, safeHttpUrl } from '../../server/src/report/escape.js';
+import { escapeHtml, html, mdCode, mdText, mdUrl, raw, safeHttpUrl } from '../../plugin/server/src/report/escape.js';
 
 test('escapeHtml escapes the five characters that matter in element text and attributes', () => {
   assert.equal(escapeHtml(`<a href="x" title='y'>&</a>`), '&lt;a href=&quot;x&quot; title=&#39;y&#39;&gt;&amp;&lt;/a&gt;');

@@ -3,12 +3,12 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { verifyFixes } from '../../server/src/repo/verify.js';
-import { compareRuns } from '../../server/src/store/compare.js';
+import { verifyFixes } from '../../plugin/server/src/repo/verify.js';
+import { compareRuns } from '../../plugin/server/src/store/compare.js';
 import { makeCrawl, makePage } from '../helpers/factories.js';
 import { makeCheckStat, makeFinding, makeRun } from '../helpers/run-factory.js';
 
-/** @import { CrawlResult, Finding } from '../../server/src/types.js' */
+/** @import { CrawlResult, Finding } from '../../plugin/server/src/types.js' */
 
 const SITE = 'https://example.test';
 const CHECKS = ['seo.title.missing', 'seo.title.duplicate', 'seo.meta_description.duplicate', 'seo.title.multiple', 'seo.title.too_short', 'seo.canonical.missing', 'seo.canonical.relative', 'seo.sitemap.missing', 'seo.sitemap.file_error', 'seo.h1.missing'];

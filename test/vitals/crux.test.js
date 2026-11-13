@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { after, before, beforeEach, test } from 'node:test';
 
-import { USER_AGENT } from '../../server/src/config.js';
-import { CRUX_ENDPOINT, queryCrux } from '../../server/src/vitals/crux.js';
+import { USER_AGENT } from '../../plugin/server/src/config.js';
+import { CRUX_ENDPOINT, queryCrux } from '../../plugin/server/src/vitals/crux.js';
 import { CRUX_PATH, INVALID_KEY, NO_CRUX_DATA, cruxAnswer, googleError, startGoogle } from '../helpers/google-api.js';
 
 /** @import { Reply, SeenRequest } from '../helpers/google-api.js' */

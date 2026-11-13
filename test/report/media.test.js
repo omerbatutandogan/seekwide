@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { reportTitle } from '../../server/src/report/copy.js';
-import { renderHtml } from '../../server/src/report/html.js';
-import { renderMarkdown } from '../../server/src/report/markdown.js';
-import { buildReport } from '../../server/src/report/model.js';
+import { reportTitle } from '../../plugin/server/src/report/copy.js';
+import { renderHtml } from '../../plugin/server/src/report/html.js';
+import { renderMarkdown } from '../../plugin/server/src/report/markdown.js';
+import { buildReport } from '../../plugin/server/src/report/model.js';
 import { makeRun } from '../helpers/run-factory.js';
 
 test('the title names the modules when the media module ran', () => {

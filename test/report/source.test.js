@@ -3,9 +3,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { renderHtml } from '../../server/src/report/html.js';
-import { renderMarkdown } from '../../server/src/report/markdown.js';
-import { buildReport } from '../../server/src/report/model.js';
+import { renderHtml } from '../../plugin/server/src/report/html.js';
+import { renderMarkdown } from '../../plugin/server/src/report/markdown.js';
+import { buildReport } from '../../plugin/server/src/report/model.js';
 import { makeFinding, makeRun } from '../helpers/run-factory.js';
 import { assertSafeHtml } from './safety.js';
 

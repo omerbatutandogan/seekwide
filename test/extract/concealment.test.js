@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { MAX_STYLE_CHARS, VISIBLE, concealments, enterElement, lengthPx, parseStyle, tinyFrame } from '../../server/src/extract/concealment.js';
+import { MAX_STYLE_CHARS, VISIBLE, concealments, enterElement, lengthPx, parseStyle, tinyFrame } from '../../plugin/server/src/extract/concealment.js';
 
 /** CPU time this process has used, in milliseconds. */
 const cpuMs = () => {

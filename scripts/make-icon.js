@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Draws the plugin icon (.claude-plugin/icon.png) without an image library, so
+// Draws the plugin icon (plugin/.claude-plugin/icon.png) without an image library, so
 // the icon has a readable source and can be regenerated or restyled.
 //
 // Usage: node scripts/make-icon.js
@@ -104,6 +104,6 @@ const png = Buffer.concat([
   chunk('IEND', Buffer.alloc(0)),
 ]);
 
-const target = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.claude-plugin', 'icon.png');
+const target = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'plugin', '.claude-plugin', 'icon.png');
 writeFileSync(target, png);
 process.stdout.write(`Wrote ${target} (${png.length} bytes)\n`);

@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { buildContext, runChecks } from '../../../server/src/checks/engine.js';
-import { checks } from '../../../server/src/checks/links/index.js';
-import { prepareChecks } from '../../../server/src/checks/validate.js';
+import { buildContext, runChecks } from '../../../plugin/server/src/checks/engine.js';
+import { checks } from '../../../plugin/server/src/checks/links/index.js';
+import { prepareChecks } from '../../../plugin/server/src/checks/validate.js';
 import { SITE, makeCrawl, makeLink, makePage, makeRedirect } from '../../helpers/factories.js';
 import { NOW, outboundResult } from './support.js';
 

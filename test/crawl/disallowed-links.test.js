@@ -6,13 +6,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { MAX_DISALLOWED_ASKED, createRecords } from '../../server/src/crawl/records.js';
-import { createFrontier } from '../../server/src/crawl/frontier.js';
+import { MAX_DISALLOWED_ASKED, createRecords } from '../../plugin/server/src/crawl/records.js';
+import { createFrontier } from '../../plugin/server/src/crawl/frontier.js';
 import { makeLink, makePage } from '../helpers/factories.js';
 
 const SITE = 'https://example.test';
 
-/** Records of `pages` with a robots.txt that disallows /private/ and counts its questions. @param {import('../../server/src/types.js').PageRecord[]} pages */
+/** Records of `pages` with a robots.txt that disallows /private/ and counts its questions. @param {import('../../plugin/server/src/types.js').PageRecord[]} pages */
 function recordsOf(pages) {
   let asked = 0;
   const robots = { isAllowed: (/** @type {string} */ url) => { asked += 1; return !url.includes('/private/'); } };

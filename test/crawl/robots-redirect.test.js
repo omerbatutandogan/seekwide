@@ -5,9 +5,9 @@
 import assert from 'node:assert/strict';
 import { after, it } from 'node:test';
 
-import { createCrawlManager } from '../../server/src/crawl/manager.js';
-import { safeFetch } from '../../server/src/net/safe-fetch.js';
-import { blockedRedirect } from '../../server/src/report/facts.js';
+import { createCrawlManager } from '../../plugin/server/src/crawl/manager.js';
+import { safeFetch } from '../../plugin/server/src/net/safe-fetch.js';
+import { blockedRedirect } from '../../plugin/server/src/report/facts.js';
 import { startServer } from '../helpers/http-server.js';
 import { removeTempDirs, tempDir } from './harness.js';
 

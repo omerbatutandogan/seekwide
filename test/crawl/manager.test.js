@@ -3,8 +3,8 @@ import { chmod, mkdir, readdir, readFile, rm, stat, utimes, writeFile } from 'no
 import path from 'node:path';
 import { after, test } from 'node:test';
 
-import { USER_AGENT } from '../../server/src/config.js';
-import { createCrawlManager } from '../../server/src/crawl/manager.js';
+import { USER_AGENT } from '../../plugin/server/src/config.js';
+import { createCrawlManager } from '../../plugin/server/src/crawl/manager.js';
 import { startServer } from '../helpers/http-server.js';
 import { fakeFetch } from '../net/fake-fetch.js';
 import { fakeExtract } from './fake-records.js';
@@ -257,7 +257,7 @@ test('allowLoopback is honoured for a host that is only loopback, by IP or by na
 test('a local crawl passes its own origin as allowLoopback, never true', async () => {
   const local = await startServer({ '/': html([]) });
   try {
-    const { safeFetch } = await import('../../server/src/net/safe-fetch.js');
+    const { safeFetch } = await import('../../plugin/server/src/net/safe-fetch.js');
     /** @type {unknown[]} */
     const seen = [];
     /** @type {typeof safeFetch} */

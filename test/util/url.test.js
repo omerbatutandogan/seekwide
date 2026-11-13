@@ -8,7 +8,7 @@ import {
   normalizeUrl,
   originOf,
   templateSignature,
-} from '../../server/src/util/url.js';
+} from '../../plugin/server/src/util/url.js';
 
 test('normalizeUrl resolves relative URLs against a base', () => {
   assert.equal(normalizeUrl('/about', 'https://example.com/blog/post'), 'https://example.com/about');
@@ -109,7 +109,7 @@ test('originOf returns null for invalid input', () => {
 });
 
 test('hidden characters: controls, direction overrides and tag characters are removed from page text, tab and line breaks kept by clip', async () => {
-  const { clip, collapseWhitespace, stripHidden } = await import('../../server/src/util/strings.js');
+  const { clip, collapseWhitespace, stripHidden } = await import('../../plugin/server/src/util/strings.js');
   const esc = String.fromCodePoint(0x1b);
   const rlo = String.fromCodePoint(0x202e);
   const tag = String.fromCodePoint(0xe0049, 0xe0047);

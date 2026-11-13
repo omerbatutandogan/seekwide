@@ -8,13 +8,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import { STORE_LIMITS, toJsonFile } from '../../server/src/store/fs-util.js';
-import { projectPaths } from '../../server/src/store/project.js';
-import { packRun, unpackRun } from '../../server/src/store/run-file.js';
-import { entryFromRun } from '../../server/src/store/run-index.js';
-import { listRuns, loadRun, saveRun } from '../../server/src/store/runs.js';
-import { withStoreErrors } from '../../server/src/tools/common.js';
-import { shortId } from '../../server/src/util/hash.js';
+import { STORE_LIMITS, toJsonFile } from '../../plugin/server/src/store/fs-util.js';
+import { projectPaths } from '../../plugin/server/src/store/project.js';
+import { packRun, unpackRun } from '../../plugin/server/src/store/run-file.js';
+import { entryFromRun } from '../../plugin/server/src/store/run-index.js';
+import { listRuns, loadRun, saveRun } from '../../plugin/server/src/store/runs.js';
+import { withStoreErrors } from '../../plugin/server/src/tools/common.js';
+import { shortId } from '../../plugin/server/src/util/hash.js';
 import { makeFinding, makeRun } from '../helpers/run-factory.js';
 
 /** @param {import('node:test').TestContext} t */

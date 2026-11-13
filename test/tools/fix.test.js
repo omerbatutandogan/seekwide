@@ -3,16 +3,16 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
-import { ToolError } from '../../server/src/mcp/stdio.js';
-import { validate } from '../../server/src/mcp/schema.js';
-import { groupRefused, publicOrigin } from '../../server/src/tools/fix.js';
-import { createTools } from '../../server/src/tools/index.js';
+import { ToolError } from '../../plugin/server/src/mcp/stdio.js';
+import { validate } from '../../plugin/server/src/mcp/schema.js';
+import { groupRefused, publicOrigin } from '../../plugin/server/src/tools/fix.js';
+import { createTools } from '../../plugin/server/src/tools/index.js';
 import { makeCrawl, makePage } from '../helpers/factories.js';
 import { makeTree } from '../helpers/repo.js';
 import { makeCheckStat, makeFinding, makeRun } from '../helpers/run-factory.js';
 import { jobFor, makeDeps, sampleCrawl, toolNamed } from './fakes.js';
 
-/** @import { Finding, Run } from '../../server/src/types.js' */
+/** @import { Finding, Run } from '../../plugin/server/src/types.js' */
 
 const LOCAL = 'http://localhost:3000';
 const REPO = { framework: /** @type {const} */ ('next-app'), label: 'Next.js (App Router)', source_dir: '.', findings_with_source: 2, pages_matched: 2, pages_total: 2 };

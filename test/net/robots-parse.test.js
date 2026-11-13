@@ -5,8 +5,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { agentToken, groupFor, parseRobotsTxt } from '../../server/src/net/robots-parse.js';
-import { loadRobots } from '../../server/src/net/robots.js';
+import { agentToken, groupFor, parseRobotsTxt } from '../../plugin/server/src/net/robots-parse.js';
+import { loadRobots } from '../../plugin/server/src/net/robots.js';
 import { fakeFetch } from './fake-fetch.js';
 
 const ORIGIN = 'https://example.test';

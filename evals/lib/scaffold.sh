@@ -9,9 +9,13 @@
 
 set -euo pipefail
 
-case_dir="$(cd "$(dirname "${BASH_SOURCE[1]}")" && pwd)"
-evals_dir="$(cd "$case_dir/.." && pwd)"
-repo_dir="$(cd "$evals_dir/.." && pwd)"
+# Physical paths (-P): a run reaches the cases through the plugin/evals link
+# (evals/README.md), and its parent is plugin/, not the repository.
+case_dir="$(cd -P "$(dirname "${BASH_SOURCE[1]}")" && pwd -P)"
+evals_dir="$(cd -P "$case_dir/.." && pwd -P)"
+repo_dir="$(cd -P "$evals_dir/.." && pwd -P)"
+# The plugin under test is the plugin/ folder of the repository; evals/ and fixtures/ are next to it.
+plugin_dir="$repo_dir/plugin"
 lib_dir="$evals_dir/lib"
 # Longer than the longest case timeout (1200 seconds), so no server expires during a run.
 SERVER_SECONDS=1500
@@ -159,5 +163,5 @@ write_history() {
     let text = fs.readFileSync(recorded, "utf8");
     for (const [from, to] of pairs) text = text.split(from).join(to);
     fs.writeFileSync(target, text);
-  ' "$recorded" "$case_dir/history.jsonl" "$(cd ../.. && pwd)" "$repo_dir"
+  ' "$recorded" "$case_dir/history.jsonl" "$(cd ../.. && pwd)" "$plugin_dir"
 }

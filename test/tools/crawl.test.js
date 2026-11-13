@@ -1,8 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { ToolError } from '../../server/src/mcp/stdio.js';
-import { createTools } from '../../server/src/tools/index.js';
-import { UNTRUSTED_NOTE } from '../../server/src/tools/common.js';
+import { ToolError } from '../../plugin/server/src/mcp/stdio.js';
+import { createTools } from '../../plugin/server/src/tools/index.js';
+import { UNTRUSTED_NOTE } from '../../plugin/server/src/tools/common.js';
 import { makeImage, makeLink, makePage } from '../helpers/factories.js';
 import { jobFor, makeDeps, sampleCrawl, toolNamed } from './fakes.js';
 

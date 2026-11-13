@@ -8,16 +8,16 @@ import os from 'node:os';
 import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { createToolDeps } from '../../server/src/deps.js';
-import { createCrawlManager } from '../../server/src/crawl/manager.js';
-import { ToolError } from '../../server/src/mcp/stdio.js';
-import { createTools } from '../../server/src/tools/index.js';
+import { createToolDeps } from '../../plugin/server/src/deps.js';
+import { createCrawlManager } from '../../plugin/server/src/crawl/manager.js';
+import { ToolError } from '../../plugin/server/src/mcp/stdio.js';
+import { createTools } from '../../plugin/server/src/tools/index.js';
 import { HTML_FIXTURE, startServer, staticRoutes } from '../helpers/repo.js';
 
 /** The static-server command uses `python` on Windows and `python3` elsewhere (see repo/detect.js). */
 const PYTHON = process.platform === 'win32' ? 'python' : 'python3';
 
-/** @import { ToolDef } from '../../server/src/mcp/stdio.js' */
+/** @import { ToolDef } from '../../plugin/server/src/mcp/stdio.js' */
 
 /** @type {Awaited<ReturnType<typeof startServer>>} */
 let server;

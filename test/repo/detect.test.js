@@ -4,7 +4,7 @@ import { symlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 
-import { detectProject } from '../../server/src/repo/detect.js';
+import { detectProject } from '../../plugin/server/src/repo/detect.js';
 import { HTML_FIXTURE, NEXT_FIXTURE, makeTree } from '../helpers/repo.js';
 
 /** The static-server command uses `python` on Windows and `python3` elsewhere (see repo/detect.js). */

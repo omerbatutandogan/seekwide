@@ -8,8 +8,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { buildReport } from '../../server/src/report/model.js';
-import { runNotes, startPage } from '../../server/src/tools/audit-summary.js';
+import { buildReport } from '../../plugin/server/src/report/model.js';
+import { runNotes, startPage } from '../../plugin/server/src/tools/audit-summary.js';
 import { makeCrawl, makePage, makeRedirect } from '../helpers/factories.js';
 import { makeCheckStat, makeRun } from '../helpers/run-factory.js';
 

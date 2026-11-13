@@ -5,9 +5,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { measureVitals } from '../../server/src/vitals/measure.js';
-import { isPublicHost as mayLeaveMachine } from '../../server/src/util/site-identity.js';
-import { selectVitalsPages } from '../../server/src/vitals/select.js';
+import { measureVitals } from '../../plugin/server/src/vitals/measure.js';
+import { isPublicHost as mayLeaveMachine } from '../../plugin/server/src/util/site-identity.js';
+import { selectVitalsPages } from '../../plugin/server/src/vitals/select.js';
 import { SITE, makeCrawl, makeField, makeLab, makePage } from '../helpers/factories.js';
 
 const PUBLIC = { max_pages: 25, rate_per_sec: 1, include_subdomains: false, local: false };

@@ -4,8 +4,8 @@ import http from 'node:http';
 import { after, before, mock, test } from 'node:test';
 import zlib from 'node:zlib';
 
-import { USER_AGENT } from '../../server/src/config.js';
-import { pinnedLookup, safeFetch } from '../../server/src/net/safe-fetch.js';
+import { USER_AGENT } from '../../plugin/server/src/config.js';
+import { pinnedLookup, safeFetch } from '../../plugin/server/src/net/safe-fetch.js';
 import { startServer } from '../helpers/http-server.js';
 
 /** @type {Awaited<ReturnType<typeof startServer>>} */

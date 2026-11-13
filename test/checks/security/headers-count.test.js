@@ -10,16 +10,16 @@ import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import { renderHtml } from '../../../server/src/report/html.js';
-import { renderMarkdown } from '../../../server/src/report/markdown.js';
-import { buildReport } from '../../../server/src/report/model.js';
-import { compareRuns } from '../../../server/src/store/compare.js';
-import { listRuns, loadRun, saveRun } from '../../../server/src/store/runs.js';
+import { renderHtml } from '../../../plugin/server/src/report/html.js';
+import { renderMarkdown } from '../../../plugin/server/src/report/markdown.js';
+import { buildReport } from '../../../plugin/server/src/report/model.js';
+import { compareRuns } from '../../../plugin/server/src/store/compare.js';
+import { listRuns, loadRun, saveRun } from '../../../plugin/server/src/store/runs.js';
 import { makePage, makeSecurity, makeSecurityHeaders } from '../../helpers/factories.js';
 import { makeRun } from '../../helpers/run-factory.js';
 import { audit } from './support.js';
 
-/** @import { ModuleScore } from '../../../server/src/types.js' */
+/** @import { ModuleScore } from '../../../plugin/server/src/types.js' */
 
 const none = makeSecurityHeaders({ hsts_max_age: null, nosniff: false, frame_ancestors: [], x_frame_options: [], csp: null });
 const COUNTED = '0 of 3 recommended headers set';

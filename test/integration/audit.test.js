@@ -9,14 +9,14 @@ import path from 'node:path';
 import { after, before, test } from 'node:test';
 
 import { siteRoutes } from '../../fixtures/site/routes.js';
-import { buildContext, runChecks } from '../../server/src/checks/engine.js';
-import { allChecks } from '../../server/src/checks/registry.js';
-import { PRODUCT_TOKEN } from '../../server/src/config.js';
-import { createCrawlManager } from '../../server/src/crawl/manager.js';
+import { buildContext, runChecks } from '../../plugin/server/src/checks/engine.js';
+import { allChecks } from '../../plugin/server/src/checks/registry.js';
+import { PRODUCT_TOKEN } from '../../plugin/server/src/config.js';
+import { createCrawlManager } from '../../plugin/server/src/crawl/manager.js';
 import { makeVitals } from '../helpers/factories.js';
 import { startServer } from '../helpers/http-server.js';
 
-/** @import { AuditResult, CrawlResult } from '../../server/src/types.js' */
+/** @import { AuditResult, CrawlResult } from '../../plugin/server/src/types.js' */
 
 const NOW = '2026-01-02T03:04:05.000Z';
 

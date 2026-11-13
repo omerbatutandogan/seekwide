@@ -1,11 +1,11 @@
 // In-memory fakes for the dependencies of createTools, for unit tests.
 
-/** @import { CheckDef, CrawlJob, CrawlResult, ImageFileResult, Run, VitalsData } from '../../server/src/types.js' */
+/** @import { CheckDef, CrawlJob, CrawlResult, ImageFileResult, Run, VitalsData } from '../../plugin/server/src/types.js' */
 
 import path from 'node:path';
-import { attachSources, loadProjectSources } from '../../server/src/repo/sources.js';
-import { assertRunId, projectPaths } from '../../server/src/store/project.js';
-import { InputError } from '../../server/src/util/errors.js';
+import { attachSources, loadProjectSources } from '../../plugin/server/src/repo/sources.js';
+import { assertRunId, projectPaths } from '../../plugin/server/src/store/project.js';
+import { InputError } from '../../plugin/server/src/util/errors.js';
 import { makeCrawl, makeLink, makePage, makeVitals } from '../helpers/factories.js';
 
 // Built with path.resolve, so that it is the absolute path the tools return on Windows too (D:\projects\site).
@@ -260,7 +260,7 @@ export function makeDeps(seed = {}) {
 }
 
 /**
- * @param {import('../../server/src/mcp/stdio.js').ToolDef[]} tools
+ * @param {import('../../plugin/server/src/mcp/stdio.js').ToolDef[]} tools
  * @param {string} name
  */
 export function toolNamed(tools, name) {

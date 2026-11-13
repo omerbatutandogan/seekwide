@@ -5,12 +5,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { extractPage } from '../../server/src/extract/page.js';
-import { MAX_TRACKED_HOSTS } from '../../server/src/extract/security.js';
-import { registrableDomain } from '../../server/src/util/public-suffix.js';
+import { extractPage } from '../../plugin/server/src/extract/page.js';
+import { MAX_TRACKED_HOSTS } from '../../plugin/server/src/extract/security.js';
+import { registrableDomain } from '../../plugin/server/src/util/public-suffix.js';
 import { makeFetch, makeInput } from './fetch-result.js';
 
-/** @import { PageSecurity } from '../../server/src/types.js' */
+/** @import { PageSecurity } from '../../plugin/server/src/types.js' */
 
 /** CPU time this process has used, in milliseconds. */
 const cpuMs = () => {

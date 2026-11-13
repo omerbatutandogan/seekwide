@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { parseLinkHeaders, parseXRobots, selectHeaders } from '../../server/src/extract/headers.js';
-import { extractPage } from '../../server/src/extract/page.js';
+import { parseLinkHeaders, parseXRobots, selectHeaders } from '../../plugin/server/src/extract/headers.js';
+import { extractPage } from '../../plugin/server/src/extract/page.js';
 import { PAGE_URL, makeFetch, makeInput } from './fetch-result.js';
 
 /**

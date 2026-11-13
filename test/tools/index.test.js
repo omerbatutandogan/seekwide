@@ -2,9 +2,9 @@ import { once } from 'node:events';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { PassThrough } from 'node:stream';
-import { createStdioServer } from '../../server/src/mcp/stdio.js';
-import { validate } from '../../server/src/mcp/schema.js';
-import { createTools } from '../../server/src/tools/index.js';
+import { createStdioServer } from '../../plugin/server/src/mcp/stdio.js';
+import { validate } from '../../plugin/server/src/mcp/schema.js';
+import { createTools } from '../../plugin/server/src/tools/index.js';
 import { makeDeps, sampleCrawl, jobFor, toolNamed } from './fakes.js';
 
 const tools = createTools(makeDeps().deps);

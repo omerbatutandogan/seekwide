@@ -1,9 +1,9 @@
 // Runs one SEO check against a test crawl through the real engine.
 
-/** @import { CheckResult, CrawlResult, Finding, CheckStat, OutboundResult, PageRecord } from '../../../server/src/types.js' */
+/** @import { CheckResult, CrawlResult, Finding, CheckStat, OutboundResult, PageRecord } from '../../../plugin/server/src/types.js' */
 
-import { buildContext, runChecks } from '../../../server/src/checks/engine.js';
-import { checks } from '../../../server/src/checks/seo/index.js';
+import { buildContext, runChecks } from '../../../plugin/server/src/checks/engine.js';
+import { checks } from '../../../plugin/server/src/checks/seo/index.js';
 import { makeCrawl } from '../../helpers/factories.js';
 
 const NOW = '2026-11-11T12:00:00.000Z';

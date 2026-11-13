@@ -3,13 +3,13 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { createTools } from '../../server/src/tools/index.js';
-import { reusedNote } from '../../server/src/tools/audit-vitals.js';
-import { LIMITS } from '../../server/src/config.js';
+import { createTools } from '../../plugin/server/src/tools/index.js';
+import { reusedNote } from '../../plugin/server/src/tools/audit-vitals.js';
+import { LIMITS } from '../../plugin/server/src/config.js';
 import { makeLab, makeVitals } from '../helpers/factories.js';
 import { NOW, jobFor, makeCheck, makeDeps, sampleCrawl, toolNamed } from './fakes.js';
 
-/** @import { VitalsData } from '../../server/src/types.js' */
+/** @import { VitalsData } from '../../plugin/server/src/types.js' */
 
 /** @param {ReturnType<typeof makeDeps>} fake */
 const audit = (fake) => toolNamed(createTools(fake.deps), 'audit_run');

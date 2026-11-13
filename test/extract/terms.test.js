@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { CATEGORIES, SCRIPT_SAMPLE_CHARS, SPAM_TERMS, TOPIC_WORDS, foldCase, scriptLetters, spamTermHits, topicHits, urlWords } from '../../server/src/extract/terms.js';
+import { CATEGORIES, SCRIPT_SAMPLE_CHARS, SPAM_TERMS, TOPIC_WORDS, foldCase, scriptLetters, spamTermHits, topicHits, urlWords } from '../../plugin/server/src/extract/terms.js';
 
 test('spam terms match whole words in any letter case, with any space between the words of a phrase', () => {
   assert.deepEqual(spamTermHits(['Buy VIAGRA and Cialis', 'online\n  casino here']), {

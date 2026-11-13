@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { classifyAddress, isPermittedClass } from '../../server/src/net/ip.js';
+import { classifyAddress, isPermittedClass } from '../../plugin/server/src/net/ip.js';
 
 /**
  * @param {string} name

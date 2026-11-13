@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
 
-import { USER_AGENT } from '../../server/src/config.js';
-import { safeFetch } from '../../server/src/net/safe-fetch.js';
+import { USER_AGENT } from '../../plugin/server/src/config.js';
+import { safeFetch } from '../../plugin/server/src/net/safe-fetch.js';
 import { startServer } from '../helpers/http-server.js';
 import { crawl, html, removeTempDirs } from './harness.js';
 

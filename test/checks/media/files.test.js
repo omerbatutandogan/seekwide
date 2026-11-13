@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { LARGE_BYTES, LEGACY_MIN_BYTES } from '../../../server/src/checks/media/files.js';
+import { LARGE_BYTES, LEGACY_MIN_BYTES } from '../../../plugin/server/src/checks/media/files.js';
 import { SITE, makePage } from '../../helpers/factories.js';
 import { audit, findingsFor, imageFile, mediaImage, mediaPage, statFor } from './support.js';
 
@@ -11,7 +11,7 @@ const LARGE = 'media.image.large_file';
 const ROBOTS = 'media.image.robots_blocked';
 const FILE_CHECKS = [BROKEN, LEGACY, LARGE, ROBOTS];
 
-/** @param {string} path @param {Partial<import('../../../server/src/types.js').ImageRecord>} [overrides] */
+/** @param {string} path @param {Partial<import('../../../plugin/server/src/types.js').ImageRecord>} [overrides] */
 const shown = (path, overrides = {}) => mediaImage({ src: path, url: `${SITE}${path}`, ...overrides });
 
 test('the file checks are skipped, with the collector\'s reason, when image files were not checked', () => {

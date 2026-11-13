@@ -1,6 +1,6 @@
 // A FetchResult builder for tests that replace safeFetch.
 
-/** @import { FetchResult } from '../../server/src/types.js' */
+/** @import { FetchResult } from '../../plugin/server/src/types.js' */
 
 /**
  * @param {string} url

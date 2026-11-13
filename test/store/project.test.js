@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import { ensureProject, projectPaths } from '../../server/src/store/project.js';
+import { ensureProject, projectPaths } from '../../plugin/server/src/store/project.js';
 
 /** @param {import('node:test').TestContext} t */
 async function makeDir(t) {

@@ -9,19 +9,19 @@ import path from 'node:path';
 import { after, before, test } from 'node:test';
 
 import { mediaRoutes } from '../../fixtures/media/routes.js';
-import { allChecks } from '../../server/src/checks/registry.js';
-import { USER_AGENT } from '../../server/src/config.js';
-import { createCrawlManager } from '../../server/src/crawl/manager.js';
-import { IMAGE_ACCEPT, checkImageFiles } from '../../server/src/net/image-check.js';
-import { checkExternalLinks } from '../../server/src/net/link-check.js';
-import { safeFetch } from '../../server/src/net/safe-fetch.js';
-import { renderHtml } from '../../server/src/report/html.js';
-import { renderMarkdown } from '../../server/src/report/markdown.js';
-import * as store from '../../server/src/store/index.js';
-import { createTools } from '../../server/src/tools/index.js';
+import { allChecks } from '../../plugin/server/src/checks/registry.js';
+import { USER_AGENT } from '../../plugin/server/src/config.js';
+import { createCrawlManager } from '../../plugin/server/src/crawl/manager.js';
+import { IMAGE_ACCEPT, checkImageFiles } from '../../plugin/server/src/net/image-check.js';
+import { checkExternalLinks } from '../../plugin/server/src/net/link-check.js';
+import { safeFetch } from '../../plugin/server/src/net/safe-fetch.js';
+import { renderHtml } from '../../plugin/server/src/report/html.js';
+import { renderMarkdown } from '../../plugin/server/src/report/markdown.js';
+import * as store from '../../plugin/server/src/store/index.js';
+import { createTools } from '../../plugin/server/src/tools/index.js';
 import { startServer } from '../helpers/http-server.js';
 
-/** @import { ToolDef } from '../../server/src/mcp/stdio.js' */
+/** @import { ToolDef } from '../../plugin/server/src/mcp/stdio.js' */
 
 /** @type {Awaited<ReturnType<typeof startServer>>} */
 let server;

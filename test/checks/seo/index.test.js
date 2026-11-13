@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { checks } from '../../../server/src/checks/seo/index.js';
-import { prepareChecks } from '../../../server/src/checks/validate.js';
+import { checks } from '../../../plugin/server/src/checks/seo/index.js';
+import { prepareChecks } from '../../../plugin/server/src/checks/validate.js';
 
 test('every SEO definition passes prepareChecks', () => {
   const prepared = prepareChecks(checks);

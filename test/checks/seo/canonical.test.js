@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { SITE, makePage, makeRedirect } from '../../helpers/factories.js';
 import { audit } from './helpers.js';
 
-/** @import { CanonicalRef } from '../../../server/src/types.js' */
+/** @import { CanonicalRef } from '../../../plugin/server/src/types.js' */
 
 /**
  * @param {string} href

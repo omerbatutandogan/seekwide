@@ -3,7 +3,7 @@ import { mkdir, symlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { RepoError, entryKind, isInside, listFiles, readFileInside, resolveSourceDir } from '../../server/src/repo/scan.js';
+import { RepoError, entryKind, isInside, listFiles, readFileInside, resolveSourceDir } from '../../plugin/server/src/repo/scan.js';
 import { makeTree } from '../helpers/repo.js';
 
 /** @type {Awaited<ReturnType<typeof makeTree>>} */

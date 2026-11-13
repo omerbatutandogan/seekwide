@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { arialWidthPx } from '../../../server/src/checks/seo/arial-widths.js';
+import { arialWidthPx } from '../../../plugin/server/src/checks/seo/arial-widths.js';
 import { SITE, makePage, makeRedirect } from '../../helpers/factories.js';
 import { audit } from './helpers.js';
 

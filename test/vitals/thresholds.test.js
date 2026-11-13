@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { THRESHOLDS, formatMetric, goodRange, rateMetric } from '../../server/src/vitals/thresholds.js';
+import { THRESHOLDS, formatMetric, goodRange, rateMetric } from '../../plugin/server/src/vitals/thresholds.js';
 
 test('the thresholds are the documented ones', () => {
   assert.deepEqual(THRESHOLDS, {
@@ -14,7 +14,7 @@ test('the thresholds are the documented ones', () => {
 });
 
 test('a value on a boundary belongs to the better range', () => {
-  for (const [metric, { good, poor }] of /** @type {[import('../../server/src/vitals/thresholds.js').VitalsMetric, {good: number, poor: number}][]} */ (Object.entries(THRESHOLDS))) {
+  for (const [metric, { good, poor }] of /** @type {[import('../../plugin/server/src/vitals/thresholds.js').VitalsMetric, {good: number, poor: number}][]} */ (Object.entries(THRESHOLDS))) {
     const step = metric === 'cls' ? 0.001 : 1;
     assert.equal(rateMetric(metric, 0), 'good', metric);
     assert.equal(rateMetric(metric, good), 'good', metric);

@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { selectVitalsPages } from '../../server/src/vitals/select.js';
+import { selectVitalsPages } from '../../plugin/server/src/vitals/select.js';
 import { SITE, makeCrawl, makePage, makeRedirect } from '../helpers/factories.js';
 
-/** @param {string} path @param {Partial<import('../../server/src/types.js').PageRecord>} [overrides] */
+/** @param {string} path @param {Partial<import('../../plugin/server/src/types.js').PageRecord>} [overrides] */
 const page = (path, overrides = {}) => makePage({ url: `${SITE}${path}`, depth: path === '/' ? 0 : 1, ...overrides });
 
 const urls = (/** @type {{url: string}[]} */ list) => list.map((entry) => entry.url.replace(SITE, ''));

@@ -5,11 +5,11 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { checkExternalLinks } from '../../server/src/net/link-check.js';
-import { createHostGates } from '../../server/src/net/polite.js';
-import { createRobotsCache } from '../../server/src/net/robots-cache.js';
-import { createTools } from '../../server/src/tools/index.js';
-import { collectVitals } from '../../server/src/tools/audit-vitals.js';
+import { checkExternalLinks } from '../../plugin/server/src/net/link-check.js';
+import { createHostGates } from '../../plugin/server/src/net/polite.js';
+import { createRobotsCache } from '../../plugin/server/src/net/robots-cache.js';
+import { createTools } from '../../plugin/server/src/tools/index.js';
+import { collectVitals } from '../../plugin/server/src/tools/audit-vitals.js';
 import { fetchResult } from '../net/fake-fetch.js';
 import { makeLink, makePage, makeVitals } from '../helpers/factories.js';
 import { jobFor, makeDeps, sampleCrawl, toolNamed } from './fakes.js';

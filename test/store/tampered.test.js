@@ -8,8 +8,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import { listRuns, loadRun, readProfile, saveRun, writeProfile } from '../../server/src/store/index.js';
-import { STORE_LIMITS } from '../../server/src/store/fs-util.js';
+import { listRuns, loadRun, readProfile, saveRun, writeProfile } from '../../plugin/server/src/store/index.js';
+import { STORE_LIMITS } from '../../plugin/server/src/store/fs-util.js';
 import { makeFinding, makeRun } from '../helpers/run-factory.js';
 
 /** @param {import('node:test').TestContext} t */

@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { extractHtml } from '../../../server/src/extract/html.js';
+import { extractHtml } from '../../../plugin/server/src/extract/html.js';
 import { SITE, makePage } from '../../helpers/factories.js';
 import { audit, findingsFor, statFor } from './support.js';
 

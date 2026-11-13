@@ -1,6 +1,6 @@
 // Builder for FetchResult values used by the extraction tests.
 
-/** @import { FetchResult } from '../../server/src/types.js' */
+/** @import { FetchResult } from '../../plugin/server/src/types.js' */
 
 export const PAGE_URL = 'https://example.test/page';
 

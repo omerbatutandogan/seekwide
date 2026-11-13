@@ -3,9 +3,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { MAX_PARSED_TAGS } from '../../server/src/extract/dom.js';
-import { extractHtml } from '../../server/src/extract/html.js';
-import { MAX_URL_LENGTH, normalizeUrl } from '../../server/src/util/url.js';
+import { MAX_PARSED_TAGS } from '../../plugin/server/src/extract/dom.js';
+import { extractHtml } from '../../plugin/server/src/extract/html.js';
+import { MAX_URL_LENGTH, normalizeUrl } from '../../plugin/server/src/util/url.js';
 
 const CONTEXT = { responseUrl: 'https://example.test/', siteHost: 'example.test', includeSubdomains: false };
 
@@ -69,7 +69,7 @@ test('links, canonicals and hreflang with huge URLs are kept without the URL', (
 });
 
 test('the link, image and hreflang lists of one page hold at most a million characters in all', async () => {
-  const { MAX_LIST_CHARS } = await import('../../server/src/extract/dom.js');
+  const { MAX_LIST_CHARS } = await import('../../plugin/server/src/extract/dom.js');
   // 5000 links with 2000-character URLs made one page record of 6 MB.
   const long = `/${'p'.repeat(2000)}`;
   const html = `<html><body>${Array.from({ length: 5000 }, (_, i) => `<a href="${long}${i}">x</a>`).join('')}</body></html>`;

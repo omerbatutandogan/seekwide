@@ -1,41 +1,14 @@
 {
-  "name": "seekwide",
-  "version": "0.1.1",
+  "name": "seekwide-dev",
   "private": true,
-  "description": "Claude Code plugin for site audits you can re-run and trust: scripted SEO, Core Web Vitals, links, signs of a hacked site, images and video, with evidence for every finding, repeatable scores, a client-ready report and fixes verified by a second audit.",
-  "keywords": [
-    "seo",
-    "technical-seo",
-    "site-audit",
-    "broken-links",
-    "internal-links",
-    "canonical",
-    "sitemap",
-    "core-web-vitals",
-    "report",
-    "agency",
-    "white-label",
-    "security",
-    "hacked-site",
-    "images",
-    "alt-text",
-    "video",
-    "repo-mode",
-    "nextjs",
-    "seo-fixes",
-    "fix-verification"
-  ],
+  "description": "Tests and checks for the Seekwide plugin. The plugin itself, with its runtime dependencies, is in plugin/.",
   "type": "module",
   "license": "MIT",
-  "homepage": "https://github.com/omerbatutandogan/seekwide",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
     "test": "node --test \"test/**/*.test.js\"",
     "check": "node scripts/check.js"
-  },
-  "dependencies": {
-    "parse5": "8.1.1"
   }
 }

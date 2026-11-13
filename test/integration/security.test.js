@@ -8,12 +8,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
 
-import { buildContext, runChecks } from '../../server/src/checks/engine.js';
-import { allChecks } from '../../server/src/checks/registry.js';
-import { PRODUCT_TOKEN, USER_AGENT } from '../../server/src/config.js';
+import { buildContext, runChecks } from '../../plugin/server/src/checks/engine.js';
+import { allChecks } from '../../plugin/server/src/checks/registry.js';
+import { PRODUCT_TOKEN, USER_AGENT } from '../../plugin/server/src/config.js';
 import { crawlLocal, staticRoutes, startServer } from '../helpers/repo.js';
 
-/** @import { AuditResult, CrawlResult } from '../../server/src/types.js' */
+/** @import { AuditResult, CrawlResult } from '../../plugin/server/src/types.js' */
 
 const FIXTURES = path.resolve(import.meta.dirname, '..', '..', 'fixtures', 'security');
 

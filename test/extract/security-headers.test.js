@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { hstsMaxAge, metaReferrerPolicy, securityHeaders } from '../../server/src/extract/security-headers.js';
+import { hstsMaxAge, metaReferrerPolicy, securityHeaders } from '../../plugin/server/src/extract/security-headers.js';
 import { makeFetch } from './fetch-result.js';
 
 /**

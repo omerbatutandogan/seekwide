@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { checks as mediaChecks } from '../../server/src/checks/media/index.js';
-import { LIMITS } from '../../server/src/config.js';
-import { IMAGE_FILES_FAILED, IMAGE_FILES_NOT_ASKED, IMAGE_FILES_REFUSED, SITE_IMAGES_SKIPPED, collectImageFiles, imageFilesNotes } from '../../server/src/tools/audit-media.js';
-import { createTools } from '../../server/src/tools/index.js';
+import { checks as mediaChecks } from '../../plugin/server/src/checks/media/index.js';
+import { LIMITS } from '../../plugin/server/src/config.js';
+import { IMAGE_FILES_FAILED, IMAGE_FILES_NOT_ASKED, IMAGE_FILES_REFUSED, SITE_IMAGES_SKIPPED, collectImageFiles, imageFilesNotes } from '../../plugin/server/src/tools/audit-media.js';
+import { createTools } from '../../plugin/server/src/tools/index.js';
 import { makeCrawl, makeImage, makeLink, makePage } from '../helpers/factories.js';
 import { jobFor, makeDeps, toolNamed } from './fakes.js';
 
@@ -19,7 +19,7 @@ const crawl = makeCrawl({
   ],
 });
 
-/** @param {Parameters<typeof makeDeps>[0]} [seed] @param {import('../../server/src/types.js').CrawlResult} [result] */
+/** @param {Parameters<typeof makeDeps>[0]} [seed] @param {import('../../plugin/server/src/types.js').CrawlResult} [result] */
 function setup(seed = {}, result = crawl) {
   const fake = makeDeps({ jobs: [jobFor(result)], results: [result], ...seed });
   fake.deps.checks = [...fake.deps.checks, ...mediaChecks];

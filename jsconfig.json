@@ -10,5 +10,5 @@
     "types": ["node"],
     "skipLibCheck": true
   },
-  "include": ["server/src/**/*.js", "scripts/**/*.js"]
+  "include": ["plugin/server/src/**/*.js", "scripts/**/*.js"]
 }

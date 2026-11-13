@@ -8,15 +8,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 
-import { createCrawlManager } from '../../server/src/crawl/manager.js';
-import { normalizeProfile } from '../../server/src/store/profile-validate.js';
-import { loadRun, saveRun } from '../../server/src/store/runs.js';
-import { createTools } from '../../server/src/tools/index.js';
-import { finishedCrawl } from '../../server/src/tools/crawl.js';
-import { publicOrigin } from '../../server/src/tools/fix.js';
-import { loadLogo } from '../../server/src/tools/logo.js';
-import { InputError } from '../../server/src/util/errors.js';
-import { isPlainHostName } from '../../server/src/util/plain-host.js';
+import { createCrawlManager } from '../../plugin/server/src/crawl/manager.js';
+import { normalizeProfile } from '../../plugin/server/src/store/profile-validate.js';
+import { loadRun, saveRun } from '../../plugin/server/src/store/runs.js';
+import { createTools } from '../../plugin/server/src/tools/index.js';
+import { finishedCrawl } from '../../plugin/server/src/tools/crawl.js';
+import { publicOrigin } from '../../plugin/server/src/tools/fix.js';
+import { loadLogo } from '../../plugin/server/src/tools/logo.js';
+import { InputError } from '../../plugin/server/src/util/errors.js';
+import { isPlainHostName } from '../../plugin/server/src/util/plain-host.js';
 import { makeFinding, makeRun } from '../helpers/run-factory.js';
 import { jobFor, makeDeps, sampleCrawl, toolNamed } from './fakes.js';
 

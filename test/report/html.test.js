@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { renderHtml } from '../../server/src/report/html.js';
-import { compareRuns } from '../../server/src/store/compare.js';
+import { renderHtml } from '../../plugin/server/src/report/html.js';
+import { compareRuns } from '../../plugin/server/src/store/compare.js';
 import { SITE, makeField, makeLab, makeVitals } from '../helpers/factories.js';
 import { makeCheckStat, makeFinding, makeRun } from '../helpers/run-factory.js';
 import { PAYLOADS, assertSafeHtml, hostileInput, parseHtml } from './safety.js';

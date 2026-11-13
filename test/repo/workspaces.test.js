@@ -8,10 +8,10 @@ import { mkdir, symlink } from 'node:fs/promises';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 
-import { detectProject } from '../../server/src/repo/detect.js';
-import { listDirs } from '../../server/src/repo/scan.js';
-import { loadProjectSources } from '../../server/src/repo/sources.js';
-import { MAX_WORKSPACE_FOLDERS, workspaceFolders } from '../../server/src/repo/workspaces.js';
+import { detectProject } from '../../plugin/server/src/repo/detect.js';
+import { listDirs } from '../../plugin/server/src/repo/scan.js';
+import { loadProjectSources } from '../../plugin/server/src/repo/sources.js';
+import { MAX_WORKSPACE_FOLDERS, workspaceFolders } from '../../plugin/server/src/repo/workspaces.js';
 import { MONOREPO_FIXTURE, makeTree } from '../helpers/repo.js';
 
 const WEB_PKG = JSON.stringify({ name: '@x/web', dependencies: { next: '16.4.6' }, scripts: { dev: 'next dev' } });

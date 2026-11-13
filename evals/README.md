@@ -29,15 +29,25 @@ Once, to install Next.js for the fix cases in a cache outside the repository:
 evals/setup.sh
 ```
 
-Then, from the repository root:
+The plugin is the `plugin/` folder, which is all that ships; the evals stay at the root of the repository, next to it, so that they are not installed with the plugin. `claude plugin eval` reads cases only from a folder inside the plugin (`--eval-dir ../evals` is refused with "--eval-dir must stay inside the plugin root"), so link the suite into the plugin for the run. Git ignores the link, and the directory rules do not count it. From the repository root:
 
 ```bash
-claude plugin eval . --scaffold --allow-real-servers --allow-tools Bash Edit Write mcp__plugin_seekwide_seekwide "Read(/$PWD/references/**)" --ablation none --no-publish --runs 1 --judge-model haiku
+ln -s ../evals plugin/evals
 ```
+
+```bash
+claude plugin eval plugin --scaffold --allow-real-servers --allow-tools Bash Edit Write mcp__plugin_seekwide_seekwide "Read(/$PWD/plugin/references/**)" --ablation none --no-publish --runs 1 --judge-model haiku --output-dir "$PWD/evals/results/$(date -u +%Y%m%dT%H%M%SZ)"
+```
+
+```bash
+rm plugin/evals
+```
+
+`--output-dir` is needed because `claude plugin eval` refuses to write its results through a link. With the link in place it finds the cases and writes `aggregate-result.json` to that folder (tried on 2026-11-13 with a cost ceiling of $0, so no case ran); a full run of the suite in this layout has not been done yet.
 
 - `--scaffold` runs each case's `scaffold.sh`, which copies a fixture into the empty workspace and starts the servers a case needs.
 - `--allow-real-servers` starts the plugin's own MCP server; nothing is mocked.
-- `--allow-tools`: Bash, Edit and Write must be available, or a case could not tell a Claude that obeys the skill from one that cannot act at all. `Read(/$PWD/references/**)` lets Claude read the plugin's reference files: `claude plugin eval` does not let the session read the plugin under test (so that it cannot read the graders), and the skills read `references/*.md`, which a normal session can. The graders under `evals/` stay unreadable.
+- `--allow-tools`: Bash, Edit and Write must be available, or a case could not tell a Claude that obeys the skill from one that cannot act at all. `Read(/$PWD/plugin/references/**)` lets Claude read the plugin's reference files: `claude plugin eval` does not let the session read the plugin under test (so that it cannot read the graders), and the skills read the plugin's `references/*.md`, which a normal session can. Whether the graders stay unreadable to the session when they are reached through the link is not verified.
 - `--ablation none` skips the run without the plugin, which would only show that the cases need it.
 - The cases ask for Sonnet themselves (`model: sonnet`); the judges use Haiku.
 
@@ -52,10 +62,10 @@ One run of all eight took about four minutes and cost 1.14 US dollars on 2026-11
 
 ## Recording the first turns
 
-The follow-up cases replay a recorded first turn. When a skill or the fixture of a first-turn case changes, record it again:
+The follow-up cases replay a recorded first turn. When a skill or the fixture of a first-turn case changes, record it again, with the link from [Running it](#running-it) in place:
 
 ```bash
-claude plugin eval . --case basic-asks-first --keep-temp --scaffold --allow-real-servers --allow-tools Bash Edit Write mcp__plugin_seekwide_seekwide "Read(/$PWD/references/**)" --ablation none --no-publish --runs 1
+claude plugin eval plugin --case basic-asks-first --keep-temp --scaffold --allow-real-servers --allow-tools Bash Edit Write mcp__plugin_seekwide_seekwide "Read(/$PWD/plugin/references/**)" --ablation none --no-publish --runs 1 --output-dir "$PWD/evals/results/$(date -u +%Y%m%dT%H%M%SZ)"
 ```
 
 ```bash

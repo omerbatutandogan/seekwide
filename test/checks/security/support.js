@@ -1,10 +1,10 @@
 // Helpers shared by the security check tests. Not a test file itself.
 
-import { buildContext, runChecks } from '../../../server/src/checks/engine.js';
-import { checks } from '../../../server/src/checks/security/index.js';
+import { buildContext, runChecks } from '../../../plugin/server/src/checks/engine.js';
+import { checks } from '../../../plugin/server/src/checks/security/index.js';
 import { makeCrawl } from '../../helpers/factories.js';
 
-/** @import { CheckStat, CrawlResult, Finding, PageRecord } from '../../../server/src/types.js' */
+/** @import { CheckStat, CrawlResult, Finding, PageRecord } from '../../../plugin/server/src/types.js' */
 
 export const NOW = '2026-11-12T00:00:00.000Z';
 

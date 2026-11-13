@@ -6,18 +6,18 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { buildContext, runChecks } from '../../server/src/checks/engine.js';
-import { checks as mediaChecks } from '../../server/src/checks/media/index.js';
-import { selectImageFiles } from '../../server/src/checks/media/select.js';
-import { allChecks } from '../../server/src/checks/registry.js';
-import { extractPage } from '../../server/src/extract/page.js';
-import { externalLinkUrls } from '../../server/src/tools/audit.js';
-import { crawlKey, isPublicHost, siteIdentity } from '../../server/src/util/site-identity.js';
+import { buildContext, runChecks } from '../../plugin/server/src/checks/engine.js';
+import { checks as mediaChecks } from '../../plugin/server/src/checks/media/index.js';
+import { selectImageFiles } from '../../plugin/server/src/checks/media/select.js';
+import { allChecks } from '../../plugin/server/src/checks/registry.js';
+import { extractPage } from '../../plugin/server/src/extract/page.js';
+import { externalLinkUrls } from '../../plugin/server/src/tools/audit.js';
+import { crawlKey, isPublicHost, siteIdentity } from '../../plugin/server/src/util/site-identity.js';
 import { makeFetch, makeInput } from '../extract/fetch-result.js';
 import { makeCrawl } from '../helpers/factories.js';
 import { imageFile, mediaImage } from '../checks/media/support.js';
 
-/** @import { PageRecord } from '../../server/src/types.js' */
+/** @import { PageRecord } from '../../plugin/server/src/types.js' */
 
 /**
  * @typedef {Object} Row

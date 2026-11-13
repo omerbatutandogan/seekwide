@@ -5,9 +5,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { renderMarkdown } from '../../server/src/report/markdown.js';
-import { buildReport } from '../../server/src/report/model.js';
-import { topGroups } from '../../server/src/tools/audit-summary.js';
+import { renderMarkdown } from '../../plugin/server/src/report/markdown.js';
+import { buildReport } from '../../plugin/server/src/report/model.js';
+import { topGroups } from '../../plugin/server/src/tools/audit-summary.js';
 import { makeFinding, makeRun } from '../helpers/run-factory.js';
 
 const targets = ['/about', '/account', '/almanac'];

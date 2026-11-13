@@ -9,22 +9,22 @@ import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
 import { siteRoutes } from '../../fixtures/site/routes.js';
-import { allChecks } from '../../server/src/checks/registry.js';
-import { createCrawlManager } from '../../server/src/crawl/manager.js';
-import { ToolError } from '../../server/src/mcp/stdio.js';
-import { checkImageFiles } from '../../server/src/net/image-check.js';
-import { checkExternalLinks } from '../../server/src/net/link-check.js';
-import { measureVitals } from '../../server/src/vitals/measure.js';
-import { safeFetch } from '../../server/src/net/safe-fetch.js';
-import { renderHtml } from '../../server/src/report/html.js';
-import { renderMarkdown } from '../../server/src/report/markdown.js';
-import * as store from '../../server/src/store/index.js';
-import { withStoreErrors } from '../../server/src/tools/common.js';
-import { createTools } from '../../server/src/tools/index.js';
+import { allChecks } from '../../plugin/server/src/checks/registry.js';
+import { createCrawlManager } from '../../plugin/server/src/crawl/manager.js';
+import { ToolError } from '../../plugin/server/src/mcp/stdio.js';
+import { checkImageFiles } from '../../plugin/server/src/net/image-check.js';
+import { checkExternalLinks } from '../../plugin/server/src/net/link-check.js';
+import { measureVitals } from '../../plugin/server/src/vitals/measure.js';
+import { safeFetch } from '../../plugin/server/src/net/safe-fetch.js';
+import { renderHtml } from '../../plugin/server/src/report/html.js';
+import { renderMarkdown } from '../../plugin/server/src/report/markdown.js';
+import * as store from '../../plugin/server/src/store/index.js';
+import { withStoreErrors } from '../../plugin/server/src/tools/common.js';
+import { createTools } from '../../plugin/server/src/tools/index.js';
 import { startServer } from '../helpers/http-server.js';
-import { PROFILE_NOTE } from '../../server/src/tools/profile.js';
+import { PROFILE_NOTE } from '../../plugin/server/src/tools/profile.js';
 
-/** @import { ToolDef } from '../../server/src/mcp/stdio.js' */
+/** @import { ToolDef } from '../../plugin/server/src/mcp/stdio.js' */
 
 /** @type {Awaited<ReturnType<typeof startServer>>} */
 let server;

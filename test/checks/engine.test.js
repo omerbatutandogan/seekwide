@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { buildContext, runChecks } from '../../server/src/checks/engine.js';
-import { scoreModules } from '../../server/src/checks/scoring.js';
-import { prepareChecks, validateCheckDef } from '../../server/src/checks/validate.js';
+import { buildContext, runChecks } from '../../plugin/server/src/checks/engine.js';
+import { scoreModules } from '../../plugin/server/src/checks/scoring.js';
+import { prepareChecks, validateCheckDef } from '../../plugin/server/src/checks/validate.js';
 import { SITE, makeCrawl, makeLink, makePage, makeRedirect, makeVitals } from '../helpers/factories.js';
 
-/** @import { CheckContext, CheckDef, CheckResult } from '../../server/src/types.js' */
+/** @import { CheckContext, CheckDef, CheckResult } from '../../plugin/server/src/types.js' */
 
 const NOW = '2026-01-02T03:04:05.000Z';
 

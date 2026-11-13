@@ -13,7 +13,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { extractPage } from '../../../server/src/extract/page.js';
+import { extractPage } from '../../../plugin/server/src/extract/page.js';
 import { makeFetch, makeInput } from '../../extract/fetch-result.js';
 import { audit, findingsFor, statFor } from './support.js';
 

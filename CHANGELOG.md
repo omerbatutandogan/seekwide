@@ -2,6 +2,16 @@
 
 Notable changes to Seekwide. Versions follow [semantic versioning](https://semver.org/); the rule set has its own version (`RULES_VERSION`) that changes whenever a check starts reporting something different.
 
+## Unreleased
+
+### Only the plugin is installed
+
+The plugin now lives in the `plugin/` folder of the repository, and only that folder is installed. Claude Code used to copy the whole repository into its cache, with the tests, fixtures, evals and docs; now the marketplace's `source` is `./plugin`, and the cache holds the server, the skills, the references, the manifest, a README, the LICENSE and the dependency lockfile. Nothing the plugin does has changed.
+
+- **If you installed from the marketplace**, update as usual; no other step is needed.
+- **If you load a local copy**, install the dependencies in `plugin/` (`npm ci --ignore-scripts --prefix plugin`, or `npm ci --ignore-scripts` from inside it) and point `--plugin-dir` at `plugin/` (`claude --plugin-dir /path/to/seekwide/plugin`). Adding the root of a local copy as a marketplace works as before.
+- **If you develop the plugin**, `package.json` at the root of the repository now holds only the scripts (`npm test`, `npm run check`); the runtime dependency and its lockfile are in `plugin/`. `npm run check` installs them when they are missing and validates the marketplace and the plugin separately. The directory rules now apply to the files under `plugin/`, and also check that the marketplace lists the plugin at `./plugin`, that `plugin/LICENSE` is identical to `LICENSE`, and that the versions in `plugin/package.json` and `plugin/.claude-plugin/plugin.json` match.
+
 ## 0.1.1 (2026-11-13)
 
 Fixes from four independent reviews of 0.1.0 (security, freshness, code quality, product). Rule set 0.1.8. `parse5` is now the only runtime dependency.

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { loadRobots } from '../../server/src/net/robots.js';
+import { loadRobots } from '../../plugin/server/src/net/robots.js';
 import { fakeFetch } from './fake-fetch.js';
 
 const IMAGE = ['Googlebot-Image', 'Googlebot'];

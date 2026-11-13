@@ -3,23 +3,23 @@
 import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
 
-import { buildContext, runChecks } from '../../server/src/checks/engine.js';
-import { checks as seoChecks } from '../../server/src/checks/seo/index.js';
-import { createTools } from '../../server/src/tools/index.js';
+import { buildContext, runChecks } from '../../plugin/server/src/checks/engine.js';
+import { checks as seoChecks } from '../../plugin/server/src/checks/seo/index.js';
+import { createTools } from '../../plugin/server/src/tools/index.js';
 import { SITE, makeCrawl } from '../helpers/factories.js';
 import { startServer } from '../helpers/http-server.js';
 import { jobFor, makeDeps, sampleCrawl, toolNamed } from '../tools/fakes.js';
 import { fakeFetch } from '../net/fake-fetch.js';
 import { crawl, html, removeTempDirs } from './harness.js';
 
-/** @import { SitemapSummary } from '../../server/src/types.js' */
+/** @import { SitemapSummary } from '../../plugin/server/src/types.js' */
 
 after(removeTempDirs);
 
 /**
  * Run one SEO check through the real engine.
  * @param {string} id
- * @param {import('../../server/src/types.js').CrawlResult} crawlResult
+ * @param {import('../../plugin/server/src/types.js').CrawlResult} crawlResult
  */
 function runOne(id, crawlResult) {
   const check = seoChecks.find((def) => def.id === id);
@@ -80,7 +80,7 @@ test('when robots.txt disallows /sitemap.xml, the guess is not requested and sit
       truncated: false,
     });
     assert.equal(server.requests.some((r) => r.url === '/sitemap.xml'), false);
-    const missing = runOne('seo.sitemap.missing', /** @type {import('../../server/src/types.js').CrawlResult} */ (result));
+    const missing = runOne('seo.sitemap.missing', /** @type {import('../../plugin/server/src/types.js').CrawlResult} */ (result));
     assert.equal(missing.stat?.applicable, 0, 'seo.sitemap.missing stays silent');
   } finally {
     await server.close();
@@ -174,7 +174,7 @@ test('a /sitemap.xml guess that redirects to a disallowed path is not read and c
     assert.equal(result?.sitemap.loaded, false);
     assert.deepEqual(result?.sitemap.files.map((f) => [f.url, f.type]), [[`${server.origin}/sitemap.xml`, 'disallowed']]);
     assert.equal(server.requests.some((r) => r.url.startsWith('/private/')), false);
-    const missing = runOne('seo.sitemap.missing', /** @type {import('../../server/src/types.js').CrawlResult} */ (result));
+    const missing = runOne('seo.sitemap.missing', /** @type {import('../../plugin/server/src/types.js').CrawlResult} */ (result));
     assert.equal(missing.stat?.applicable, 0, 'seo.sitemap.missing stays silent');
   } finally {
     await server.close();

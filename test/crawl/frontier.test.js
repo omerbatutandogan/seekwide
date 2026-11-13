@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { createFrontier, roundRobinByTemplate } from '../../server/src/crawl/frontier.js';
+import { createFrontier, roundRobinByTemplate } from '../../plugin/server/src/crawl/frontier.js';
 
 const S = 'https://site.test';
 

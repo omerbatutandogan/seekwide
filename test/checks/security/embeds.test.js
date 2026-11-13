@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { MIN_PAGES_FOR_RARE } from '../../../server/src/checks/security/embeds.js';
+import { MIN_PAGES_FOR_RARE } from '../../../plugin/server/src/checks/security/embeds.js';
 import { SITE, makePage, makeSecurity } from '../../helpers/factories.js';
 import { audit, findingsFor, statFor } from './support.js';
 
@@ -12,13 +12,13 @@ const RARE = 'security.embeds.rare_host';
  * @param {'script'|'iframe'} tag
  * @param {string} url
  * @param {string|null} [hidden]
- * @returns {import('../../../server/src/types.js').EmbedRecord}
+ * @returns {import('../../../plugin/server/src/types.js').EmbedRecord}
  */
 const embed = (tag, url, hidden = null) => ({ tag, url, host: new URL(url).host.replace(/^www\./, ''), hidden, line: 12 });
 
 /**
  * @param {string} path
- * @param {import('../../../server/src/types.js').EmbedRecord[]} embeds
+ * @param {import('../../../plugin/server/src/types.js').EmbedRecord[]} embeds
  */
 const page = (path, embeds) => makePage({ url: `${SITE}${path}`, security: makeSecurity({ embeds }) });
 
@@ -37,7 +37,7 @@ test(`${FRAME} fails a page with a hidden frame from another site and passes one
   assert.deepEqual(finding.evidence.observed, { hidden_frames: 2, hosts: ['bad.test'], first: { src: 'https://bad.test/x', how: 'zero size' } });
 });
 
-/** Pages that load only a shared tag, so that the crawl reaches `MIN_PAGES_FOR_RARE`. @param {number} count @param {import('../../../server/src/types.js').EmbedRecord[]} embeds */
+/** Pages that load only a shared tag, so that the crawl reaches `MIN_PAGES_FOR_RARE`. @param {number} count @param {import('../../../plugin/server/src/types.js').EmbedRecord[]} embeds */
 const filler = (count, embeds) => Array.from({ length: count }, (_, i) => page(`/filler-${i}`, embeds));
 
 test(`${RARE} lists a script or frame host that only one page uses, on a crawl of 50 or more pages`, () => {
@@ -76,7 +76,7 @@ test(`${RARE} leaves out the hosts of the site's own organisation, and nothing e
     embed('script', 'https://example.xyz/x.js'), embed('script', 'https://odd.test/x.js')]), ...filler(MIN_PAGES_FOR_RARE - 2, [])];
   assert.deepEqual(findingsFor(audit(pages), RARE).map((finding) => /** @type {any} */ (finding.evidence.observed).host).sort(), ['example.xyz', 'odd.test']);
   // vercel.app is a public suffix (the private section of the Public Suffix List): each customer's host is a site of its own.
-  const tenant = (/** @type {string} */ path, /** @type {import('../../../server/src/types.js').EmbedRecord[]} */ embeds) =>
+  const tenant = (/** @type {string} */ path, /** @type {import('../../../plugin/server/src/types.js').EmbedRecord[]} */ embeds) =>
     makePage({ url: `https://mysite.vercel.app${path}`, security: makeSecurity({ embeds }) });
   const shared = [tenant('/', []), tenant('/a', [embed('script', 'https://evil.vercel.app/x.js')]), ...Array.from({ length: MIN_PAGES_FOR_RARE - 2 }, (_, i) => tenant(`/f${i}`, []))];
   const crawl = { start_url: 'https://mysite.vercel.app/', site_origin: 'https://mysite.vercel.app', site_host: 'mysite.vercel.app' };
@@ -92,7 +92,7 @@ test(`${RARE} counts the same name under another ending as the organisation's on
 });
 
 test(`${FRAME} and ${RARE} leave out frames and scripts from the deployed site of a local crawl`, () => {
-  const local = (/** @type {string} */ path, /** @type {import('../../../server/src/types.js').EmbedRecord[]} */ embeds) =>
+  const local = (/** @type {string} */ path, /** @type {import('../../../plugin/server/src/types.js').EmbedRecord[]} */ embeds) =>
     makePage({ url: `http://localhost:3000${path}`, security: makeSecurity({ embeds }) });
   const pages = ['/', '/a', '/b', '/c', '/d'].map((path, i) => local(path, i === 1 ? [embed('iframe', 'https://www.acme.com/widget', 'zero size')] : []));
   const crawl = {

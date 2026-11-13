@@ -2,10 +2,10 @@
 // unreadableRecord), so crawler tests do not depend on the extractor. Links are
 // pulled out of href="..." attributes.
 
-import { isInternalUrl, normalizeUrl } from '../../server/src/util/url.js';
+import { isInternalUrl, normalizeUrl } from '../../plugin/server/src/util/url.js';
 import { makeLink, makePage, makeRedirect } from '../helpers/factories.js';
 
-/** @import { FetchResult, PageRecord, RedirectHop } from '../../server/src/types.js' */
+/** @import { FetchResult, PageRecord, RedirectHop } from '../../plugin/server/src/types.js' */
 
 /**
  * @param {{url: string, result: FetchResult, depth: number|null, discoveredVia: PageRecord['discovered_via'],

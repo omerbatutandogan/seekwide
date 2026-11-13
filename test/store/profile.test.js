@@ -4,8 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import { projectPaths } from '../../server/src/store/project.js';
-import { readProfile, writeProfile } from '../../server/src/store/profile.js';
+import { projectPaths } from '../../plugin/server/src/store/project.js';
+import { readProfile, writeProfile } from '../../plugin/server/src/store/profile.js';
 
 const NOW = new Date('2026-11-11T14:03:22.000Z');
 

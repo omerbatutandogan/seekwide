@@ -1,9 +1,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { ToolError } from '../../server/src/mcp/stdio.js';
-import { InputError } from '../../server/src/util/errors.js';
-import { createTools } from '../../server/src/tools/index.js';
-import { settingValue, withStoreErrors } from '../../server/src/tools/common.js';
+import { ToolError } from '../../plugin/server/src/mcp/stdio.js';
+import { InputError } from '../../plugin/server/src/util/errors.js';
+import { createTools } from '../../plugin/server/src/tools/index.js';
+import { settingValue, withStoreErrors } from '../../plugin/server/src/tools/common.js';
 import { makeDeps, sampleCrawl, jobFor, toolNamed } from './fakes.js';
 
 /** @param {string} code @param {string} message */

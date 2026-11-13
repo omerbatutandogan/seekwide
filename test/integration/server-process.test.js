@@ -9,8 +9,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { after, afterEach, before, test } from 'node:test';
 
-import { UNTRUSTED_NOTE } from '../../server/src/tools/common.js';
-import { PROFILE_NOTE } from '../../server/src/tools/profile.js';
+import { UNTRUSTED_NOTE } from '../../plugin/server/src/tools/common.js';
+import { PROFILE_NOTE } from '../../plugin/server/src/tools/profile.js';
 import { startServer } from '../helpers/http-server.js';
 import { killTree, startProcess as startServerProcess, stopAll } from '../helpers/server-process.js';
 
@@ -43,7 +43,7 @@ function startProcess(extraEnv = {}, options = {}) {
   return startServerProcess(tmp, {
     SEEKWIDE_DATA_DIR: path.join(tmp, 'data'),
     CLAUDE_PROJECT_DIR: tmp,
-    // What .mcp.json passes when the plugin settings are not filled in.
+    // What plugin/.mcp.json passes when the plugin settings are not filled in.
     SEEKWIDE_REPORT_BRAND: '${user_config.report_brand_name}',
     SEEKWIDE_REPORT_LOGO: '',
     SEEKWIDE_GOOGLE_API_KEY: '${user_config.google_api_key}',

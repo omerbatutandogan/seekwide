@@ -7,10 +7,10 @@ import { readFileSync, statSync } from 'node:fs';
 import { test } from 'node:test';
 
 import { compact } from '../../scripts/gen-public-suffixes.js';
-import { TENANT_DOMAINS, parseSuffixRules, publicSuffix, registrableDomain, suffixRules } from '../../server/src/util/public-suffix.js';
-import { siteIdentity } from '../../server/src/util/site-identity.js';
+import { TENANT_DOMAINS, parseSuffixRules, publicSuffix, registrableDomain, suffixRules } from '../../plugin/server/src/util/public-suffix.js';
+import { siteIdentity } from '../../plugin/server/src/util/site-identity.js';
 
-const DATA = new URL('../../server/data/public-suffixes.txt', import.meta.url);
+const DATA = new URL('../../plugin/server/data/public-suffixes.txt', import.meta.url);
 
 test('the data file holds both sections of the list, fits the directory\'s size rule, and names the list\'s version', () => {
   const text = readFileSync(DATA, 'utf8');

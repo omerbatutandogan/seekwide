@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { buildNextRoutes, matchNextRoute, pathSegments } from '../../server/src/repo/next-routes.js';
-import { listFiles } from '../../server/src/repo/scan.js';
+import { buildNextRoutes, matchNextRoute, pathSegments } from '../../plugin/server/src/repo/next-routes.js';
+import { listFiles } from '../../plugin/server/src/repo/scan.js';
 import { NEXT_FIXTURE } from '../helpers/repo.js';
 
 /**

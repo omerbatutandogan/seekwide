@@ -7,8 +7,8 @@ import { mkdir, readdir, stat, symlink, utimes, writeFile } from 'node:fs/promis
 import path from 'node:path';
 import { after, test } from 'node:test';
 
-import { createCrawlManager } from '../../server/src/crawl/manager.js';
-import { createCrawlStore } from '../../server/src/crawl/store.js';
+import { createCrawlManager } from '../../plugin/server/src/crawl/manager.js';
+import { createCrawlStore } from '../../plugin/server/src/crawl/store.js';
 import { makeCrawl, makeVitals } from '../helpers/factories.js';
 import { removeTempDirs, tempDir } from './harness.js';
 

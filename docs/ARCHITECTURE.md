@@ -2,7 +2,7 @@
 
 This document is the contract between the modules. If code and this document disagree, fix one of them in the same change.
 
-Data shapes live in [`server/src/types.js`](../server/src/types.js), which names the shapes defined per area under `server/src/types/`. Check definitions are specified in [`CHECKS-SPEC.md`](CHECKS-SPEC.md).
+Data shapes live in [`plugin/server/src/types.js`](../plugin/server/src/types.js), which names the shapes defined per area under `plugin/server/src/types/`. Check definitions are specified in [`CHECKS-SPEC.md`](CHECKS-SPEC.md).
 
 ## 1. What v0.1 core does
 
@@ -12,7 +12,7 @@ A user runs `/seekwide:basic https://example.com`. The plugin crawls the site po
 skill (SKILL.md)
    │  calls MCP tools
    ▼
-MCP server (server/src/index.js)
+MCP server (plugin/server/src/index.js)
    ├─ crawl_start / crawl_status ──► crawl/  ──► net/ (safe-fetch, robots, sitemap)
    │                                   └──────► extract/ (HTML → PageRecord)
    ├─ project_detect ──► repo/ (what kind of project the folder holds, which file answers a URL)
@@ -31,7 +31,7 @@ Not in this milestone: fixes other than metadata, and every module other than `s
 ## 2. Principles that shape the code
 
 1. **Scripted checks are deterministic.** The same data always gives the same findings, ids and scores. No clocks, random numbers or network calls inside checks. Timestamps and ids are passed in by the caller. What comes from outside the crawl (external link results, Core Web Vitals) is collected before the checks run and handed to them as data. That data can differ between two audits of an unchanged site: an external site can answer differently, a lab test at Google varies from run to run, the real-user data covers a 28-day window that moves every day, and Google can answer one audit and refuse the next. The lab checks are `likely` for that reason.
-2. **Code measures, the model judges.** Everything under `server/` is `engine: code`. Model judgment (rewriting a title, summarizing) happens in skills and never changes a score.
+2. **Code measures, the model judges.** Everything under `plugin/server/` is `engine: code`. Model judgment (rewriting a title, summarizing) happens in skills and never changes a score.
 3. **Crawled content is untrusted data.** It is stored and returned as plain strings inside structured fields. Nothing from a page is ever executed, interpolated into a command, or written into HTML unescaped.
 4. **The crawler is a polite, honest client.** It obeys robots.txt, identifies itself with `USER_AGENT` from `config.js`, sends one request at a time, and stops when a site challenges it. It never impersonates a browser or another bot and never tries to get past a block.
 5. **No private-network access.** Every request goes through `safeFetch`, which refuses non-public addresses.
@@ -42,11 +42,13 @@ Not in this milestone: fixes other than metadata, and every module other than `s
 
 ## 3. Layout and ownership
 
+Only `plugin/` ships: the marketplace's `source` is `./plugin`, so Claude Code copies that folder and nothing else. It holds the manifest (`.claude-plugin/`), `.mcp.json`, `skills/`, `references/`, `server/`, a `package.json` with its lockfile, a README and the LICENSE. The tests, fixtures, evals, docs and scripts stay at the root of the repository. The paths below start at `plugin/` for the server and at the repository root for `test/`.
+
 ```
-server/src/
+plugin/server/src/
   config.js  types.js (+ types/)  log.js   shared
   util/{url,hash,strings,site-identity,public-suffix,errors,plain-host}.js  shared
-server/data/public-suffixes.txt  the Public Suffix List, compacted (scripts/gen-public-suffixes.js)
+plugin/server/data/public-suffixes.txt  the Public Suffix List, compacted (scripts/gen-public-suffixes.js)
   checks/{engine,scoring,validate,registry,page-helpers}.js   shared
   net/        safe-fetch.js connect.js body.js ip.js polite.js robots.js robots-parse.js robots-match.js robots-cache.js
               sitemap.js sitemap-scan.js link-check.js image-check.js
@@ -69,7 +71,7 @@ server/data/public-suffixes.txt  the Public Suffix List, compacted (scripts/gen-
   index.js    entry point
 test/
   helpers/{http-server,factories,run-factory,repo,server-process,failing-server-run,google-api}.js    shared
-  <area>/*.test.js                      mirrors server/src
+  <area>/*.test.js                      mirrors plugin/server/src
 ```
 
 Each module is written against the contracts below. A change to a contract changes this document and the code in the same pull request.
@@ -675,6 +677,6 @@ export function publicSuffix(name), registrableDomain(name)      // the list's a
 
 - **One answer per question.** `SiteIdentity` answers `isInternal(url)` (the crawl's scope), `isSiteHost(url)` (the site's host name), `isDeployed(url)`, `namesSite(url)` (any of the three: what a share link may share), `isSameOrganisation(host)`, `sharesName(host)` (the organisation, or its name under any ending: the hosts left alone after a refusal) and `isPublic(url)`. `buildContext` puts the crawl's identity on `ctx.identity`; the extractor builds one per page from `siteHost`, `includeSubdomains` and `deployedOrigin`, without visible hosts; `selectImageFiles` and `externalLinkUrls` build one from the crawl.
 - **Consumers.** The crawler and the extractor (`isInternalUrl`, through `util/url.js`), the crawl manager (`crawlKey`), the local crawl's deployed address (`isDeployed`, in `audit_run`'s external link list and the security checks), `seo.canonical.cross_host` (`isSiteHost`), the security scan, `security.hidden.external_link` and `security.embeds.rare_host` (`isSameOrganisation`), the media module's own-site rule (`isSameOrganisation`) and its image selection after a refusal (`sharesName`), and Core Web Vitals (`isPublicHost`). `checks/links/internal.js` compares the host of a redirect's end and of its return parameter with the link's own host exactly: that asks whether two URLs are one address, not whether a host is the site, and a link to the apex that ends on `www.` is a redirect worth reporting.
-- **The suffix list as data.** `server/data/public-suffixes.txt` holds both sections of the Public Suffix List, one line per top-level label, in ASCII (about 120 KiB of 256 allowed for a text file; the list itself is about 330 KiB). `scripts/gen-public-suffixes.js <public_suffix_list.dat>` writes it; it is read once, on first use, into three sets (rules, wildcards, exceptions). Hosting services that give each customer a host but are missing from the list are added in code (`TENANT_DOMAINS`), each with its source. A new copy of the list can change what the checks report, so it comes with a rule set version (CONTRIBUTING.md).
+- **The suffix list as data.** `plugin/server/data/public-suffixes.txt` holds both sections of the Public Suffix List, one line per top-level label, in ASCII (about 120 KiB of 256 allowed for a text file; the list itself is about 330 KiB). `scripts/gen-public-suffixes.js <public_suffix_list.dat>` writes it; it is read once, on first use, into three sets (rules, wildcards, exceptions). Hosting services that give each customer a host but are missing from the list are added in code (`TENANT_DOMAINS`), each with its source. A new copy of the list can change what the checks report, so it comes with a rule set version (CONTRIBUTING.md).
 - **Tests.** One table of hosts (www, apex, trailing dot, port, subdomain, the organisation's CDN, another company's CDN, a sister domain, a shared host, a local server and its deployed site) runs through every consumer (`test/util/site-identity.test.js`).
 

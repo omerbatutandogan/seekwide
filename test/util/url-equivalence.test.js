@@ -6,9 +6,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { indexabilityOf } from '../../server/src/extract/indexability.js';
-import { compileRule, decidingRule, rulePath } from '../../server/src/net/robots-match.js';
-import { normalizeUrl, sameCanonicalTarget } from '../../server/src/util/url.js';
+import { indexabilityOf } from '../../plugin/server/src/extract/indexability.js';
+import { compileRule, decidingRule, rulePath } from '../../plugin/server/src/net/robots-match.js';
+import { normalizeUrl, sameCanonicalTarget } from '../../plugin/server/src/util/url.js';
 import { makePage } from '../helpers/factories.js';
 
 test('escapes of unreserved characters are decoded, other escapes keep their meaning with upper-case hex', () => {

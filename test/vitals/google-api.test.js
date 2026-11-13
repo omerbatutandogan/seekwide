@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 
-import { describeFailure, isServiceFailure, nonNegative, requestJson } from '../../server/src/vitals/google-api.js';
+import { describeFailure, isServiceFailure, nonNegative, requestJson } from '../../plugin/server/src/vitals/google-api.js';
 import { INVALID_KEY, KEYLESS_PSI, NO_CRUX_DATA, googleError } from '../helpers/google-api.js';
 import { startServer } from '../helpers/http-server.js';
 
-/** @import { ApiFailure } from '../../server/src/vitals/google-api.js' */
+/** @import { ApiFailure } from '../../plugin/server/src/vitals/google-api.js' */
 
 /** @type {Awaited<ReturnType<typeof startServer>>} */
 let server;

@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { SITE } from '../../helpers/factories.js';
 import { audit, findingsFor, mediaPage, statFor } from './support.js';
 
-/** @import { JsonLdBlock, VideoRecord } from '../../../server/src/types.js' */
+/** @import { JsonLdBlock, VideoRecord } from '../../../plugin/server/src/types.js' */
 
 const CAPTIONS = 'media.video.captions_missing';
 const INCOMPLETE = 'media.video.structured_data_incomplete';

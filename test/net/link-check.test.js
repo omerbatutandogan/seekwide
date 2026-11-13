@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { checkExternalLinks } from '../../server/src/net/link-check.js';
-import { createHostGates } from '../../server/src/net/polite.js';
+import { checkExternalLinks } from '../../plugin/server/src/net/link-check.js';
+import { createHostGates } from '../../plugin/server/src/net/polite.js';
 import { startServer } from '../helpers/http-server.js';
 import { fetchResult } from './fake-fetch.js';
 
-/** @import { FetchResult } from '../../server/src/types.js' */
+/** @import { FetchResult } from '../../plugin/server/src/types.js' */
 
 const noSleep = async () => {};
 

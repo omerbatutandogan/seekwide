@@ -1,10 +1,10 @@
-// Builders for `Run` objects (server/src/types.js) that look like real audit
+// Builders for `Run` objects (plugin/server/src/types.js) that look like real audit
 // output, for tests of storage, reports and tools.
 
-/** @import { CheckStat, Finding, ModuleScore, Run } from '../../server/src/types.js' */
+/** @import { CheckStat, Finding, ModuleScore, Run } from '../../plugin/server/src/types.js' */
 
-import { RULES_VERSION, SCHEMA_VERSION } from '../../server/src/config.js';
-import { shortId } from '../../server/src/util/hash.js';
+import { RULES_VERSION, SCHEMA_VERSION } from '../../plugin/server/src/config.js';
+import { shortId } from '../../plugin/server/src/util/hash.js';
 
 const SITE = 'https://example.test';
 const CREATED_AT = '2026-11-11T14:03:22.000Z';

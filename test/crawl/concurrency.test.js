@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { after, it } from 'node:test';
 
-import { createCrawlManager } from '../../server/src/crawl/manager.js';
+import { createCrawlManager } from '../../plugin/server/src/crawl/manager.js';
 import { removeTempDirs, tempDir } from './harness.js';
 
 after(removeTempDirs);
@@ -57,7 +57,7 @@ it('crawls of one site started at the same moment get one job, while the local c
 
 it('a crawl stops as truncated when its page records reach the size budget, and runs to its page limit below it', async () => {
   const { startServer } = await import('../helpers/http-server.js');
-  const { safeFetch } = await import('../../server/src/net/safe-fetch.js');
+  const { safeFetch } = await import('../../plugin/server/src/net/safe-fetch.js');
   /** @type {Record<string, {body: string}>} */
   const routes = {};
   for (let i = 0; i < 8; i += 1) routes[`/p${i}`] = { body: `<!doctype html><html lang="en"><head><title>P${i}</title></head><body>${'<p>text</p>'.repeat(50)}<a href="/p${i + 1}">next</a></body></html>` };

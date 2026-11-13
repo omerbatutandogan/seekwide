@@ -1,13 +1,13 @@
 import path from 'node:path';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { ToolError } from '../../server/src/mcp/stdio.js';
-import { LIMITS } from '../../server/src/config.js';
-import { createTools } from '../../server/src/tools/index.js';
-import { UNTRUSTED_NOTE } from '../../server/src/tools/common.js';
+import { ToolError } from '../../plugin/server/src/mcp/stdio.js';
+import { LIMITS } from '../../plugin/server/src/config.js';
+import { createTools } from '../../plugin/server/src/tools/index.js';
+import { UNTRUSTED_NOTE } from '../../plugin/server/src/tools/common.js';
 import { PROJECT, makeDeps, toolNamed } from './fakes.js';
 
-/** @import { Finding, Run } from '../../server/src/types.js' */
+/** @import { Finding, Run } from '../../plugin/server/src/types.js' */
 
 /**
  * @param {string} id

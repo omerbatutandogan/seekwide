@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { extractPage, redirectRecord, unreadableRecord } from '../../server/src/extract/page.js';
+import { extractPage, redirectRecord, unreadableRecord } from '../../plugin/server/src/extract/page.js';
 import { makePage } from '../helpers/factories.js';
 import { PAGE_URL, makeFetch, makeInput } from './fetch-result.js';
 

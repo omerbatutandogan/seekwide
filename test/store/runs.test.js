@@ -4,10 +4,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import { writeFileAtomic } from '../../server/src/store/fs-util.js';
-import { projectPaths } from '../../server/src/store/project.js';
-import { packRun } from '../../server/src/store/run-file.js';
-import { listRuns, loadRun, newRunId, saveRun } from '../../server/src/store/runs.js';
+import { writeFileAtomic } from '../../plugin/server/src/store/fs-util.js';
+import { projectPaths } from '../../plugin/server/src/store/project.js';
+import { packRun } from '../../plugin/server/src/store/run-file.js';
+import { listRuns, loadRun, newRunId, saveRun } from '../../plugin/server/src/store/runs.js';
 import { makeFinding, makeRun } from '../helpers/run-factory.js';
 
 /** @param {import('node:test').TestContext} t */

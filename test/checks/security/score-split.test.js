@@ -6,9 +6,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { validateCheckDef } from '../../../server/src/checks/validate.js';
-import { checks } from '../../../server/src/checks/security/index.js';
-import { buildReport } from '../../../server/src/report/model.js';
+import { validateCheckDef } from '../../../plugin/server/src/checks/validate.js';
+import { checks } from '../../../plugin/server/src/checks/security/index.js';
+import { buildReport } from '../../../plugin/server/src/report/model.js';
 import { makePage, makeSecurity, makeSecurityHeaders } from '../../helpers/factories.js';
 import { makeRun } from '../../helpers/run-factory.js';
 import { audit } from './support.js';

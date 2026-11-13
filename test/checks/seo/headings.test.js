@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { SITE, makePage } from '../../helpers/factories.js';
 import { audit } from './helpers.js';
 
-/** @import { Heading } from '../../../server/src/types.js' */
+/** @import { Heading } from '../../../plugin/server/src/types.js' */
 
 const NOINDEX = { indexable: false, reasons: ['noindex_meta'] };
 

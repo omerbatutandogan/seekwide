@@ -49,9 +49,9 @@ Seekwide fetches pages from sites it does not control and hands the results to a
 
 ## Dependencies
 
-The plugin has one runtime dependency, `parse5`, pinned. CI fails when `npm audit` reports a known vulnerability of any level in it, and Dependabot proposes updates every week.
+The plugin has one runtime dependency, `parse5`, pinned, declared in `plugin/package.json` and locked in `plugin/package-lock.json`. The `plugin/` folder (the marketplace's `source`) is the only part of the repository that is installed: Claude Code copies it into its plugin cache and installs the dependency there. Adding the marketplace also clones the whole repository into Claude Code's marketplace folder, but the tests, fixtures, evals, docs and scripts in that clone are not part of the installed plugin and nothing runs them; the development tools CI installs are not installed at all. CI fails when `npm audit` reports a known vulnerability of any level in the dependency, and Dependabot proposes updates every week.
 
-CI installs them with `npm ci --ignore-scripts` from the lockfile, which pins every package with its integrity hash. The GitHub Actions it uses are pinned to full commit SHAs, and the tools it installs (TypeScript, the Node.js types, Claude Code) to exact versions, so a moved tag or a new release cannot change what CI runs. The workflow's token can only read the repository, and the checkout does not keep it.
+CI installs it with `npm ci --ignore-scripts` in `plugin/`, from that lockfile, which pins every package with its integrity hash. The GitHub Actions it uses are pinned to full commit SHAs, and the tools it installs (TypeScript, the Node.js types, Claude Code) to exact versions, so a moved tag or a new release cannot change what CI runs. The workflow's token can only read the repository, and the checkout does not keep it.
 
 ## Supported versions
 

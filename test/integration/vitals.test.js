@@ -6,13 +6,13 @@
 import assert from 'node:assert/strict';
 import { after, before, beforeEach, test } from 'node:test';
 
-import { allChecks } from '../../server/src/checks/registry.js';
-import { renderHtml } from '../../server/src/report/html.js';
-import { renderMarkdown } from '../../server/src/report/markdown.js';
-import { createTools } from '../../server/src/tools/index.js';
-import { queryCrux } from '../../server/src/vitals/crux.js';
-import { measureVitals } from '../../server/src/vitals/measure.js';
-import { runPagespeed } from '../../server/src/vitals/psi.js';
+import { allChecks } from '../../plugin/server/src/checks/registry.js';
+import { renderHtml } from '../../plugin/server/src/report/html.js';
+import { renderMarkdown } from '../../plugin/server/src/report/markdown.js';
+import { createTools } from '../../plugin/server/src/tools/index.js';
+import { queryCrux } from '../../plugin/server/src/vitals/crux.js';
+import { measureVitals } from '../../plugin/server/src/vitals/measure.js';
+import { runPagespeed } from '../../plugin/server/src/vitals/psi.js';
 import { makeCrawl, makePage } from '../helpers/factories.js';
 import { INVALID_KEY, KEYLESS_PSI, NO_CRUX_DATA, cruxAnswer, psiAnswer, startGoogle } from '../helpers/google-api.js';
 import { jobFor, makeDeps, toolNamed } from '../tools/fakes.js';

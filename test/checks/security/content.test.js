@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { foreignScriptOf, scriptsOfLanguage, siteScripts } from '../../../server/src/checks/security/content.js';
+import { foreignScriptOf, scriptsOfLanguage, siteScripts } from '../../../plugin/server/src/checks/security/content.js';
 import { SITE, makePage, makeSecurity } from '../../helpers/factories.js';
 import { audit, findingsFor, statFor } from './support.js';
 
@@ -10,8 +10,8 @@ const SCRIPT = 'security.content.foreign_script';
 
 /**
  * @param {string} path
- * @param {Partial<import('../../../server/src/types.js').PageSecurity>} security
- * @param {Partial<import('../../../server/src/types.js').PageRecord>} [overrides]
+ * @param {Partial<import('../../../plugin/server/src/types.js').PageSecurity>} security
+ * @param {Partial<import('../../../plugin/server/src/types.js').PageRecord>} [overrides]
  */
 const page = (path, security, overrides = {}) => makePage({ url: `${SITE}${path}`, security: makeSecurity(security), ...overrides });
 

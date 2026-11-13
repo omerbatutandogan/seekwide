@@ -10,12 +10,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { buildContext, runChecks } from '../../server/src/checks/engine.js';
-import { allChecks } from '../../server/src/checks/registry.js';
-import { createToolDeps } from '../../server/src/deps.js';
-import { planFixes } from '../../server/src/repo/fixes.js';
-import { attachSources, loadProjectSources } from '../../server/src/repo/sources.js';
-import { createTools } from '../../server/src/tools/index.js';
+import { buildContext, runChecks } from '../../plugin/server/src/checks/engine.js';
+import { allChecks } from '../../plugin/server/src/checks/registry.js';
+import { createToolDeps } from '../../plugin/server/src/deps.js';
+import { planFixes } from '../../plugin/server/src/repo/fixes.js';
+import { attachSources, loadProjectSources } from '../../plugin/server/src/repo/sources.js';
+import { createTools } from '../../plugin/server/src/tools/index.js';
 import { MONOREPO_FIXTURE, NEXT_TS_FIXTURE, crawlLocal, startServer } from '../helpers/repo.js';
 import { makeRun } from '../helpers/run-factory.js';
 

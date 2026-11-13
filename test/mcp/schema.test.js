@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { assertSupportedSchema, validate } from '../../server/src/mcp/schema.js';
+import { assertSupportedSchema, validate } from '../../plugin/server/src/mcp/schema.js';
 
 describe('validate', () => {
   it('checks type, including integer and type lists', () => {

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { after, before, beforeEach, test } from 'node:test';
 
-import { USER_AGENT } from '../../server/src/config.js';
-import { PSI_ENDPOINT, runPagespeed } from '../../server/src/vitals/psi.js';
+import { USER_AGENT } from '../../plugin/server/src/config.js';
+import { PSI_ENDPOINT, runPagespeed } from '../../plugin/server/src/vitals/psi.js';
 import { INVALID_KEY, KEYLESS_PSI, PSI_PATH, googleError, psiAnswer, startGoogle } from '../helpers/google-api.js';
 
 /** @import { Reply, SeenRequest } from '../helpers/google-api.js' */

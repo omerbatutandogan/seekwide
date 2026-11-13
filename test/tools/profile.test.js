@@ -1,10 +1,10 @@
 import path from 'node:path';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { ToolError } from '../../server/src/mcp/stdio.js';
-import { createTools } from '../../server/src/tools/index.js';
+import { ToolError } from '../../plugin/server/src/mcp/stdio.js';
+import { createTools } from '../../plugin/server/src/tools/index.js';
 import { NOW, PROJECT, makeDeps, toolNamed } from './fakes.js';
-import { PROFILE_NOTE } from '../../server/src/tools/profile.js';
+import { PROFILE_NOTE } from '../../plugin/server/src/tools/profile.js';
 
 /** @param {ReturnType<typeof makeDeps>} fake @param {string} name */
 const tool = (fake, name) => toolNamed(createTools(fake.deps), name);

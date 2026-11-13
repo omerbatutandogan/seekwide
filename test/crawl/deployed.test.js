@@ -4,10 +4,10 @@
 import assert from 'node:assert/strict';
 import { after, describe, it } from 'node:test';
 
-import { deployedOriginOf, localizeRecord, localizeUrls, toLocalUrl } from '../../server/src/crawl/deployed.js';
-import { siteIdentity } from '../../server/src/util/site-identity.js';
-import { createCrawlManager } from '../../server/src/crawl/manager.js';
-import { safeFetch } from '../../server/src/net/safe-fetch.js';
+import { deployedOriginOf, localizeRecord, localizeUrls, toLocalUrl } from '../../plugin/server/src/crawl/deployed.js';
+import { siteIdentity } from '../../plugin/server/src/util/site-identity.js';
+import { createCrawlManager } from '../../plugin/server/src/crawl/manager.js';
+import { safeFetch } from '../../plugin/server/src/net/safe-fetch.js';
 import { makePage } from '../helpers/factories.js';
 import { startServer } from '../helpers/http-server.js';
 import { removeTempDirs, tempDir } from './harness.js';
@@ -219,7 +219,7 @@ describe('a crawl of a local server whose pages name the deployed site', () => {
   it('a robots.txt on the local server that redirects to another host is not followed there', async () => {
     /** @type {string[]} */
     const asked = [];
-    const { safeFetch } = await import('../../server/src/net/safe-fetch.js');
+    const { safeFetch } = await import('../../plugin/server/src/net/safe-fetch.js');
     const server = await startServer({ ...routes(), '/robots.txt': { status: 302, redirect: `${DEPLOYED}/robots.txt` } });
     try {
       const manager = createCrawlManager({
@@ -244,7 +244,7 @@ describe('a crawl of a local server whose pages name the deployed site', () => {
   it('a sitemap on the local server that redirects to another host is not followed there either', async () => {
     /** @type {string[]} */
     const asked = [];
-    const { safeFetch } = await import('../../server/src/net/safe-fetch.js');
+    const { safeFetch } = await import('../../plugin/server/src/net/safe-fetch.js');
     const server = await startServer({ ...routes(), '/robots.txt': { headers: { 'content-type': 'text/plain' }, body: 'User-agent: *\nAllow: /\n' }, '/sitemap.xml': { status: 301, redirect: 'https://cdn.example.net/sitemap.xml' } });
     try {
       const manager = createCrawlManager({

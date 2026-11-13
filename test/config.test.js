@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { CAPABILITIES, LIMITS, googleApiKey, googleApiKeySetting, toolSettings } from '../server/src/config.js';
+import { CAPABILITIES, LIMITS, googleApiKey, googleApiKeySetting, toolSettings } from '../plugin/server/src/config.js';
 
 test('googleApiKey returns the key from the plugin settings, trimmed', () => {
   assert.equal(googleApiKey({ SEEKWIDE_GOOGLE_API_KEY: 'AIzaSyExample-Key_123' }), 'AIzaSyExample-Key_123');

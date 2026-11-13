@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { placeholderReason } from '../../../server/src/checks/media/alt.js';
-import { reservesSpace } from '../../../server/src/checks/media/layout.js';
+import { placeholderReason } from '../../../plugin/server/src/checks/media/alt.js';
+import { reservesSpace } from '../../../plugin/server/src/checks/media/layout.js';
 import { SITE, makePage } from '../../helpers/factories.js';
 import { audit, findingsFor, mediaImage, mediaPage, statFor } from './support.js';
 

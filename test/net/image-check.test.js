@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { USER_AGENT } from '../../server/src/config.js';
-import { IMAGE_ACCEPT, checkImageFiles, fileSize } from '../../server/src/net/image-check.js';
-import { createHostGates } from '../../server/src/net/polite.js';
+import { USER_AGENT } from '../../plugin/server/src/config.js';
+import { IMAGE_ACCEPT, checkImageFiles, fileSize } from '../../plugin/server/src/net/image-check.js';
+import { createHostGates } from '../../plugin/server/src/net/polite.js';
 import { startServer } from '../helpers/http-server.js';
 import { fakeFetch, fetchResult } from './fake-fetch.js';
 
@@ -29,7 +29,7 @@ test('robots.txt is read first, then one HEAD that accepts AVIF and WebP gives t
 test('a HEAD without a size is followed by one GET for the first byte, which reads at most 1 KiB', async () => {
   /** @type {any[]} */
   const calls = [];
-  /** @type {typeof import('../../server/src/net/safe-fetch.js').safeFetch} */
+  /** @type {typeof import('../../plugin/server/src/net/safe-fetch.js').safeFetch} */
   const fetch = async (url, options = {}) => {
     calls.push({ url, options });
     if (url.endsWith('/robots.txt')) return fetchResult(url, { status: 404 });
@@ -45,7 +45,7 @@ test('a HEAD without a size is followed by one GET for the first byte, which rea
 });
 
 test('a HEAD the server refuses is retried once with the ranged GET; a GET that does worse keeps the HEAD answer', async () => {
-  /** @type {typeof import('../../server/src/net/safe-fetch.js').safeFetch} */
+  /** @type {typeof import('../../plugin/server/src/net/safe-fetch.js').safeFetch} */
   const fetch = async (url, options = {}) => {
     if (url.endsWith('/robots.txt')) return fetchResult(url, { status: 404 });
     if (url.endsWith('/head-405.webp')) return options.method === 'HEAD' ? fetchResult(url, { status: 405 }) : fetchResult(url, { status: 200, headers: { 'content-type': 'image/webp', 'content-length': '900' } });

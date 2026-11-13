@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import zlib from 'node:zlib';
 
-import { loadSitemaps } from '../../server/src/net/sitemap.js';
-import { scanSitemap } from '../../server/src/net/sitemap-scan.js';
+import { loadSitemaps } from '../../plugin/server/src/net/sitemap.js';
+import { scanSitemap } from '../../plugin/server/src/net/sitemap-scan.js';
 import { fakeFetch } from './fake-fetch.js';
 
 const S = 'https://site.test';

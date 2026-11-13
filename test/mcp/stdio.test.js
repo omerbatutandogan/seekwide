@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { PassThrough } from 'node:stream';
-import { ToolError, createStdioServer } from '../../server/src/mcp/stdio.js';
+import { ToolError, createStdioServer } from '../../plugin/server/src/mcp/stdio.js';
 
 const META = {
   'io.modelcontextprotocol/protocolVersion': '2026-07-28',
@@ -10,7 +10,7 @@ const META = {
 };
 const SERVER_INFO = { 'io.modelcontextprotocol/serverInfo': { name: 'test-server', version: '9.9.9' } };
 
-/** @type {import('../../server/src/mcp/stdio.js').ToolDef[]} */
+/** @type {import('../../plugin/server/src/mcp/stdio.js').ToolDef[]} */
 const TOOLS = [
   {
     name: 'echo',
@@ -40,7 +40,7 @@ const TOOLS = [
 ];
 
 /**
- * @param {import('../../server/src/mcp/stdio.js').ToolDef[]} [tools]
+ * @param {import('../../plugin/server/src/mcp/stdio.js').ToolDef[]} [tools]
  */
 function harness(tools = TOOLS) {
   const input = new PassThrough();

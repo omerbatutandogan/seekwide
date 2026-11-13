@@ -4,9 +4,9 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import { createCrawlManager } from '../../server/src/crawl/manager.js';
-import { createHostGates } from '../../server/src/net/polite.js';
-import { createRobotsCache } from '../../server/src/net/robots-cache.js';
+import { createCrawlManager } from '../../plugin/server/src/crawl/manager.js';
+import { createHostGates } from '../../plugin/server/src/net/polite.js';
+import { createRobotsCache } from '../../plugin/server/src/net/robots-cache.js';
 import { fakeExtract } from './fake-records.js';
 
 export const NOW = new Date('2026-11-11T14:03:22Z');

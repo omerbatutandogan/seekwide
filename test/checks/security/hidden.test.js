@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { SITE, makeLink, makePage, makeSecurity } from '../../helpers/factories.js';
 import { audit, findingsFor, statFor } from './support.js';
 
-/** @import { HiddenLinkRecord } from '../../../server/src/types.js' */
+/** @import { HiddenLinkRecord } from '../../../plugin/server/src/types.js' */
 
 const ID = 'security.hidden.external_link';
 

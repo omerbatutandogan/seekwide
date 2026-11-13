@@ -1,8 +1,8 @@
-// Builders for the data shapes in server/src/types.js, for unit tests.
+// Builders for the data shapes in plugin/server/src/types.js, for unit tests.
 // Each builder returns a valid object with sensible defaults; pass only the
 // fields a test cares about.
 
-/** @import { CrawlResult, FieldRecord, LabMetrics, LinkRecord, ImageRecord, PageRecord, PageSecurity, SecurityHeaders, VitalsData } from '../../server/src/types.js' */
+/** @import { CrawlResult, FieldRecord, LabMetrics, LinkRecord, ImageRecord, PageRecord, PageSecurity, SecurityHeaders, VitalsData } from '../../plugin/server/src/types.js' */
 
 const SITE = 'https://example.test';
 

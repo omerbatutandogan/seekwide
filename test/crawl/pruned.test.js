@@ -7,9 +7,9 @@ import { readFile, utimes } from 'node:fs/promises';
 import path from 'node:path';
 import { after, test } from 'node:test';
 
-import { createCrawlManager } from '../../server/src/crawl/manager.js';
-import { FILES_KEPT, createCrawlStore } from '../../server/src/crawl/store.js';
-import { crawlTools } from '../../server/src/tools/crawl.js';
+import { createCrawlManager } from '../../plugin/server/src/crawl/manager.js';
+import { FILES_KEPT, createCrawlStore } from '../../plugin/server/src/crawl/store.js';
+import { crawlTools } from '../../plugin/server/src/tools/crawl.js';
 import { makeCrawl } from '../helpers/factories.js';
 import { removeTempDirs, tempDir } from './harness.js';
 

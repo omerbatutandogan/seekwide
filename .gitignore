@@ -23,5 +23,7 @@ docs/internal/
 # the scaffolds start
 evals/results/
 evals/*/*.jsonl
+# The link to evals/ that a run of the suite puts into the plugin folder
+/plugin/evals
 evals/.deps-dir
 evals/.servers/

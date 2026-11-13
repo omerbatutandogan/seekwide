@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Writes server/data/public-suffixes.txt, the compact copy of the Public
+// Writes plugin/server/data/public-suffixes.txt, the compact copy of the Public
 // Suffix List that site-identity.js reads, from a copy of the list itself.
 //
 // Usage:
@@ -16,7 +16,7 @@ import path from 'node:path';
 import { domainToASCII, fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const TARGET = path.join(ROOT, 'server', 'data', 'public-suffixes.txt');
+const TARGET = path.join(ROOT, 'plugin', 'server', 'data', 'public-suffixes.txt');
 
 /**
  * One rule in ASCII, as host names arrive from `URL`: each label through

@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { after, it } from 'node:test';
 
-import { createCrawlManager } from '../../server/src/crawl/manager.js';
+import { createCrawlManager } from '../../plugin/server/src/crawl/manager.js';
 import { removeTempDirs, tempDir } from './harness.js';
 
 after(removeTempDirs);

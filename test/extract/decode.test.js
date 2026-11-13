@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { decodeBody, isHtmlResponse, mediaTypeOf } from '../../server/src/extract/decode.js';
-import { extractPage } from '../../server/src/extract/page.js';
+import { decodeBody, isHtmlResponse, mediaTypeOf } from '../../plugin/server/src/extract/decode.js';
+import { extractPage } from '../../plugin/server/src/extract/page.js';
 import { makeFetch, makeInput } from './fetch-result.js';
 
 // "Şişli'de güzel bir gün, İzmir" in windows-1254: ş=FE, Ş=DE, ğ=F0, İ=DD, ü=FC.

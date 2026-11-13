@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { buildContext } from '../../../server/src/checks/engine.js';
+import { buildContext } from '../../../plugin/server/src/checks/engine.js';
 import { SITE, makeCrawl, makeLink, makePage, makeRedirect } from '../../helpers/factories.js';
 import { audit, checkById, findingsFor, makeRawLink, statFor } from './support.js';
 
-/** @import { PageRecord } from '../../../server/src/types.js' */
+/** @import { PageRecord } from '../../../plugin/server/src/types.js' */
 
 const errorPage = (/** @type {string} */ path, /** @type {Partial<PageRecord>} */ extra = {}) =>
   makePage({ url: `${SITE}${path}`, status: 404, indexability: { indexable: false, reasons: ['status_404'] }, ...extra });

@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { SITE, makeField, makeLab, makePage, makeVitals } from '../../helpers/factories.js';
 import { audit } from './helpers.js';
 
-/** @import { VitalsData, VitalsPage } from '../../../server/src/types.js' */
+/** @import { VitalsData, VitalsPage } from '../../../plugin/server/src/types.js' */
 
 const HOME = `${SITE}/`;
 const POST = `${SITE}/blog/post`;
@@ -129,7 +129,7 @@ for (const { id, metric, good, bad, poor, expected, severity, weight } of /** @t
       expected,
       detail: 'One simulated load on an emulated mid-range phone. Lab values change from run to run.',
     });
-    const finding = /** @type {import('../../../server/src/types.js').Finding} */ (byUrl.get(HOME));
+    const finding = /** @type {import('../../../plugin/server/src/types.js').Finding} */ (byUrl.get(HOME));
     assert.deepEqual([finding.confidence, finding.severity, finding.weight], ['likely', severity, weight]);
   });
 

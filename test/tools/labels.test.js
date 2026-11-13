@@ -4,8 +4,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { createTools } from '../../server/src/tools/index.js';
-import { UNTRUSTED_NOTE, clipValue, findingForModel } from '../../server/src/tools/common.js';
+import { createTools } from '../../plugin/server/src/tools/index.js';
+import { UNTRUSTED_NOTE, clipValue, findingForModel } from '../../plugin/server/src/tools/common.js';
 import { makeFinding, makeRun } from '../helpers/run-factory.js';
 import { jobFor, makeDeps, sampleCrawl, toolNamed } from './fakes.js';
 
