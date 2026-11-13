@@ -8,7 +8,10 @@ import { InputError } from '../util/errors.js';
 import { writeFileAtomic } from '../store/fs-util.js';
 import { ensureRunDir } from '../store/project.js';
 import { PROJECT_DIR_SCHEMA, loadBaseRun, resolveProjectDir, runRefSchema, settingValue, withStoreErrors } from './common.js';
+import { IMPORT_SOURCES } from '../imports/parse.js';
+import { matchPages } from '../imports/match.js';
 import { loadLogo } from './logo.js';
+import { crawlOfRun } from './search-data.js';
 
 const FORMATS = /** @type {const} */ (['markdown', 'html']);
 const FILE_FORMATS = /** @type {const} */ ({ markdown: 'md', html: 'html' });
@@ -37,7 +40,8 @@ export function reportTools(deps) {
       name: 'report_render',
       title: 'Render the report',
       description:
-        "Write the Markdown and/or HTML report of a saved run into the run's folder. Brand name and logo come from the " +
+        "Write the Markdown and/or HTML report of a saved run into the run's folder. Imported search data (search_data_import) fills the search " +
+        'performance section and orders findings by impressions. Brand name and logo come from the ' +
         'arguments, then the profile, then SEEKWIDE_REPORT_BRAND and SEEKWIDE_REPORT_LOGO. The logo must be a PNG, JPEG, WebP or SVG image ' +
         'of at most 200 KB; a logo named by the profile must be inside the project folder.',
       inputSchema: {
@@ -61,6 +65,12 @@ export function reportTools(deps) {
           brand_name: { type: 'string', maxLength: 200, description: 'Shown as "Prepared by".' },
           logo_path: { type: 'string', maxLength: 4096, description: 'Logo file, absolute or relative to project_dir.' },
           compare_to: runRefSchema('Run id, or "previous" for the newest run older than the one rendered, to include a "changes since" section.'),
+          search_data: {
+            type: 'array',
+            items: { type: 'string', enum: [...IMPORT_SOURCES] },
+            maxItems: IMPORT_SOURCES.length,
+            description: 'Imported search data to show (search_data_import). Defaults to every source imported into the project; [] leaves it out.',
+          },
         },
         additionalProperties: false,
       },
@@ -82,12 +92,24 @@ export function reportTools(deps) {
         const logo = pickLogo(settingValue(args.logo_path), settingValue(profile?.report?.logo_path), settingValue(deps.env.SEEKWIDE_REPORT_LOGO));
         const logoDataUri = logo ? await loadLogo(logo, projectDir) : undefined;
 
+        const sources = args.search_data === undefined ? [...IMPORT_SOURCES] : [...new Set(/** @type {import('../imports/parse.js').ImportSource[]} */ (args.search_data))];
+        const search = [];
+        for (const source of sources) {
+          const data = await withStoreErrors(() => deps.loadSearchImport(projectDir, source));
+          if (data === null) {
+            if (args.search_data === undefined) continue;
+            throw new ToolError(`No search data from ${source} was imported into this project. Import the export with search_data_import, or leave it out of search_data.`);
+          }
+          search.push({ data, match: matchPages(data, run, await crawlOfRun(deps, run)) });
+        }
+
         const options = {
           ...(args.executive_summary !== undefined ? { executiveSummary: args.executive_summary } : {}),
           ...(args.recommendations !== undefined ? { recommendations: args.recommendations } : {}),
           ...(brandName ? { brandName } : {}),
           ...(logoDataUri ? { logoDataUri } : {}),
           ...(comparison ? { comparison } : {}),
+          ...(search.length > 0 ? { search } : {}),
         };
 
         const formats = args.formats && args.formats.length > 0 ? [...new Set(/** @type {('markdown'|'html')[]} */ (args.formats))] : [...FORMATS];
@@ -111,7 +133,7 @@ export function reportTools(deps) {
           files[format] = file;
           bytes[format] = Buffer.byteLength(content, 'utf8');
         }
-        return { run_id: run.run_id, files, bytes };
+        return { run_id: run.run_id, files, bytes, search_data: search.map((entry) => entry.data.source) };
       },
     },
   ];

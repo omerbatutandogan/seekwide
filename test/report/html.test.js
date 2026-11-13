@@ -134,16 +134,18 @@ test('scope: budget, truncation, blocks, robots.txt, sitemap and user agent', ()
   assert.match(limited, /No URLs found in XML sitemaps\./);
 });
 
-test('layers: technical eligibility is measured; three say "No data in this version" with a planned source; experience says why it has no data in this run', () => {
+test('layers: technical eligibility is measured; two say "No data in this version" with a planned source; search visibility and experience say why they have no data in this run', () => {
   const out = section(renderHtml(makeRun()), 'layers');
   const cards = out.split(/<div class="layer(?: on)?">/).slice(1);
   assert.equal(cards.length, 5);
   assert.match(out, /<div class="layer on">\s*<h3>Technical eligibility/);
   assert.match(cards[0], /^\s*<h3>Technical eligibility \(this run\)<\/h3><span class="pill">Measured in this run<\/span>/);
-  for (const card of [cards[1], cards[2], cards[4]]) {
+  for (const card of [cards[2], cards[4]]) {
     assert.match(card, /<span class="pill">No data in this version<\/span>/);
     assert.match(card, /Planned source: /);
   }
+  assert.match(cards[1], /<span class="pill">No data in this run<\/span>/);
+  assert.match(cards[1], /None was imported for this report\./);
   assert.match(cards[3], /<span class="pill">No data in this run<\/span>/);
   assert.match(cards[3], /<p class="src">Source: the Chrome UX Report\. It was not asked in this run\.<\/p>/);
   assert.deepEqual(cards.slice(1).map((c) => /<h3>([^<]+)<\/h3>/.exec(c)?.[1]), ['Search visibility', 'AI visibility', 'Experience', 'Business results']);
@@ -322,10 +324,10 @@ test('footer names the versions, the run and the date', () => {
 
 test('the report says which layers have no data and what the audit does not do', () => {
   const out = renderHtml(makeRun());
-  assert.equal(out.match(/No data in this version/g)?.length, 3, 'the three layers this version cannot measure');
-  assert.equal(out.match(/No data in this run/g)?.length, 1, 'the experience layer, which this run did not fill');
+  assert.equal(out.match(/No data in this version/g)?.length, 2, 'the two layers this version cannot measure');
+  assert.equal(out.match(/No data in this run/g)?.length, 2, 'search visibility and experience, which this run did not fill');
   assert.match(out, /Not covered: whether the pages are actually indexed\./);
-  assert.match(out, /The layers marked &quot;No data&quot; were not measured at all\./);
+  assert.match(out, /The layers marked &quot;No data&quot; were not measured at all, and a layer marked &quot;Imported data&quot; holds figures the user supplied\./);
 });
 
 test('the same arguments give byte-identical output, whatever the clock says', (t) => {

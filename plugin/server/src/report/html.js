@@ -7,6 +7,7 @@ import { plural } from './facts.js';
 import { affectedText, confidenceText } from './findings.js';
 import { CSS } from './html-css.js';
 import { buildReport } from './model.js';
+import { trafficText } from './search.js';
 
 /** @typedef {ReturnType<typeof buildReport>} Report */
 
@@ -103,6 +104,22 @@ ${v.notes.length > 0 ? html`<ul class="meta">${v.notes.map((note) => html`<li>${
 </section>`;
 }
 
+/** @param {Report} r */
+function search(r) {
+  const s = r.search;
+  if (s === null) return '';
+  const sources = s.sources.map((source) => html`<h3>${source.name}</h3>
+<dl><dt>Report</dt><dd>${source.report}, from the file <code>${source.file}</code>, imported on ${source.imported}.</dd>
+<dt>Period</dt><dd>${source.periodText}</dd>
+${source.filters.length > 0 ? html`<dt>Filters stated in the export</dt><dd>${source.filters.map((f, i) => html`${i > 0 ? '; ' : ''}${f.name}: ${f.value}`)}</dd>` : ''}
+<dt>Matched with this audit</dt><dd>${source.matchText}</dd></dl>
+<div class="figs">${source.figures.map((f) => html`<div class="fig"><b>${f.value}</b><span>${f.label}</span></div>`)}</div>
+<p class="meta">${source.totalsNote}</p>
+<table><thead><tr><th>Page</th><th class="n">Clicks</th><th class="n">Impressions</th><th class="n">CTR</th><th class="n">Position</th><th class="n">Findings in this audit</th></tr></thead><tbody>${source.topPages.map((page) => html`<tr><td>${urlHtml(page.url)}</td><td class="n">${page.clicks}</td><td class="n">${page.impressions}</td><td class="n">${page.ctr}</td><td class="n">${page.position}</td><td class="n">${page.findings}</td></tr>`)}</tbody></table>
+${source.notes.length > 0 ? html`<ul class="meta">${source.notes.map((note) => html`<li>${note}</li>`)}</ul>` : ''}`);
+  return html`<section id="search-performance"><h2>Search performance (imported)</h2><p class="note">${s.supplied}</p>${sources}<p class="meta">${s.orderNote}</p></section>`;
+}
+
 /** @param {Report['groups'][number]} g */
 function badges(g) {
   return html`<span class="badge sev-${g.severity}">${sevLabel(g.severity)}</span> <span class="badge ${g.confidence}">${confidenceText(g)}</span>`;
@@ -112,7 +129,7 @@ function badges(g) {
 function topFixes(r) {
   const cards = r.topFixes.map((g, i) => html`<article class="card sev-${g.severity}">
 <h3><span class="rank">${i + 1}.</span>${g.title} ${badges(g)}</h3>
-<p class="meta"><code>${g.checkId}</code> &middot; ${affectedText(g)}</p>
+<p class="meta"><code>${g.checkId}</code> &middot; ${affectedText(g)}${g.traffic !== null ? html` &middot; Search data: ${trafficText(g.traffic)} on the affected pages` : ''}</p>
 ${g.recommendation ? html`<p><strong>What to do:</strong> ${g.recommendation}</p>` : ''}
 ${g.examples.length > 0 ? html`<p class="meta">Examples: ${g.examples.map((url) => html`<br>${urlHtml(url)}`)}</p>` : ''}
 ${g.docRef ? html`<p class="meta">Documentation: ${urlHtml(g.docRef)}</p>` : ''}
@@ -131,6 +148,7 @@ function findingItem(f) {
     const { file, line, route } = f.source;
     rows.push(html`<div><span class="k">Source</span><code>${line === null ? file : `${file}:${line}`}</code>${route === null ? '' : html` <span class="k">Route</span><code>${route}</code>`}</div>`);
   }
+  if (f.traffic && f.url !== null && f.traffic.impressions + f.traffic.clicks > 0) rows.push(html`<div><span class="k">Search data</span>${trafficText(f.traffic)}</div>`);
   if (f.related.length > 0) {
     const rest = f.related.length - 3;
     rows.push(html`<div><span class="k">Also</span>${f.related.slice(0, 3).map((url) => html`${urlHtml(url)} `)}${rest > 0 ? `+${rest} more` : ''}</div>`);
@@ -223,7 +241,7 @@ export function renderHtml(run, options) {
 </head>
 <body>
 <main>
-${titleBlock(r)}${summary(r)}${scope(r)}${fixes(r)}${layers(r)}${scores(r)}${vitals(r)}${topFixes(r)}${allFindings(r)}${suggestions(r)}${notRun(r)}${changes(r)}${method(r)}
+${titleBlock(r)}${summary(r)}${scope(r)}${fixes(r)}${layers(r)}${scores(r)}${vitals(r)}${search(r)}${topFixes(r)}${allFindings(r)}${suggestions(r)}${notRun(r)}${changes(r)}${method(r)}
 <footer>Seekwide ${r.pluginVersion} &middot; rules ${r.rulesVersion} &middot; run <code>${r.runId}</code> &middot; ${r.date.iso}</footer>
 </main>
 </body>

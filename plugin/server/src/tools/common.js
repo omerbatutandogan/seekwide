@@ -81,6 +81,9 @@ const STORE_ERROR_ADVICE = {
   STORE_FILE_TOO_LARGE: 'Tell the user. For a run, audit the site again: this version saves only runs it can read back.',
   RUN_TOO_LARGE: 'Nothing was saved. Audit fewer modules, or crawl fewer pages (crawl_start max_pages) and audit that crawl.',
   RUN_INVALID: 'Nothing was saved. Tell the user; this is a bug in the plugin.',
+  IMPORT_CORRUPT: 'Import the export again with search_data_import, which replaces the file, or pass search_data: [] to render the report without it.',
+  IMPORT_INVALID: 'Nothing was saved. Tell the user; this is a bug in the plugin.',
+  IMPORT_TOO_LARGE: 'Nothing was saved. Export a shorter period or fewer rows.',
 };
 
 /**

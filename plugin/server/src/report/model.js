@@ -1,5 +1,6 @@
 /** @import { Run } from '../types.js' */
 /** @import { RunComparison } from '../store/compare.js' */
+/** @import { SearchEntry } from './search.js' */
 
 import { countText } from '../checks/scoring.js';
 import { SEVERITIES } from '../config.js';
@@ -11,6 +12,7 @@ import { viewFixes } from './fixes.js';
 import { factualSummary, moduleLabel } from './facts.js';
 import { REPO_FRAMEWORKS, orderModules, startFacts, unreadablePages, viewBlock, viewScope } from './scope.js';
 import { compareText, num, obj, str, text } from './values.js';
+import { prioritize, searchLayer, viewSearch } from './search.js';
 import { describeVitals, viewLayers, viewVitals } from './vitals.js';
 
 const DEFAULT_MAX_URLS = 10;
@@ -48,6 +50,10 @@ function readOptions(run, options) {
   }
   const recommendations = o.recommendations ?? [];
   if (!Array.isArray(recommendations)) throw new TypeError('recommendations must be an array of {title, detail}.');
+  const search = o.search ?? [];
+  if (!Array.isArray(search) || !search.every((entry) => obj(entry).data !== undefined && obj(entry).match !== undefined)) {
+    throw new TypeError('search must be an array of {data, match}.');
+  }
   const comparison = o.comparison ?? null;
   if (comparison !== null && obj(comparison).run_id !== run.run_id) {
     throw new TypeError(`The comparison belongs to run ${String(obj(comparison).run_id)}, not to run ${run.run_id}.`);
@@ -58,6 +64,7 @@ function readOptions(run, options) {
     logo: /** @type {string|undefined} */ (o.logoDataUri),
     brand: text(o.brandName).slice(0, 200),
     comparison: /** @type {RunComparison|null} */ (comparison),
+    search: /** @type {SearchEntry[]} */ (search),
     recommendations: recommendations.map((item, index) => {
       const entry = obj(item);
       const title = text(entry.title);
@@ -160,7 +167,8 @@ export function buildReport(run, options = {}) {
   const opts = readOptions(run, options);
   const crawl = obj(run.crawl);
   const findings = run.findings.map(viewFinding);
-  const groups = withLimits(groupByCheck(findings), opts.maxUrls);
+  // With imported search data, groups of one severity are ordered by the impressions of their pages (report/search.js).
+  const groups = withLimits(prioritize(groupByCheck(findings), opts.search), opts.maxUrls);
   const severityCounts = Object.fromEntries(SEVERITIES.map((s) => [s, findings.filter((f) => f.severity === s).length]));
   const checksRun = run.checks.filter((check) => check.status === 'run').length;
   // A crawl blocked before any page was read: count the checks that had anything to look at, not those that ran on nothing.
@@ -219,7 +227,8 @@ export function buildReport(run, options = {}) {
     ],
     scope: viewScope(run, { host, blocked }),
     fixes: viewFixes(run),
-    layers: viewLayers(vitals),
+    layers: viewLayers(vitals, opts.search.length > 0 ? searchLayer(opts.search) : null),
+    search: viewSearch(opts.search, findings),
     scores,
     vitals,
     groups,
@@ -233,7 +242,7 @@ export function buildReport(run, options = {}) {
     method: methodSections({
       pluginVersion: text(run.plugin_version, 'unknown'), rulesVersion: text(run.rules_version, 'unknown'), vitals: vitals !== null,
       repo: REPO_FRAMEWORKS.includes(str(obj(run.repo).framework)), security: Array.isArray(run.modules_requested) && run.modules_requested.includes('security'),
-      media: Array.isArray(run.modules_requested) && run.modules_requested.includes('media'),
+      media: Array.isArray(run.modules_requested) && run.modules_requested.includes('media'), search: opts.search.length > 0,
     }),
     pluginVersion: text(run.plugin_version, 'unknown'),
     rulesVersion: text(run.rules_version, 'unknown'),

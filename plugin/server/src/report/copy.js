@@ -60,10 +60,31 @@ export const STATIC_LAYERS = Object.freeze([
     text: 'Whether search engines can reach, index and understand the pages that were crawled. Measured by the scripted checks in this report. Not covered: whether the pages are actually indexed.',
     source: '',
   },
-  { name: 'Search visibility', measured: false, text: 'Impressions, clicks and positions by query.', source: 'Google Search Console and Bing Webmaster Tools.' },
+  { name: 'Search visibility', measured: false, text: 'Impressions, clicks and positions in search results.', source: 'Google Search Console and Bing Webmaster Tools.' },
   { name: 'AI visibility', measured: false, text: 'Whether and how AI search and assistants mention or cite the brand.', source: 'the Search Console generative AI report and sampled AI answers.' },
   { name: 'Business results', measured: false, text: 'Leads, sales and revenue.', source: 'Analytics and CRM data.' },
 ]);
+
+/**
+ * The Search visibility layer of a run without imported search data. This
+ * version can fill it from an export, so it has no data in this run, not in this version.
+ */
+export const SEARCH_LAYER_EMPTY = Object.freeze({
+  name: 'Search visibility',
+  measured: false,
+  status: NO_DATA_RUN,
+  text: 'Impressions, clicks and positions in search results.',
+  detail: "Source: an export of Search Console's Performance report or of Bing Webmaster Tools' Search Performance report, imported into the project. None was imported for this report.",
+});
+
+/** How imported search data is read and used, for the method section. */
+export const SEARCH_METHOD = Object.freeze({
+  label: 'How search data is used',
+  text: 'The search performance figures come from export files the user downloaded from Google Search Console or Bing Webmaster Tools and imported; Seekwide did not measure them. ' +
+    'Search Console exports at most 1,000 rows of a table, so a page missing from the export can still have impressions. Click-through rate is clicks divided by impressions, and averages of position are weighted by impressions. ' +
+    "The export's pages are matched to the audit by address, normalized the way the crawler normalizes links. " +
+    'Findings of the same severity are listed by the impressions of their pages; the checks, findings and scores do not depend on the data.',
+});
 
 export const RATING_LABELS = Object.freeze({ good: 'Good', 'needs improvement': 'Needs improvement', poor: 'Poor' });
 
@@ -100,14 +121,15 @@ export const MEDIA_METHOD = Object.freeze({
 });
 
 /**
- * @param {{pluginVersion: string, rulesVersion: string, vitals?: boolean, repo?: boolean, security?: boolean, media?: boolean}} run
+ * @param {{pluginVersion: string, rulesVersion: string, vitals?: boolean, repo?: boolean, security?: boolean, media?: boolean, search?: boolean}} run
  *   `vitals`: the run asked for Core Web Vitals, so the method says how they are measured.
  *   `repo`: the findings name source files, so the method says how those were found.
  *   `security`: the run included the security module, so the method says what it can and cannot see.
  *   `media`: the run included the media module, so the method says what it requests and what it cannot see.
+ *   `search`: the report shows imported search data, so the method says where it comes from and what it changes.
  * @returns {{label: string, text: string}[]}
  */
-export function methodSections({ pluginVersion, rulesVersion, vitals = false, repo = false, security = false, media = false }) {
+export function methodSections({ pluginVersion, rulesVersion, vitals = false, repo = false, security = false, media = false, search = false }) {
   const vitalsMethod = {
     label: 'How Core Web Vitals are measured',
     text: 'Only a few pages are measured, because each test takes many seconds: the start page, then one page from each of the largest groups of similar pages. Google loads each of them once on an emulated mid-range phone (PageSpeed Insights); that is the lab data, and it changes from run to run. Field data is what real Chrome users on phones experienced over 28 days (Chrome UX Report); it exists only for sites and pages with enough visits, and collecting it needs a Google API key. The URLs of the measured pages are sent to Google.',
@@ -128,10 +150,11 @@ export function methodSections({ pluginVersion, rulesVersion, vitals = false, re
     }] : []),
     ...(security ? SECURITY_METHOD : []),
     ...(media ? [MEDIA_METHOD] : []),
+    ...(search ? [SEARCH_METHOD] : []),
     { label: 'How scores work', text: SCORE_NOTE },
     {
       label: 'What is not measured',
-      text: 'The written summary and the suggestions, when present, are interpretation and never change a score. The layers marked "No data" were not measured at all.',
+      text: 'The written summary and the suggestions, when present, are interpretation and never change a score. The layers marked "No data" were not measured at all, and a layer marked "Imported data" holds figures the user supplied.',
     },
     { label: 'Versions', text: `Seekwide ${pluginVersion}, rules ${rulesVersion}. A different rules version can change findings without any change to the site.` },
     {

@@ -92,17 +92,18 @@ test('scope: every robots.txt status is explained', () => {
   assert.match(text('something-new'), /robots\.txt:\*\* something-new/);
 });
 
-test('layers: technical eligibility is measured; three layers say "No data in this version" and name a planned source; experience says why it has no data in this run', () => {
+test('layers: technical eligibility is measured; two layers say "No data in this version" and name a planned source; search visibility and experience say why they have no data in this run', () => {
   const layers = section(renderMarkdown(makeRun()), 'Status by layer');
   const rows = layers.split('\n').filter((line) => line.startsWith('| ') && !line.startsWith('| Layer'));
   assert.equal(rows.length, 5);
   assert.match(rows[0], /^\| Technical eligibility \(this run\) \| Measured in this run \|/);
   assert.deepEqual(rows.slice(1).map((r) => r.split(' | ')[0].replace('| ', '')), ['Search visibility', 'AI visibility', 'Experience', 'Business results']);
-  for (const row of [rows[1], rows[2], rows[4]]) {
+  for (const row of [rows[2], rows[4]]) {
     assert.ok(row.includes('**No data in this version**'), row);
     assert.match(row, /Planned source: /);
   }
-  assert.match(rows[1], /Search Console/);
+  assert.ok(rows[1].includes('**No data in this run**'), rows[1]);
+  assert.match(rows[1], /Source: an export of Search Console's Performance report or of Bing Webmaster Tools' Search Performance report, imported into the project\. None was imported for this report\./);
   assert.ok(rows[3].includes('**No data in this run**'), rows[3]);
   assert.match(rows[3], /Real-user speed and usability of the pages\. Source: the Chrome UX Report\. It was not asked in this run\./);
   assert.match(rows[4], /Analytics and CRM/);
@@ -311,10 +312,10 @@ test('method: crawl behaviour, confirmed and likely, versions and the no-predict
 
 test('the report is honest about what it did not measure', () => {
   const md = renderMarkdown(makeRun());
-  assert.equal(md.match(/No data in this version/g)?.length, 3, 'the three layers this version cannot measure');
-  assert.equal(md.match(/No data in this run/g)?.length, 1, 'the experience layer, which this run did not fill');
+  assert.equal(md.match(/No data in this version/g)?.length, 2, 'the two layers this version cannot measure');
+  assert.equal(md.match(/No data in this run/g)?.length, 2, 'search visibility and experience, which this run did not fill');
   assert.match(md, /Not covered: whether the pages are actually indexed\./);
-  assert.match(md, /The layers marked "No data" were not measured at all\./);
+  assert.match(md, /The layers marked "No data" were not measured at all, and a layer marked "Imported data" holds figures the user supplied\./);
   assert.ok(!/guarantee(?!s? any position)/.test(md.replace(/does not guarantee any position/g, '')));
 });
 

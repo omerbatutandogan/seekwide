@@ -8,7 +8,7 @@
 
 import { clip } from '../util/strings.js';
 import { formatMetric, rateMetric } from '../vitals/thresholds.js';
-import { NO_DATA, NO_DATA_RUN, STATIC_LAYERS, VITALS_LEGEND } from './copy.js';
+import { NO_DATA, NO_DATA_RUN, SEARCH_LAYER_EMPTY, STATIC_LAYERS, VITALS_LEGEND } from './copy.js';
 import { plural } from './facts.js';
 import { obj, str, text } from './values.js';
 
@@ -156,22 +156,29 @@ export function describeVitals(view) {
   return `Core Web Vitals: ${lab}; ${field}.`;
 }
 
+/** @typedef {{name: string, measured: boolean, status: string, text: string, detail: string|null}} LayerView */
+
 /**
  * The five layers of reporting, with the experience layer filled in from this
  * run: measured when real-user data arrived, otherwise "no data in this run"
- * with the reason.
+ * with the reason; and the search visibility layer from imported data when
+ * there is some, otherwise "no data in this run" with where the data comes from.
  * @param {VitalsView|null} view
- * @returns {{name: string, measured: boolean, status: string, text: string, detail: string|null}[]}
+ * @param {LayerView|null} [search]  The search visibility layer of imported data (report/search.js).
+ * @returns {LayerView[]}
  */
-export function viewLayers(view) {
-  const fixed = STATIC_LAYERS.map((layer) => ({
-    name: layer.name,
-    measured: layer.measured,
-    status: layer.measured ? 'Measured in this run' : NO_DATA,
-    text: layer.text,
-    detail: layer.measured ? null : `Planned source: ${layer.source}`,
-  }));
-  /** @type {{name: string, measured: boolean, status: string, text: string, detail: string|null}} */
+export function viewLayers(view, search = null) {
+  const fixed = STATIC_LAYERS.map((layer) => {
+    if (layer.name === SEARCH_LAYER_EMPTY.name) return search ?? { ...SEARCH_LAYER_EMPTY };
+    return {
+      name: layer.name,
+      measured: layer.measured,
+      status: layer.measured ? 'Measured in this run' : NO_DATA,
+      text: layer.text,
+      detail: layer.measured ? null : `Planned source: ${layer.source}`,
+    };
+  });
+  /** @type {LayerView} */
   let experience;
   if (view !== null && view.fieldCovered.length > 0) {
     experience = {

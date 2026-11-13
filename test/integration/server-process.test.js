@@ -62,7 +62,7 @@ test('the server speaks both protocol styles over stdio and exits when stdin clo
 
   const modernList = await request({ id: 1, method: 'tools/list', params: { _meta: META } });
   assert.equal(modernList.result.resultType, 'complete');
-  assert.equal(modernList.result.tools.length, 12);
+  assert.equal(modernList.result.tools.length, 13);
 
   const runs = toolResult(await request({ id: 2, method: 'tools/call', params: { _meta: META, name: 'runs_list', arguments: {} } }));
   assert.deepEqual(runs, { project_dir: tmp, total: 0, runs: [], _note: UNTRUSTED_NOTE });

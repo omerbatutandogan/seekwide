@@ -19,8 +19,11 @@ MCP server (plugin/server/src/index.js)
    ├─ audit_run ──► net/link-check, net/image-check, vitals/ (PageSpeed Insights, Chrome UX Report) ──► checks/ (engine + seo + links + security + media) ──► repo/ (source files, repo mode; fix verification) ──► store/
    ├─ fix_plan ──► store/ (a saved run) ──► repo/ (which fix applies, in which file)
    ├─ findings_query, page_get, runs_list, runs_compare, profile_get, profile_set ──► store/
-   └─ report_render ──► report/ (Markdown, HTML)
+   ├─ search_data_import ──► imports/ (an export file in the project: CSV, zip, Excel) ──► store/ (.seekwide/imports/)
+   └─ report_render ──► report/ (Markdown, HTML), with the imported search data
 ```
+
+Search data comes in as a file: the user downloads a Performance export from Google Search Console or the Pages table of Bing Webmaster Tools' Search Performance report into the project folder, `search_data_import` reads and stores it, and the report shows it and orders findings by the impressions of their pages (4.17). No account is connected and nothing is sent.
 
 In repo mode the same flow runs against the project's own local server: `project_detect` says what the folder holds and which command starts the server, the skill has Claude propose that command (it runs only with the user's approval, and the plugin's server never starts anything), and `audit_run` with `source_dir` adds the source file to each finding (4.12).
 
@@ -62,9 +65,10 @@ plugin/server/data/public-suffixes.txt  the Public Suffix List, compacted (scrip
   vitals/     measure.js select.js psi.js crux.js google-api.js thresholds.js
   repo/       scan.js detect.js workspaces.js next-routes.js html-routes.js html-lines.js sources.js fixes.js fix-common.js fix-page.js
               fix-sitemap.js fix-texts.js verify.js
+  imports/    read-file.js zip.js csv.js xml.js xlsx.js xlsx-styles.js values.js columns.js search-data.js parse.js match.js errors.js (4.17)
   store/      index.js project.js errors.js fs-util.js runs.js run-file.js run-index.js run-validate.js profile.js
-              profile-validate.js compare.js
-  report/     markdown.js html.js (+ shared helpers)
+              profile-validate.js compare.js imports.js import-validate.js
+  report/     markdown.js html.js search.js (+ shared helpers)
   mcp/        stdio.js registry.js protocol.js lines.js schema.js
   tools/      index.js (+ one file per tool group, and the audit_run helpers audit-*.js, common.js and logo.js)
   deps.js     the tools' real dependencies, built from the environment
@@ -330,6 +334,7 @@ Questions that several checks ask about a page (is it noindex, which canonicals 
   runs/index.json       {schema_version, runs: RunIndexEntry[]}  in the order the runs were saved
   runs/<run_id>/findings.json   Run, in its stored form (store/run-file.js)
   runs/<run_id>/report.md  report.html
+  imports/<source>.json  the latest import of each source: google_search_console.json, bing_webmaster_tools.json (4.17)
 ```
 
 ```js
@@ -362,7 +367,8 @@ export function compareRuns(base, current)
 export function renderMarkdown(run, options)   // → string
 export function renderHtml(run, options)       // → string
 // options: {executiveSummary?: string, recommendations?: {title: string, detail: string}[],
-//           brandName?: string, logoDataUri?: string, comparison?: ReturnType<typeof compareRuns>, maxUrlsPerCheck?: number}
+//           brandName?: string, logoDataUri?: string, comparison?: ReturnType<typeof compareRuns>, maxUrlsPerCheck?: number,
+//           search?: {data: SearchImport, match: PageMatch}[]}
 ```
 
 Both are pure and depend only on their arguments (dates come from `run.created_at`). They render one shared model (`report/model.js`), so the two formats cannot drift apart. Invalid options throw `TypeError`: a `comparison` that belongs to another run, or a `logoDataUri` that is not a base64 PNG, JPEG, WebP or SVG data URI. Sections, in order:
@@ -371,10 +377,11 @@ Both are pure and depend only on their arguments (dates come from `run.created_a
 2. Summary: `executiveSummary` when given, otherwise a factual one built from the numbers.
 3. Scope and limits: pages crawled against the budget, truncation, blocks, robots.txt status, sitemap URLs, user agent. In repo mode (`run.repo` is an object) also "Source files": the kind of project and how many findings name a file, or that the project could not be mapped; and, when the crawl was told the deployed address, that canonical links and sitemap entries naming it were read as pages of the local server, or that the address matched none of them.
 4. Fixes verified in this run, when the run holds a fix verification (`run.fixes` with results; 4.13): one sentence with the counts, the base run, and a row per fixed finding with its outcome (closed, replaced, still open, not verified), the page, the source file and what the re-audit found, closed ones first, at most 100 rows. The counts are made from the rows, and an outcome the plugin does not know is shown as not verified. Then the caveats of the comparison.
-5. Status by layer: technical eligibility (this run), then search visibility, AI visibility, experience and business results. Search visibility, AI visibility and business results are marked "No data in this version" with the source that will provide them. Experience is "Measured in this run" when the run holds real-user Core Web Vitals, and otherwise "No data in this run" with the reason.
+5. Status by layer: technical eligibility (this run), then search visibility, AI visibility, experience and business results. AI visibility and business results are marked "No data in this version" with the source that will provide them. Search visibility is "Imported data" when the report is given imported search data (`search`), with its sources and periods and a sentence that the user supplied it, and otherwise "No data in this run" with the exports that fill it. Experience is "Measured in this run" when the run holds real-user Core Web Vitals, and otherwise "No data in this run" with the reason.
 6. Scores: module, score, coverage, checks run.
 7. Core Web Vitals, when the run asked for them (`run.core_web_vitals` is an object): what each source gave or why it gave nothing, then a table with the whole site first and each measured page after it, every value formatted and rated good, needs improvement or poor. Only columns with one or more values are shown. Then the run's notes on the measurement.
-8. Top fixes: findings grouped by check, ordered by severity, then impact (high first), then effort (low first); the first ten groups with count, confidence, recommendation, up to three example URLs and the documentation link.
+7b. Search performance (imported), when the report is given imported search data (4.17): per source the report, the file and the day it was imported, the period and where it comes from, the filters the export states, totals (clicks, impressions, CTR, average position), how the export's pages match this audit, and the ten pages with the most clicks with their findings in this audit; then how the data orders the findings.
+8. Top fixes: findings grouped by check, ordered by severity, then impact (high first), then effort (low first); with imported search data, by severity, then the impressions of the group's pages, then impact and effort (4.17). The first ten groups with count, confidence, the search data of their pages, recommendation, up to three example URLs and the documentation link.
 9. All findings by check, each with up to `maxUrlsPerCheck` (default 10) URLs and their evidence, and "+N more". A finding that names a source file (4.12) shows it as `file` or `file:line`, with its route.
 10. Suggestions (not scored): `recommendations`, when given.
 11. Checks that did not run, with the reason.
@@ -423,7 +430,8 @@ export class ToolError extends Error {}
 | `fix_plan` | `run_id` ('last'), `project_dir`, `site_url`, `check_id`, `limit` 1–200 (50), `offset` | `{run_id, project_dir, source_dir, framework, audited, max_pages, modules, site_url, site_url_source, fixable_total, returned, next_offset, fixes, not_fixable, not_fixable_total, out_of_scope, in_scope_checks, notes}`; `limit` and `offset` page `fixes` only |
 | `findings_query` | `run_id` ('last'), `project_dir`, `module`, `severity`, `check_id`, `url_contains`, `limit` 1–200 (50), `offset` | `{run_id, total, returned, next_offset, findings}`; `next_offset` is null on the last page |
 | `page_get` | `job_id`, `url` | selected `PageRecord` fields and counts |
-| `report_render` | `run_id` ('last'), `project_dir`, `formats` (both), `executive_summary` ≤ 4000, `recommendations` ≤ 20, `brand_name`, `logo_path`, `compare_to` | `{run_id, files, bytes}` |
+| `search_data_import` | `path` (required; a file inside the project folder), `source` (required: `google_search_console` or `bing_webmaster_tools`), `project_dir`, `period_start` and `period_end` (YYYY-MM-DD, only for a file without a table of dates), `run_id` ('last') | `{source, saved_to, replaced, file, period, filters, totals, pages, dates, counts, top_pages, match, priority_pages, notes}` (4.17) |
+| `report_render` | `run_id` ('last'), `project_dir`, `formats` (both), `executive_summary` ≤ 4000, `recommendations` ≤ 20, `brand_name`, `logo_path`, `compare_to`, `search_data` (the imported sources to show; every one imported by default, `[]` for none) | `{run_id, files, bytes, search_data}` |
 | `runs_list` | `project_dir` | `{project_dir, total, runs}`: the 50 newest runs, newest first |
 | `runs_compare` | `run_id` ('last'), `base_run_id` ('previous'), `project_dir`, `limit` 1–200 (20) | `{base_run_id, run_id, resolved_total, added_total, persisting, scores, notes, resolved, added}`; `resolved` and `added` hold at most `limit` findings each |
 | `profile_get` | `project_dir` | `{exists, profile}` |
@@ -680,3 +688,34 @@ export function publicSuffix(name), registrableDomain(name)      // the list's a
 - **The suffix list as data.** `plugin/server/data/public-suffixes.txt` holds both sections of the Public Suffix List, one line per top-level label, in ASCII (about 120 KiB of 256 allowed for a text file; the list itself is about 330 KiB). `scripts/gen-public-suffixes.js <public_suffix_list.dat>` writes it; it is read once, on first use, into three sets (rules, wildcards, exceptions). Hosting services that give each customer a host but are missing from the list are added in code (`TENANT_DOMAINS`), each with its source. A new copy of the list can change what the checks report, so it comes with a rule set version (CONTRIBUTING.md).
 - **Tests.** One table of hosts (www, apex, trailing dot, port, subdomain, the organisation's CDN, another company's CDN, a sister domain, a shared host, a local server and its deployed site) runs through every consumer (`test/util/site-identity.test.js`).
 
+
+### 4.17 Imported search data: `imports/`, `store/imports.js`, `report/search.js`, `tools/search-data.js`
+
+Search visibility from the export files people download from Google Search Console and Bing Webmaster Tools. What the official documentation says about each format, what it leaves out, and the sources with the dates they were read are in [IMPORTS.md](IMPORTS.md).
+
+```js
+// imports/read-file.js
+export async function readImportFile(projectDir, input, maxBytes)   // → {bytes, relative}   throws ImportError
+// imports/parse.js
+export async function readTables(bytes)                             // → {format: 'csv'|'zip'|'xlsx', tables}
+export async function importExport({bytes, path, source, importedAt, period})   // → SearchImport   throws ImportError
+// imports/match.js                                                  pure
+export function matchPages(data, run, crawl)                        // → PageMatch
+export function trafficOf(match, data, url)                         // → {impressions, clicks}
+// store/imports.js
+export async function saveSearchImport(projectDir, record)          // → {file, relative}
+export async function loadSearchImport(projectDir, source)          // → SearchImport | null
+// report/search.js                                                  pure
+export function viewSearch(entries, findings), searchLayer(entries), prioritize(groups, entries)
+```
+
+- **Untrusted input.** An export is a file the user supplied, and its text can be anything: a search query or a filter can be written by whoever searches. It is read as data. Nothing in it is evaluated (a cell that starts with `=`, `+`, `-` or `@` is text, and an Excel formula is its stored value), nothing becomes a path, and its text reaches the model only in data fields of a result whose `_note` (`IMPORT_NOTE`) says so. An error message never quotes the file: it names the table, row and column (`ImportError`, `imports/errors.js`).
+- **Where the file may be** (`readImportFile`). The rules of a logo named by the project profile and of `source_dir`: the path, absolute or relative to the project folder, must lie inside it before anything is touched (so a network path never makes Windows contact another machine), every step to the file is walked without following a symbolic link (`entryKind`), the file is opened with `O_NOFOLLOW` and `O_NONBLOCK` and checked again, and a file over `IMPORT_MAX_BYTES` (10 MB) is refused before it is read.
+- **Reading without a dependency.** A ZIP archive (`zip.js`) is read from its central directory; an entry is unpacked with `node:zlib` only when it is asked for, to at most the size the directory states (`maxOutputLength`), which must be within 20 MB, and all entries of one archive together to at most 40 MB, so neither a compression bomb nor entries that point at the same data can unpack to more; the size and the CRC-32 must match. ZIP64, encryption and split archives are refused. An Excel workbook (`xlsx.js`) is a ZIP archive of XML parts read with a small reader (`xml.js`) that refuses a document type declaration, so no entity is ever defined or expanded, and reads tags and attributes by hand in one pass (a `>` inside a quoted value does not end a tag; a review of 2026-11-13 found a pattern that took seconds on one long tag, and another in the reading of number formats). CSV (`csv.js`) is RFC 4180 with the delimiter the header uses most (comma, semicolon or tab), UTF-8 or UTF-16 with a byte order mark. Every reader is linear in its input; tables hold at most 50,000 rows, 64 columns and 4,096 characters per cell, and one file at most 1,000,000 cells, counted over all its tables; a row of empty cells is not kept, so a file of commas costs no memory.
+- **What a table is** (`columns.js`, `search-data.js`). Neither tool documents the header row of an export, so a metric column is known by the name its help page gives the metric, in English or Turkish (IMPORTS.md), and the other column by its content: page addresses make the table of pages, `YYYY-MM-DD` dates the table of dates; a table of two columns without a metric is the filters table. Exactly one table of pages is needed and at most one table of dates; anything ambiguous or malformed refuses the whole file, a row with a value past the header's columns included (an unquoted decimal comma would shift the columns after it). Addresses are normalized with `normalizeUrl`; rows that name one address once normalized are added up with running sums (linear, and refused past exact counting), and an address it cannot use is left out and counted. CTR is not read but computed as clicks divided by impressions; positions are weighted by impressions.
+- **The record** (`SearchImport`) holds the source, when it was imported, the file's path inside the project, format, size and SHA-256, the period (from the table of dates, or as the user stated it with `period_start` and `period_end`, or null), the filters as the export states them, totals (from the table of dates, which Search Console aggregates by property, or else the sum of the pages), the pages and dates, and counts. It is stored at `.seekwide/imports/<source>.json`; the next import from the same source replaces it.
+- **A stored import is untrusted too** (`store/import-validate.js`): `.seekwide/` can arrive with a repository. Before it is used, every object must have exactly the fields the plugin writes and every value is checked against the form the plugin writes (addresses normalized http(s) URLs of at most 2,048 characters, counts whole numbers, positions 1 or more, dates real and in order, `imported_at` a time that exists, texts short, on one line and without the characters `stripHidden` removes), and the parts must agree as the import writes them (totals are the sums of their rows, pages in order without an address twice, a period from the file its first and last date); anything else is `IMPORT_CORRUPT`, naming the field and never its value. The folders must be real folders and the file a regular file of at most 20 MB, read without following a link. `saveSearchImport` applies the same rules before it writes.
+- **Matching** (`matchPages`). The export's pages are joined to the crawl behind the run, when the cache still has it, else to the addresses the run's findings name, by exact normalized address. For a local audit told the deployed address, an export address on exactly that origin is read as the same path on the local server, as the crawl reads links (4.5). The match counts the export's pages the audit has, the crawled indexable pages the export does not list, and the export's pages on the audited host.
+- **Ordering** (`prioritize`). With imported data, groups of findings are ordered by severity, then by the impressions of their distinct pages added up over the sources (a finding about the whole site counts the site's totals, a page the export does not list counts 0), then as before; findings inside a group by their page's impressions. Nothing else depends on the data: no check runs differently, no finding is added or removed, and scores are those of the run. The report says so (`SEARCH_ORDER_NOTE`, `SEARCH_METHOD`).
+- **The report** (4.9) shows it as "Imported data", supplied by the user and not measured, with the source, file, period and filters. In Markdown the file name and the filters are code spans, so an address in them is never linked by a renderer that links bare addresses. A page with more clicks than impressions in the export is kept as stated and named in a note. `report_render` uses every stored import unless `search_data` names the sources to use; a source it names that was never imported is a `ToolError`.
+- **Not supported.** Search Console's generative AI report and Bing's AI Performance report: their columns are not documented. The AI visibility layer stays "No data in this version".

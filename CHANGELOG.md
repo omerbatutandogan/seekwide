@@ -2,7 +2,14 @@
 
 Notable changes to Seekwide. Versions follow [semantic versioning](https://semver.org/); the rule set has its own version (`RULES_VERSION`) that changes whenever a check starts reporting something different.
 
-## Unreleased
+## 0.2.0 (unreleased)
+
+### Added
+
+- **Search Console and Bing data, from an export file.** A new tool, `search_data_import`, reads a file the user downloaded and saved in the project folder: Search Console's Performance export (the CSV zip, the Excel file, or its Pages table as CSV) or the Pages table of Bing Webmaster Tools' Search Performance report (CSV), with the interface in English or Turkish. No OAuth, no API key, no scraping, and no new network destination: the file is read on the user's machine and sent nowhere. The pages, daily totals and stated filters are stored in `.seekwide/imports/<source>.json`, one file per source, replaced by the next import. ZIP and Excel files are read with `node:zlib` and a small XML reader of the plugin's own; there is no new dependency.
+- **The report's Search visibility layer is filled** when search data was imported: it says "Imported data", supplied by the user and not measured, and a new section shows per source the period, the filters, totals (clicks, impressions, CTR, average position), how the export's pages match the audit, and the pages with the most clicks with their findings. `report_render` uses every imported source unless `search_data` names them (`[]` for none).
+- **Findings ordered by impressions.** With search data, findings of the same severity are listed by the impressions of the pages they are on (a finding about the whole site counts the site's impressions), and each shows the clicks and impressions of its page. The order is the only change: no check, finding or score depends on the data. `search_data_import` also returns the pages with findings that have the most impressions.
+- `/seekwide:setup` tells the user how to download each export and imports it.
 
 ### Only the plugin is installed
 
@@ -11,6 +18,15 @@ The plugin now lives in the `plugin/` folder of the repository, and only that fo
 - **If you installed from the marketplace**, update as usual; no other step is needed.
 - **If you load a local copy**, install the dependencies in `plugin/` (`npm ci --ignore-scripts --prefix plugin`, or `npm ci --ignore-scripts` from inside it) and point `--plugin-dir` at `plugin/` (`claude --plugin-dir /path/to/seekwide/plugin`). Adding the root of a local copy as a marketplace works as before.
 - **If you develop the plugin**, `package.json` at the root of the repository now holds only the scripts (`npm test`, `npm run check`); the runtime dependency and its lockfile are in `plugin/`. `npm run check` installs them when they are missing and validates the marketplace and the plugin separately. The directory rules now apply to the files under `plugin/`, and also check that the marketplace lists the plugin at `./plugin`, that `plugin/LICENSE` is identical to `LICENSE`, and that the versions in `plugin/package.json` and `plugin/.claude-plugin/plugin.json` match.
+
+### Not supported, and why
+
+- Neither Google nor Microsoft documents the header row of an export, so metric columns are recognized by the names their help pages give the metrics, in English and Turkish, and a file that does not match is refused. Search Console's generative AI report and Bing's AI Performance report are not read: their columns are not documented. Sources, dates and open questions are in `docs/IMPORTS.md`.
+
+### Security
+
+- An imported file is untrusted input: inside the project folder only, never through a symbolic link, at most 10 MB, a ZIP unpacked to at most its stated size (20 MB per entry, 40 MB in all) with its checksum checked, no XML document type, capped tables and cells, nothing evaluated, and its text given to the model only as data. A stored import is checked like a saved run before every use, its totals and page order included. See SECURITY.md.
+- An adversarial review of the import before release found twelve problems, each reproduced before and after its fix: two patterns that took seconds on one long XML tag or number format (now read by hand in one pass), a merge of rows that was quadratic, a file of empty cells that took 400 MB of memory, valid Persian and emoji text refused when saved, a split decimal comma hidden by an empty last cell, an address in filter text that Markdown renderers turn into a link, empty dates and impossible times accepted, hexadecimal numbers in Excel cells, counts past exact counting, no word on pages with more clicks than impressions, and hand-edited totals and page orders accepted.
 
 ## 0.1.1 (2026-11-13)
 

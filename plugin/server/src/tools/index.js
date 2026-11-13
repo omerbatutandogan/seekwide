@@ -1,4 +1,4 @@
-// The twelve MCP tools. Every dependency is injected so handlers can be tested
+// The thirteen MCP tools. Every dependency is injected so handlers can be tested
 // with fakes; server/src/index.js wires the real modules.
 
 /** @import { CheckDef, CrawlJob, CrawlResult, ImageFileResult, OutboundResult, Profile, Run, RunIndexEntry, Finding, RepoSummary, VitalsData } from '../types.js' */
@@ -7,6 +7,7 @@
 /** @import { ProjectPaths } from '../store/project.js' */
 /** @import { ProjectSources } from '../repo/sources.js' */
 /** @import { ScoreChange } from '../store/compare.js' */
+/** @import { ImportSource, SearchImport } from '../imports/parse.js' */
 
 import { auditTools } from './audit.js';
 import { projectTools } from './project.js';
@@ -15,6 +16,7 @@ import { fixTools } from './fix.js';
 import { profileTools } from './profile.js';
 import { reportTools } from './report.js';
 import { runTools } from './runs.js';
+import { searchDataTools } from './search-data.js';
 
 /**
  * @typedef {Object} Comparison
@@ -60,6 +62,10 @@ import { runTools } from './runs.js';
  *   package.json as data; throws `RepoError` for a folder that is missing or outside the project.
  * @property {(findings: Finding[], crawl: CrawlResult, sources: ProjectSources) => Promise<{findings: Finding[], summary: RepoSummary, notes: string[]}>} attachSources
  *   Repo mode: add `source` to the findings whose source file can be determined.
+ * @property {(projectDir: string, record: SearchImport) => Promise<{file: string, relative: string}>} saveSearchImport
+ *   Store an imported export under .seekwide/imports/, replacing the one from the same source.
+ * @property {(projectDir: string, source: ImportSource) => Promise<SearchImport|null>} loadSearchImport
+ *   The stored import from one source, checked like a run; null when there is none.
  * @property {() => Date} now
  * @property {() => string} defaultProjectDir
  * @property {{SEEKWIDE_REPORT_BRAND?: string, SEEKWIDE_REPORT_LOGO?: string}} env
@@ -67,10 +73,10 @@ import { runTools } from './runs.js';
  */
 
 /**
- * Build the tool definitions in a fixed order (crawl, project, audit, fix, runs, report, profile).
+ * Build the tool definitions in a fixed order (crawl, project, audit, fix, runs, search data, report, profile).
  * @param {ToolDeps} deps
  * @returns {ToolDef[]}
  */
 export function createTools(deps) {
-  return [...crawlTools(deps), ...projectTools(deps), ...auditTools(deps), ...fixTools(deps), ...runTools(deps), ...reportTools(deps), ...profileTools(deps)];
+  return [...crawlTools(deps), ...projectTools(deps), ...auditTools(deps), ...fixTools(deps), ...runTools(deps), ...searchDataTools(deps), ...reportTools(deps), ...profileTools(deps)];
 }

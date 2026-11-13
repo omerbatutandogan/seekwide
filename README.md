@@ -104,6 +104,7 @@ The pictures below come from one run of the plugin on [`fixtures/sample-site`](f
 - **Checks images and videos**: alt text that is missing or is only a file name, images without the size that keeps a page from jumping as it loads, a main image that is lazy-loaded, and, for up to 50 image files per audit, broken files, JPEG and PNG where WebP or AVIF would serve, very large files, and images that robots.txt keeps from Google. For video: captions and `VideoObject` structured data. See [Images and video](#images-and-video).
 - **Names the source file** when you audit a project in its own folder (repo mode). For a Next.js App Router project or a plain HTML site, the audit runs against the project's local server and each finding says which file it comes from: `app/about/page.tsx` for the route `/about`, or `services.html:17` for a broken link on line 17. See [Auditing a project in its folder](#auditing-a-project-in-its-folder).
 - **Fixes what it found, and checks the fix.** For a project audited in its folder, `/seekwide:fix` proposes changes for metadata findings (a missing or duplicate title or meta description, a missing canonical, missing Open Graph tags, a missing sitemap) in the file each one comes from. Every change is shown as a diff and written only after you say yes; nothing is committed. A second audit then says, finding by finding, whether it is closed, still open, replaced by another finding, or could not be verified. See [Fixing findings](#fixing-findings).
+- **Uses the search data you export.** A Search Console or Bing Webmaster Tools export saved in the project folder adds clicks, impressions and positions to the report and lists findings on the pages with the most impressions first, with no account connection (see [Search Console and Bing data](#search-console-and-bing-data)). Scores do not depend on it.
 - **Writes a report** as Markdown and as one self-contained HTML file, with an optional agency name and logo. The HTML prints cleanly to PDF.
 - **Keeps facts and advice apart.** Claude writes the summary and can suggest better titles, and the report labels those parts as suggestions. They never change a score.
 
@@ -277,6 +278,27 @@ What to know:
 - **Measured on real sites.** Before release the module was run on 19 real sites (the 20 sites the other modules were measured on, without the one that blocked the crawler) and a sample of its findings was judged by hand; the rules that were often wrong or not worth acting on were narrowed, made informational or removed (a check for pages with a video and no `VideoObject` was removed, because which page is a watch page cannot be told from its markup).
 - **Not measured:** what an image shows (so whether alt text fits it), images and videos that scripts add, images in CSS backgrounds, and images much larger than the box they are shown in, which needs layout. Fixes for images come later.
 
+## Search Console and Bing data
+
+Seekwide can show what search engines report about the site: clicks, impressions, click-through rate and average position. It reads them from an export file you download yourself, so it needs no account connection, no OAuth and no API key, and the plugin uploads the file nowhere. What Claude reads of it is in [Network and data](#network-and-data).
+
+1. Download an export:
+   - **Google Search Console:** open Performance, then Search results, choose the date range and filters, then Export and "Download CSV" (a zip) or "Download Excel".
+   - **Bing Webmaster Tools:** open Search Performance, choose the date range, open the Pages tab and download it as CSV.
+2. Save the file in the project folder, the one that holds `.seekwide/`.
+3. Ask Claude to import it, or run `/seekwide:setup` and say you have an export. With a Bing file, say which dates it covers: the file does not record them.
+
+The next report then has a "Search performance (imported)" section: totals and the pages with the most clicks, with the period, the filters and the file they come from, and how many of those pages the audit crawled. The "Search visibility" layer says the figures were imported, not measured. Findings of the same severity are listed by the impressions of the pages they are on, so the problems on the pages people see most come first. Scores and findings do not change.
+
+What is read:
+
+- The Performance export of Search Console (the CSV zip, the Excel file, or its Pages table saved as CSV) and the Pages table of Bing's Search Performance report, with the interface in English or Turkish.
+- Only the pages, the daily totals and the filters the export states. Queries, countries and devices are left out.
+
+What is not read, and why: neither tool documents the column layout of its exports, so columns are recognized by the metric names of each tool's help page, and a file that does not match is refused with a message rather than guessed at. Search Console's generative AI report and Bing's AI Performance report are not read yet, because their columns are not documented at all. Search Console exports at most 1,000 rows of a table, so a page missing from the export can still have impressions. [docs/IMPORTS.md](docs/IMPORTS.md) lists the sources and what each one leaves open.
+
+The import is stored as `.seekwide/imports/google_search_console.json` or `.seekwide/imports/bing_webmaster_tools.json`; a new import from the same source replaces it.
+
 ## Files it writes
 
 Run audits from the folder that belongs to the site. An agency keeps one folder per client.
@@ -289,6 +311,8 @@ Run audits from the folder that belongs to the site. An agency keeps one folder 
   runs/<run-id>/findings.json
   runs/<run-id>/report.md
   runs/<run-id>/report.html
+  imports/google_search_console.json   an imported Search Console export
+  imports/bing_webmaster_tools.json    an imported Bing export
 ```
 
 Crawl results are cached in the plugin's data directory, each with the Core Web Vitals measured for it, and can be deleted at any time.
@@ -308,7 +332,7 @@ Seekwide has no telemetry and no backend. This is everything it sends or fetches
 | Google Chrome UX Report API (`chromeuxreport.googleapis.com`) | The origin of the site and the URLs of the same pages, one request each (4 with `/seekwide:basic`, 6 with `/seekwide:seo` and `/seekwide:all`, never more than 11), with your Google API key | The same audits, and only when a Google API key is set |
 | Anthropic | Tool results that Claude reads during the session: scores, findings, Core Web Vitals values, and short page excerpts when Claude drafts a suggestion | Every audit, as part of your Claude Code session |
 
-The `security` module adds nothing to this table: it reads the pages the crawl already fetched. The `media` module adds the row on image hosts.
+The `security` module adds nothing to this table: it reads the pages the crawl already fetched. The `media` module adds the row on image hosts. An import of [Search Console or Bing data](#search-console-and-bing-data) adds nothing either: it reads a file in the project folder and sends no request. The totals and the pages' clicks and impressions it returns, and the report section built from them, become part of your Claude session like the rest of the audit.
 
 Nothing else leaves your machine. What Claude reads is covered by the terms of your Claude account. If you audit a client's site, the findings and page excerpts become part of your Claude session.
 
@@ -338,7 +362,7 @@ Planned, in this order, and not built yet:
 
 1. Alt text written from the image itself, and fixes for images and internal links.
 2. Answer and AI search readiness, entity checks against Wikidata, E-E-A-T, international, local, programmatic pages, conversion.
-3. Search Console and Bing Webmaster Tools data, backlinks, measured AI visibility, app stores and social search.
+3. Backlinks, measured AI visibility, app stores and social search. (Search Console and Bing data can already be [imported from an export](#search-console-and-bing-data).)
 4. WordPress core and plugin vulnerabilities, using Wordfence Intelligence with your own key.
 
 Seekwide will never pretend to be a search engine's crawler to look for cloaking.

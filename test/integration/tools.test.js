@@ -241,6 +241,22 @@ describe('the full tool flow on the fixture site', () => {
     assert.ok(markdown.includes('Write a buying guide for the widget.'));
   });
 
+  it('search_data_import reads an export saved in the project, and report_render shows it', async () => {
+    const rows = [[url('/'), 30, 1200, '2.5%', 3.4], [url('/missing'), 1, 40, '2.5%', 9]];
+    const pages = ['Top pages,Clicks,Impressions,CTR,Position', ...rows.map((row) => row.join(','))].join('\n');
+    await writeFile(path.join(projectDir, 'pages.csv'), `${pages}\n`);
+    const imported = await call('search_data_import', { path: 'pages.csv', source: 'google_search_console' });
+    assert.equal(imported.match.run_id, firstAudit.run_id);
+    assert.equal(imported.match.matched, 2);
+    const result = await call('report_render', { formats: ['markdown'] });
+    assert.deepEqual(result.search_data, ['google_search_console']);
+    const markdown = await readFile(result.files.markdown, 'utf8');
+    assert.match(markdown, /\| Search visibility \| Imported data \|/);
+    assert.match(markdown, /## Search performance \(imported\)/);
+    assert.match(markdown, /- \*\*Totals:\*\* Clicks: 31 · Impressions: 1,240/);
+    await rm(path.join(projectDir, '.seekwide', 'imports'), { recursive: true });
+  });
+
   it('a second audit_run, runs_list and runs_compare', async () => {
     const second = await call('audit_run', { job_id: jobId, check_outbound_links: false });
     assert.notEqual(second.run_id, firstAudit.run_id);

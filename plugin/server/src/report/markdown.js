@@ -5,6 +5,7 @@ import { mdCode, mdText, mdUrl } from './escape.js';
 import { plural } from './facts.js';
 import { affectedText, confidenceText } from './findings.js';
 import { buildReport } from './model.js';
+import { trafficText } from './search.js';
 
 /** @typedef {ReturnType<typeof buildReport>} Report */
 
@@ -39,6 +40,7 @@ function evidenceCell(finding) {
     const { file, line, route } = finding.source;
     parts.push(`Source: ${mdCode(line === null ? file : `${file}:${line}`, true)}${route === null ? '' : ` (route ${mdCode(route, true)})`}`);
   }
+  if (finding.traffic && finding.url !== null && finding.traffic.impressions + finding.traffic.clicks > 0) parts.push(`Search data: ${trafficText(finding.traffic)}`);
   if (finding.related.length > 0) {
     const shown = finding.related.slice(0, 3).map((url) => mdUrl(url, true));
     const rest = finding.related.length - shown.length;
@@ -129,6 +131,26 @@ function vitals(r) {
 }
 
 /** @param {Report} r */
+function search(r) {
+  const s = r.search;
+  if (s === null) return [];
+  const lines = ['## Search performance (imported)', '', `*${mdText(s.supplied)}*`, ''];
+  for (const source of s.sources) {
+    lines.push(`### ${mdText(source.name)}`, '');
+    lines.push(`- **Report:** ${mdText(source.report)}, from the file ${mdCode(source.file)}, imported on ${mdText(source.imported)}.`);
+    lines.push(`- **Period:** ${mdText(source.periodText)}`);
+    // Code spans: text from the file, an address in it included, never becomes a link or markup (review of 2026-11-13).
+    if (source.filters.length > 0) lines.push(`- **Filters stated in the export:** ${source.filters.map((f) => `${mdCode(f.name) || '—'}: ${mdCode(f.value) || '—'}`).join('; ')}`);
+    lines.push(`- **Totals:** ${source.figures.map((f) => `${mdText(f.label)}: ${mdText(f.value)}`).join(' · ')}`);
+    lines.push(`- **Matched with this audit:** ${mdText(source.matchText)}`, '', `*${mdText(source.totalsNote)}*`, '');
+    const rows = source.topPages.map((page) => [mdUrl(page.url, true), page.clicks, page.impressions, page.ctr, page.position, page.findings]);
+    lines.push(...table(['Page', 'Clicks', 'Impressions', 'CTR', 'Position', 'Findings in this audit'], rows), '');
+    if (source.notes.length > 0) lines.push(...source.notes.map((note) => `- ${mdText(note)}`), '');
+  }
+  return [...lines, `*${mdText(s.orderNote)}*`, ''];
+}
+
+/** @param {Report} r */
 function topFixes(r) {
   const lines = ['## Top fixes', ''];
   if (r.topFixes.length === 0) return [...lines, 'No findings. Every check that ran passed.', ''];
@@ -137,6 +159,7 @@ function topFixes(r) {
     lines.push(`### ${index + 1}. ${mdText(group.title)} (${severity(group.severity)})`, '');
     lines.push(`- **Check:** ${mdCode(group.checkId)}`);
     lines.push(`- **Affected:** ${affectedText(group)} · **Confidence:** ${confidenceText(group)}`);
+    if (group.traffic !== null) lines.push(`- **Search data:** ${trafficText(group.traffic)} on the affected pages`);
     if (group.recommendation) lines.push(`- **What to do:** ${mdText(group.recommendation)}`);
     if (group.examples.length > 0) lines.push(`- **Examples:** ${group.examples.map((url) => mdUrl(url)).join(' ')}`);
     if (group.docRef) lines.push(`- **Documentation:** ${mdUrl(group.docRef)}`);
@@ -226,7 +249,7 @@ function method(r) {
 export function renderMarkdown(run, options) {
   const r = buildReport(run, options);
   const lines = [
-    ...header(r), ...summary(r), ...scope(r), ...fixes(r), ...layers(r), ...scores(r), ...vitals(r), ...topFixes(r),
+    ...header(r), ...summary(r), ...scope(r), ...fixes(r), ...layers(r), ...scores(r), ...vitals(r), ...search(r), ...topFixes(r),
     ...allFindings(r), ...suggestions(r), ...notRun(r), ...changes(r), ...method(r),
   ];
   return `${lines.join('\n').trimEnd()}\n`;

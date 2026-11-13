@@ -55,6 +55,8 @@ function evidenceText(value) {
  * @property {string|null} target  The link target the finding is about (`evidence.observed.target_url`), when it names one.
  * @property {string} recommendation
  * @property {string} docRef
+ * @property {{impressions: number, clicks: number}|null} [traffic]  Imported search data of the finding's page, set by
+ *   `prioritize` (report/search.js); null without imported data.
  */
 
 /**
@@ -202,7 +204,8 @@ export function groupByCheck(findings) {
  * the first `maxUrls` findings, and how many findings are left out. In a group
  * of the links module, one finding per distinct link comes first, so the
  * shown findings name every link before they repeat one.
- * @param {ReturnType<typeof groupByCheck>} groups
+ * @template {ReturnType<typeof groupByCheck>[number]} G
+ * @param {G[]} groups
  * @param {number} maxUrls
  */
 export function withLimits(groups, maxUrls) {
