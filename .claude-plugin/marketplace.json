@@ -1,6 +1,6 @@
 {
   "name": "seekwide",
-  "description": "Seekwide: repeatable SEO, link and Core Web Vitals audits for Claude Code, with evidence for every finding and client-ready reports.",
+  "description": "Claude Code plugin for site audits you can re-run and trust: scripted SEO, Core Web Vitals, links, signs of a hacked site, images and video, with evidence for every finding, repeatable scores, a client-ready report and fixes verified by a second audit.",
   "owner": {
     "name": "omerbatutandogan"
   },
@@ -8,7 +8,7 @@
     {
       "name": "seekwide",
       "source": "./",
-      "description": "Site audits you can re-run and trust: a polite crawler, scripted SEO, link and Core Web Vitals checks with evidence, repeatable scores and a client-ready report."
+      "description": "Claude Code plugin for site audits you can re-run and trust: scripted SEO, Core Web Vitals, links, signs of a hacked site, images and video, with evidence for every finding, repeatable scores, a client-ready report and fixes verified by a second audit."
     }
   ]
 }

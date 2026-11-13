@@ -1,8 +1,97 @@
 # Seekwide
 
-Site audits for Claude Code that you can re-run and trust. Seekwide crawls a site politely, runs scripted SEO, link, Core Web Vitals, security, image and video checks with evidence for every finding, scores the result the same way every time, and writes a report you can send to a client.
+[![CI](https://github.com/omerbatutandogan/seekwide/actions/workflows/ci.yml/badge.svg)](https://github.com/omerbatutandogan/seekwide/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-> **Status: 0.1.1.** Four modules work today, `seo`, `links`, `security` and `media`, plus metadata fixes for a project in its own folder. The roadmap further down lists what is planned and not built yet.
+Claude Code plugin for site audits you can re-run and trust: scripted SEO, Core Web Vitals, links, signs of a hacked site, images and video, with evidence for every finding, repeatable scores, a client-ready report and fixes verified by a second audit.
+
+> **Status: 0.1.1.** Four modules work today, `seo`, `links`, `security` and `media`, plus metadata fixes for a project in its own folder. The [roadmap](#roadmap) lists what is planned and not built yet.
+
+![The top of a Seekwide report for a fictional café site: the logo and name of the agency that prepared it, a written summary marked as not scored, four measured figures, and the scores of the SEO, links, security and media modules, each with its coverage](docs/images/report-overview.png)
+
+*The top of the [sample report](#see-it-on-a-sample-site), branded for a made-up agency. Open the [whole report](https://raw.githack.com/omerbatutandogan/seekwide/main/docs/sample-report.html).*
+
+## Install
+
+You need Claude Code, and Node.js 22 or later with npm on your `PATH` (the plugin's server runs with `node`).
+
+### From GitHub
+
+In Claude Code, add this repository as a plugin marketplace, then install the plugin from it:
+
+```
+/plugin marketplace add omerbatutandogan/seekwide
+```
+
+```
+/plugin install seekwide@seekwide
+```
+
+The same from a terminal:
+
+```bash
+claude plugin marketplace add omerbatutandogan/seekwide
+```
+
+```bash
+claude plugin install seekwide@seekwide
+```
+
+Claude Code clones the repository, copies the plugin into its own cache and installs the two dependencies there itself, from `package-lock.json`: the exact versions it pins, with npm from your `PATH` and without running any package's install scripts. Start a new Claude Code session, then audit a site:
+
+```
+/seekwide:basic https://www.your-site.com
+```
+
+The agency name, the logo and the Google API key for Core Web Vitals are optional [settings](#settings).
+
+### From a local copy
+
+Both ways below load the plugin in place from your copy, and Claude Code does not install packages into a folder it loads in place. So install the plugin's one small dependency (`parse5`) in that folder first, with the exact versions the lockfile pins:
+
+```bash
+npm ci --ignore-scripts
+```
+
+From a local copy, for one session:
+
+```bash
+claude --plugin-dir /path/to/seekwide
+```
+
+As an installed plugin, using your copy as its own marketplace:
+
+```bash
+claude plugin marketplace add /path/to/seekwide
+```
+
+```bash
+claude plugin install seekwide@seekwide
+```
+
+## See it on a sample site
+
+The pictures below come from one run of the plugin on [`fixtures/sample-site`](fixtures/sample-site): a small, fictional café site with problems put in on purpose, a broken link, a page without a title, hidden spam links and images without alt text among them. It was served from this machine with Python's static server, which is why the addresses are `http://localhost:8000/`, why the report finds no HTTPS, and why Core Web Vitals and security headers were not measured. It was audited as a project in its own folder with all four modules, and the report was branded for "Example Agency", a name and logo made up for the sample.
+
+- **[The sample report](https://raw.githack.com/omerbatutandogan/seekwide/main/docs/sample-report.html)**: the HTML file the plugin wrote, unchanged. GitHub shows HTML files as source, so this link goes through raw.githack.com, a third-party service that serves files from GitHub with the right content type. The file is [`docs/sample-report.html`](docs/sample-report.html); it is self-contained, runs no scripts and opens in any browser.
+- **[The report after the fixes](https://raw.githack.com/omerbatutandogan/seekwide/main/docs/sample-report-after-fix.html)** ([`docs/sample-report-after-fix.html`](docs/sample-report-after-fix.html)): the 22 metadata fixes in the plan the plugin made for the first run were written into the site's files, as `/seekwide:fix` writes them after your yes, and a second audit checked them. Its report says what became of each fixed finding and what changed since the first run.
+
+**In Claude Code.** `/seekwide:basic` crawls, scores and answers with what to fix first, naming the source file and line of each finding:
+
+![Claude Code answering /seekwide:basic for the sample site: the SEO and links scores with their coverage, five fixes in order, each with the source file and line it comes from, and the path of the saved report](docs/images/terminal-basic.png)
+
+*Redrawn from the results of the sample run: the scores, files and lines are the run's; the wording of a real answer varies.*
+
+**Top fixes.** The findings that matter most come first, each with its severity, a confidence label, what to do and the documentation the rule is based on:
+
+![The Top fixes section of the sample report: a broken internal link, a page without a title and spam terms on the home page, each with its severity, its confidence, what to do, an example URL and a documentation link](docs/images/report-top-fixes.png)
+
+**Signs of a hacked site, with evidence.** Every finding shows what was observed, what was expected, the element, the line and the source file:
+
+![Security findings of the sample report: pharmacy spam terms on the home page, a hidden 1-by-1 frame from another site on the About page, and two links to a spam site moved off-screen, each with the observed values, the selector, the line and the source file](docs/images/report-security.png)
+
+**Fixes verified by a second audit.** After `/seekwide:fix`, the re-audit marks each fixed finding closed, still open, replaced or not verified:
+
+![The Fixes verified section of the second sample report: 22 fixed findings checked again and all 22 closed, listed with the page, the source file and what the re-audit found](docs/images/report-fixes-verified.png)
 
 ## What it does today
 
@@ -27,37 +116,6 @@ Site audits for Claude Code that you can re-run and trust. Seekwide crawls a sit
 - It does not change your code by itself. The plugin's own server never writes into a project. With `/seekwide:fix`, Claude edits files with its normal tools, after showing you each diff and getting your yes, and it never commits. Only metadata fixes exist; images, links and content are not touched.
 - It does not look for cloaking or sneaky redirects, and it does not test a site's defences. Finding cloaking needs a request that pretends to be Google, which this crawler never sends, so a clean security result is not proof of a clean site.
 - It does not look at images themselves: it cannot tell whether alt text describes a picture, and it does not write alt text or convert images. It has no AI search or local SEO modules yet.
-
-## Requirements
-
-- Claude Code
-- Node.js 22 or later on your `PATH` (the plugin's server runs with `node`)
-
-## Install
-
-Both ways below load the plugin in place from your copy, and Claude Code does not install packages into a folder it loads in place. So install the plugin's one small dependency (`parse5`) in that folder first, with the exact versions the lockfile pins:
-
-```bash
-npm ci --ignore-scripts
-```
-
-From a local copy, for one session:
-
-```bash
-claude --plugin-dir /path/to/seekwide
-```
-
-As an installed plugin, using this repository as its own marketplace:
-
-```bash
-claude plugin marketplace add /path/to/seekwide
-```
-
-```bash
-claude plugin install seekwide@seekwide
-```
-
-When Claude Code installs the plugin from a marketplace it fetches, such as this repository on GitHub, it copies the plugin into its own cache and installs the two dependencies there itself, from `package-lock.json`: the exact versions it pins, with npm from your `PATH` and without running any package's install scripts.
 
 ## Commands
 
@@ -306,6 +364,8 @@ node scripts/check-directory-rules.js
 CI runs the tests on Linux, macOS and Windows with Node.js 22 and 26; the type check, the generated docs, the directory rules and `claude plugin validate` run on Linux.
 
 The skill flows (asking before a dev server starts, stopping it, showing diffs before a fix, the wording of suggestions, blocked crawls and security findings) are covered by an eval suite under [`evals/`](evals/README.md), run with `claude plugin eval`. It drives a real Claude session, so it costs tokens and is not part of CI.
+
+The sample reports and the pictures in [`docs/images/`](docs/images) come from [`fixtures/sample-site`](fixtures/sample-site). To audit it yourself, serve that folder with `python3 -m http.server 8000 --bind 127.0.0.1` from inside it and run `/seekwide:all http://localhost:8000/` there; the report was branded with `docs/images/example-agency-logo.svg` and the name "Example Agency", and the deployed address given for the fixes was `https://www.harbor-coffee.example`, a name under the `.example` top-level domain, which is reserved for documentation and belongs to no one.
 
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) describes the modules and their contracts. [docs/CHECKS-SPEC.md](docs/CHECKS-SPEC.md) specifies every check. See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request, and [SECURITY.md](SECURITY.md) to report a vulnerability.
 
