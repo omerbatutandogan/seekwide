@@ -4,7 +4,7 @@ import { SCHEMA_VERSION } from '../config.js';
 import { storeError } from './errors.js';
 import { STORE_LIMITS, readStoreFile, toJsonFile, writeFileAtomic } from './fs-util.js';
 import { assertStoreDirs, ensureProject, projectPaths } from './project.js';
-import { normalizeProfile } from './profile-validate.js';
+import { PROFILE_FIELDS, normalizeProfile } from './profile-validate.js';
 import { isIsoDate } from './run-validate.js';
 
 /**
@@ -22,8 +22,12 @@ function invalidProfile(errors, prefix) {
  * @returns {Profile}
  */
 function assemble(fields, updatedAt) {
-  const { site_url, brand, business_model, markets, competitors, target_queries, report } = fields;
-  const profile = { schema_version: SCHEMA_VERSION, site_url, brand, business_model, markets, competitors, target_queries, report, updated_at: updatedAt };
+  // Every field `normalizeProfile` keeps, in a fixed order: one left out here is silently dropped on every write and read
+  // (the apps and the AI policy were, before rule set 0.2.0).
+  /** @type {Record<string, unknown>} */
+  const profile = { schema_version: SCHEMA_VERSION };
+  for (const key of PROFILE_FIELDS) profile[key] = fields[key];
+  profile.updated_at = updatedAt;
   return /** @type {Profile} */ (Object.fromEntries(Object.entries(profile).filter(([, value]) => value !== undefined)));
 }
 

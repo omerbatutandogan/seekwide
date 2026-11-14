@@ -1,6 +1,7 @@
 // A crawl and its parts (ARCHITECTURE.md 4.2 to 4.5). No runtime code.
 
 /** @import { PageRecord } from './page.js' */
+/** @import { AiRobots } from './ai.js' */
 
 export {};
 
@@ -86,6 +87,10 @@ export {};
  * @property {Record<string, boolean>} [preview_agents]  For each link-preview crawler that says it obeys robots.txt
  *   (`PREVIEW_CRAWLERS`), whether the site's robots.txt lets it fetch the start page. Absent when robots.txt could not be
  *   read, when no start page was recorded, and in crawls made before rule set 0.1.9.
+ * @property {AiRobots} [ai_robots]  What robots.txt tells the AI crawlers the ai module knows (`crawl/ai-robots.js`). Absent
+ *   when no start page on the robots.txt's origin was recorded, when robots.txt answered what may be a refusal of this crawler,
+ *   and in crawls made before rule set 0.2.0.
+ * @property {string} [ai_robots_error]  Set, with a fixed sentence, when working out `ai_robots` threw; the crawl is not affected.
  */
 
 /**

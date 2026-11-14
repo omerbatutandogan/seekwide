@@ -84,7 +84,7 @@ export function viewFinding(raw) {
   const evidence = obj(f.evidence);
   /** @type {EvidencePart[]} */
   const parts = [];
-  for (const [key, label, kind] of /** @type {const} */ ([['observed', 'Observed', 'code'], ['expected', 'Expected', 'code'], ['detail', 'Detail', 'text']])) {
+  for (const [key, label, kind] of /** @type {const} */ ([['observed', 'Observed', 'code'], ['expected', 'Expected', 'code'], ['detail', 'Detail', 'text'], ['limit', 'Limit', 'text']])) {
     const value = evidence[key];
     if (value !== undefined && value !== null && value !== '') parts.push({ label, kind, value: evidenceText(value) });
   }

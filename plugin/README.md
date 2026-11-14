@@ -1,6 +1,6 @@
 # Seekwide
 
-Claude Code plugin for site audits you can re-run and trust: scripted SEO, Core Web Vitals, links, signs of a hacked site, images and video, social sharing previews and app links, with evidence for every finding, repeatable scores, a client-ready report and fixes verified by a second audit.
+Claude Code plugin for site audits you can re-run and trust: scripted SEO, Core Web Vitals, links, signs of a hacked site, images and video, social sharing previews, app links and AI access and readiness, with evidence for every finding, repeatable scores, a client-ready report and fixes verified by a second audit.
 
 This folder is the plugin as Claude Code installs it. The full documentation is in the [repository](https://github.com/omerbatutandogan/seekwide); the links are at the end.
 
@@ -33,6 +33,7 @@ Start a new Claude Code session, then audit a site:
 | `/seekwide:media [url]` | Images and video: alt text, sizes, formats, broken files, robots.txt for Google, captions and video structured data |
 | `/seekwide:smo [url]` | Social sharing previews: Open Graph tags, where they stand in the HTML, the sharing image's size and weight, and robots.txt for Meta's preview crawler |
 | `/seekwide:aso [url]` | The site's side of its apps: the Smart App Banner, and the association files for iOS universal links and Android App Links |
+| `/seekwide:ai [url]` | AI access and readiness: which AI crawlers robots.txt lets in, training preferences, snippet controls for AI answers, content in the served HTML, and `/llms.txt` as information; a count, never a score |
 | `/seekwide:all [url]` | Every installed module in one report |
 | `/seekwide:fix [run-id]` | Fix metadata findings of an audit of the project in this folder, with your approval for each change, then audit again to verify |
 | `/seekwide:report [run-id]` | Rebuild a report, brand it, or compare two audits |
@@ -55,6 +56,7 @@ Seekwide has no telemetry and no backend. In short (the [full table](https://git
 - **The site you audit:** requests for pages, `robots.txt` and XML sitemaps, about one per second, with the user agent `seekwide/<version> (+https://github.com/omerbatutandogan/seekwide)`. It obeys robots.txt and never gets past a block.
 - **Sites the audited site links to, and the hosts of its images:** the `robots.txt` of each, then a `HEAD` request (a `GET` when the `HEAD` fails or answers with an error status) for at most 50 links and 50 images, in the audits that include the `links` and `media` modules; and for at most 20 sharing images (`og:image`) one `GET` of at most their first 64 KiB, with the `smo` module.
 - **The audited site's app files:** `/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json`, one `GET` each after robots.txt, with the `aso` module.
+- **The audited site's `/llms.txt`:** one `GET` after robots.txt, with the `ai` module; only its title line and number of links are kept. What robots.txt tells AI crawlers is read from the file the crawl fetched anyway: no AI vendor is ever contacted, and Seekwide never pretends to be an AI crawler. The crawler data ships with the plugin (`references/ai-bots.md`).
 - **Never:** Google Play and social platforms (Facebook, Instagram, X, LinkedIn, Pinterest, TikTok, YouTube, Telegram, Discord and others), not even their robots.txt. Links and images there are listed as not checked.
 - **Google PageSpeed Insights and Chrome UX Report APIs:** the URLs of the pages whose Core Web Vitals are measured (3 with `/seekwide:basic`, 5 with `/seekwide:seo` and `/seekwide:all`, never more than 10), and with a Google API key also the site's origin, unless you pass `--no-cwv` or the site is on your own machine. The key is sent to these two APIs only, in a request header, never in a URL.
 - **Anthropic:** the tool results that Claude reads during your session: scores, findings, Core Web Vitals values and short page excerpts. When you audit a project in its folder, the file paths it finds and the text of its `dev` script are part of those results, and with `/seekwide:fix` the source files Claude reads and the diffs it shows are part of your session like any file Claude reads. When you import a Search Console or Bing export (a file in the project folder; no request is sent), its totals and the pages' clicks and impressions are part of those results too.

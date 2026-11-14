@@ -30,6 +30,14 @@ export {};
 /** @typedef {import('./types/page.js').Indexability} Indexability */
 /** @typedef {import('./types/page.js').PageRecord} PageRecord */
 
+// The ai module: types/ai.js
+/** @typedef {import('./types/ai.js').AiPreferenceLine} AiPreferenceLine */
+/** @typedef {import('./types/ai.js').AiRobots} AiRobots */
+/** @typedef {import('./types/ai.js').AiPageRecord} AiPageRecord */
+/** @typedef {import('./types/ai.js').AiPolicy} AiPolicy */
+/** @typedef {import('./types/ai.js').LlmsTxtResult} LlmsTxtResult */
+/** @typedef {import('./types/ai.js').AiSummary} AiSummary */
+
 // Security signals: types/security.js
 /** @typedef {import('./types/security.js').HiddenLinkRecord} HiddenLinkRecord */
 /** @typedef {import('./types/security.js').EmbedRecord} EmbedRecord */

@@ -4,6 +4,7 @@
 /** @import { AppFiles, CheckDef, CrawlJob, CrawlResult, ImageFileResult, OutboundResult, Profile, Run, RunIndexEntry, Finding, RepoSummary, VitalsData } from '../types.js' */
 /** @import { checkImageFiles } from '../net/image-check.js' */
 /** @import { fetchAppFiles } from '../net/app-files.js' */
+/** @import { fetchLlmsTxt } from '../net/llms-txt.js' */
 /** @import { ToolDef } from '../mcp/stdio.js' */
 /** @import { ProjectPaths } from '../store/project.js' */
 /** @import { ProjectSources } from '../repo/sources.js' */
@@ -59,6 +60,7 @@ import { searchDataTools } from './search-data.js';
  *   wired, so no tool ever holds it.
  * @property {(urls: string[], options?: Parameters<typeof checkImageFiles>[1]) => Promise<Map<string, ImageFileResult>>} checkImageFiles
  * @property {(siteOrigin: string, options?: Parameters<typeof fetchAppFiles>[1]) => Promise<AppFiles>} fetchAppFiles
+ * @property {(siteOrigin: string, options?: Parameters<typeof fetchLlmsTxt>[1]) => Promise<import('../types.js').LlmsTxtResult>} fetchLlmsTxt
  * @property {(projectDir: string, sourceDir?: string) => Promise<ProjectSources>} loadProjectSources
  *   Repo mode: what kind of web project a folder holds and which file answers a URL. Reads file names and
  *   package.json as data; throws `RepoError` for a folder that is missing or outside the project.

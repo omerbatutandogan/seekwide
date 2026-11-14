@@ -1,5 +1,6 @@
 /** @import { CheckDef } from '../types.js' */
 
+import { checks as aiChecks } from './ai/index.js';
 import { checks as asoChecks } from './aso/index.js';
 import { checks as linkChecks } from './links/index.js';
 import { checks as mediaChecks } from './media/index.js';
@@ -13,5 +14,5 @@ import { prepareChecks } from './validate.js';
  * @returns {CheckDef[]}
  */
 export function allChecks() {
-  return prepareChecks([...seoChecks, ...linkChecks, ...securityChecks, ...mediaChecks, ...smoChecks, ...asoChecks]);
+  return prepareChecks([...seoChecks, ...linkChecks, ...securityChecks, ...mediaChecks, ...smoChecks, ...asoChecks, ...aiChecks]);
 }

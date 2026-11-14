@@ -1,9 +1,11 @@
 /** @import { Run, Finding } from '../types.js' */
 
+import { tokensNotInData } from '../util/ai-summary.js';
+
 /**
  * How one score changed. For a score given as a count (`ModuleScore.count`), `from_count` and `to_count` hold the
  * counts (null for a run that has none, as before rule set 0.1.7), `from` and `to` are null, and `delta` is the change
- * in how many passed.
+ * in how many passed, when both are counts of the same number of checks; null otherwise.
  * @typedef {{from: number|null, to: number|null, delta: number|null,
  *   from_count?: {passed: number, of: number}|null, to_count?: {passed: number, of: number}|null}} ScoreChange
  */
@@ -58,6 +60,10 @@ function buildNotes(base, current, changed) {
   if (base.start_url !== current.start_url) {
     notes.push(`The runs started from different URLs (${base.start_url} and ${current.start_url}), so they may describe different sites or sections.`);
   }
+  for (const [label, run] of /** @type {const} */ ([['base', base], ['current', current]])) {
+    const unknown = tokensNotInData(run.ai);
+    if (unknown > 0) notes.push(`The ${label} run names ${unknown} AI crawler ${unknown === 1 ? 'token' : 'tokens'} that the current crawler data does not have, so its count of AI search crawlers leaves ${unknown === 1 ? 'it' : 'them'} out.`);
+  }
   if (base.crawl.max_pages !== current.crawl.max_pages) {
     notes.push(`The page budget changed from ${base.crawl.max_pages} to ${current.crawl.max_pages} pages, so the runs may have looked at different pages.`);
   }
@@ -105,9 +111,11 @@ export function compareRuns(base, current) {
     if (fromCount === undefined && toCount === undefined) {
       scores[name] = { from, to, delta: from === null || to === null ? null : to - from };
     } else {
-      // A score given as a count: compare the counts; delta is the change in how many passed.
+      // A score given as a count: compare the counts. Delta is the change in how many passed, and only when both counts are
+      // of the same number of checks: "3 of 4" to "4 of 6" is not one more passing, so both are shown and delta is null.
       const counts = { from_count: fromCount ?? null, to_count: toCount ?? null };
-      scores[name] = { from, to, ...counts, delta: counts.from_count && counts.to_count ? counts.to_count.passed - counts.from_count.passed : null };
+      const comparable = counts.from_count && counts.to_count && counts.from_count.of === counts.to_count.of;
+      scores[name] = { from, to, ...counts, delta: comparable ? /** @type {{passed: number}} */ (counts.to_count).passed - /** @type {{passed: number}} */ (counts.from_count).passed : null };
     }
   }
 

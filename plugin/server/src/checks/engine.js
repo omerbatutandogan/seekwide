@@ -1,8 +1,9 @@
-/** @import { AppFiles, AppsProfile, CheckContext, CheckDef, CheckResult, CheckStat, CrawlResult, Finding, AuditResult, ImageFileResult, InlinkRef, OutboundResult, PageRecord, VitalsData } from '../types.js' */
+/** @import { AiPolicy, AppFiles, AppsProfile, CheckContext, LlmsTxtResult, CheckDef, CheckResult, CheckStat, CrawlResult, Finding, AuditResult, ImageFileResult, InlinkRef, OutboundResult, PageRecord, VitalsData } from '../types.js' */
 
 import { LIMITS, SEVERITIES } from '../config.js';
 import { shortId } from '../util/hash.js';
 import { crawlIdentity } from '../util/site-identity.js';
+import { aiRobotsReason } from '../crawl/ai-robots.js';
 import { isRefusedSitemap } from './page-helpers.js';
 import { scoreModules } from './scoring.js';
 
@@ -17,6 +18,9 @@ const SKIP_REASONS = {
   image_files: 'Needs the image files to be checked. They were not.',
   social_images: 'Needs the sharing images to be checked. They were not.',
   app_files: 'Needs the app association files of the site to be read. They were not.',
+  llms_txt: 'Needs the site\'s /llms.txt to be requested. It was not.',
+  ai_robots: 'Needs what robots.txt tells AI crawlers. This crawl did not record it.',
+  ai_pages: 'Needs the page signals the AI checks read (Bing\'s directives, data-nosnippet, scripts). This crawl was made before rule set 0.2.0 and did not record them. Crawl the site again.',
 };
 
 /**
@@ -38,10 +42,11 @@ function unreadSitemapReason(crawl) {
  * @param {CrawlResult} crawl
  * @param {{outbound?: Map<string, OutboundResult>|null, vitals?: VitalsData|null, imageFiles?: Map<string, ImageFileResult>|null,
  *          imageFilesReason?: string, socialImages?: Map<string, ImageFileResult>|null, socialImagesReason?: string,
- *          appFiles?: AppFiles|null, appFilesReason?: string, apps?: AppsProfile|null}} [extras]
+ *          appFiles?: AppFiles|null, appFilesReason?: string, apps?: AppsProfile|null,
+ *          llmsTxt?: LlmsTxtResult|null, llmsTxtReason?: string, aiPolicy?: AiPolicy|null}} [extras]
  *   What was collected besides the crawl: external link results, Core Web Vitals, image files, sharing images and the app
  *   association files; a `…Reason` says why one was not collected, when the collector knows. `apps` is what the site
- *   profile declares about the site's apps.
+ *   profile declares about the site's apps, `aiPolicy` the AI policy it states, `llmsTxt` what the site answered at /llms.txt.
  * @returns {CheckContext}
  */
 export function buildContext(crawl, extras = {}) {
@@ -90,6 +95,14 @@ export function buildContext(crawl, extras = {}) {
   const appFiles = extras.appFiles ?? null;
   if (appFiles !== null) capabilities.add('app_files');
   else if (extras.appFilesReason) skipReasons.app_files = extras.appFilesReason;
+  // The ai module's crawl data: what robots.txt tells AI crawlers, and the page signals of records made since rule set 0.2.0.
+  const aiReason = aiRobotsReason(crawl);
+  if (aiReason === null) capabilities.add('ai_robots');
+  else skipReasons.ai_robots = aiReason;
+  if (pages.length === 0 || pages.some((page) => page.ai !== undefined)) capabilities.add('ai_pages');
+  const llmsTxt = extras.llmsTxt ?? null;
+  if (llmsTxt !== null) capabilities.add('llms_txt');
+  else if (extras.llmsTxtReason) skipReasons.llms_txt = extras.llmsTxtReason;
   if (vitals !== null) {
     if (vitals.lab.available) capabilities.add('lab_data');
     else if (vitals.lab.reason) skipReasons.lab_data = vitals.lab.reason;
@@ -134,6 +147,8 @@ export function buildContext(crawl, extras = {}) {
     socialImages,
     appFiles,
     apps: extras.apps ?? {},
+    aiPolicy: extras.aiPolicy ?? null,
+    llmsTxt,
     resolve,
   };
 }

@@ -12,7 +12,6 @@ import {
   APPS_NO_SITE_URL, APPS_OTHER_SITE, APP_FILES_LOCAL, APP_FILES_NOT_ASKED, PROFILE_UNREADABLE, SOCIAL_IMAGES_FAILED, SOCIAL_IMAGES_NOT_ASKED, appsFor,
   notRequestedNotes, notRequestedSummary,
 } from '../../plugin/server/src/tools/audit-sharing.js';
-import { crawlIdentity } from '../../plugin/server/src/util/site-identity.js';
 import { SOCIAL_PLATFORM_DOMAINS } from '../../plugin/server/src/util/off-limits.js';
 import { makeCrawl, makeLink, makePage } from '../helpers/factories.js';
 import { jobFor, makeDeps, toolNamed } from './fakes.js';
@@ -140,8 +139,12 @@ describe('what the review of batch 1 found in audit_run', () => {
     const ownResult = await own.run({ modules: ['aso'] });
     assert.ok(!ownResult.notes.includes(APPS_OTHER_SITE));
     assert.deepEqual(own.fake.runs[0].findings.filter((finding) => finding.check_id.endsWith('.missing')).map((finding) => finding.check_id).sort(), ['aso.aasa.missing', 'aso.assetlinks.missing']);
-    assert.deepEqual(appsFor(/** @type {any} */ ({ apps }), crawlIdentity(makeCrawl())), { apps: {}, note: APPS_NO_SITE_URL });
-    assert.deepEqual(appsFor(null, crawlIdentity(makeCrawl())), { apps: {}, note: null });
+    assert.deepEqual(appsFor(/** @type {any} */ ({ apps }), makeCrawl()), { apps: {}, note: APPS_NO_SITE_URL });
+    assert.deepEqual(appsFor(null, makeCrawl()), { apps: {}, note: null });
+    // The same host rule as the ai module's policy: a subdomain or another port has association files of its own.
+    assert.deepEqual(appsFor(/** @type {any} */ ({ apps, site_url: 'https://shop.example.test/' }), makeCrawl()), { apps: {}, note: APPS_OTHER_SITE });
+    assert.deepEqual(appsFor(/** @type {any} */ ({ apps, site_url: 'https://example.test:8443/' }), makeCrawl()), { apps: {}, note: APPS_OTHER_SITE });
+    assert.deepEqual(appsFor(/** @type {any} */ ({ apps, site_url: 'https://www.example.test./' }), makeCrawl()).apps, apps);
   });
 
   it('app-file redirects are followed only where the crawl would go: the site\'s host, on its port', async () => {

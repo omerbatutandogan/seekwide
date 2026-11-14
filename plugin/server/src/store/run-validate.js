@@ -217,6 +217,53 @@ function sharingProblem(run) {
   return null;
 }
 
+const AI_POLICY_VALUES = new Set(['allow_all', 'allow_search', 'block_all']);
+const ROBOTS_STATUSES = new Set(['ok', 'missing', 'unreachable']);
+const TRAINING_PREFERENCES = new Set(['disallow', 'allow', 'empty', 'none', 'unknown']);
+const LLMS_OUTCOMES = new Set(['found', 'not_found', 'unverifiable', 'disallowed']);
+/**
+ * A crawler token as a run stores it: the form of a robots.txt product token, not membership of the current bot data,
+ * which is refreshed every month; a run written with older data stays readable.
+ */
+const AI_TOKEN = /^[A-Za-z0-9_-]{1,64}$/;
+/** More tokens than the bot data will plausibly ever hold. */
+export const MAX_STORED_AI_AGENTS = 200;
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * What the ai module stored (rule set 0.2.0). Every value has a fixed form: a
+ * date, a policy, statuses, the tokens of the plugin's own bot data with a
+ * boolean each, a count, and /llms.txt's address with an outcome and status.
+ * @param {unknown} ai
+ * @returns {string|null}
+ */
+function aiProblem(ai) {
+  if (ai === undefined || ai === null) return null;
+  if (!isObject(ai)) return 'ai';
+  const { bots_verified: verified, policy, robots, agents, training_preference: training, preference_lines: lines, llms_txt: llms } = /** @type {Record<string, unknown>} */ (ai);
+  if (typeof verified !== 'string' || !DAY.test(verified)) return 'ai.bots_verified';
+  if (policy !== null && !(typeof policy === 'string' && AI_POLICY_VALUES.has(policy))) return 'ai.policy';
+  if (robots !== null && !(typeof robots === 'string' && ROBOTS_STATUSES.has(robots))) return 'ai.robots';
+  const refused = /** @type {Record<string, unknown>} */ (ai).robots_refused;
+  if (refused !== undefined && !isCount(refused)) return 'ai.robots_refused';
+  const failed = /** @type {Record<string, unknown>} */ (ai).robots_error;
+  if (failed !== undefined && failed !== true) return 'ai.robots_error';
+  if (!Array.isArray(agents) || agents.length > MAX_STORED_AI_AGENTS) return 'ai.agents';
+  for (let i = 0; i < agents.length; i += 1) {
+    const agent = agents[i];
+    if (!isObject(agent) || typeof agent.token !== 'string' || !AI_TOKEN.test(agent.token) || typeof agent.allowed !== 'boolean') return `ai.agents[${i}]`;
+  }
+  if (typeof training !== 'string' || !TRAINING_PREFERENCES.has(training)) return 'ai.training_preference';
+  if (!isCount(lines)) return 'ai.preference_lines';
+  if (llms !== null) {
+    if (!isObject(llms)) return 'ai.llms_txt';
+    const { url, outcome, status } = /** @type {Record<string, unknown>} */ (llms);
+    if (!isStoredUrl(url)) return 'ai.llms_txt.url';
+    if (typeof outcome !== 'string' || !LLMS_OUTCOMES.has(outcome) || !isCount(status)) return 'ai.llms_txt';
+  }
+  return null;
+}
+
 /**
  * The first field of a stored run that does not have the form the plugin
  * writes, as a dotted name ("findings[3].source.line"), or null when every
@@ -253,6 +300,8 @@ export function storedRunProblem(run) {
   if (repo !== null) return repo;
   const sharing = sharingProblem(run);
   if (sharing !== null) return sharing;
+  const ai = aiProblem(run.ai);
+  if (ai !== null) return ai;
   const findings = /** @type {unknown[]} */ (run.findings);
   for (let i = 0; i < findings.length; i += 1) {
     const finding = findings[i];

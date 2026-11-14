@@ -1,7 +1,7 @@
 // HTML document → content fields of a PageRecord. Pure. This file walks the
 // document and collects the visible text; html-elements.js reads each element.
 
-/** @import { CanonicalRef, Heading, HreflangRef, ImageRecord, JsonLdBlock, LinkRecord, PageSecurity, SocialRecord, VideoEmbedRecord, VideoRecord } from '../types.js' */
+/** @import { AiPageRecord, CanonicalRef, Heading, HreflangRef, ImageRecord, JsonLdBlock, LinkRecord, PageSecurity, SocialRecord, VideoEmbedRecord, VideoRecord } from '../types.js' */
 /** @import { DomNode } from './dom.js' */
 /** @import { Frame, HtmlState } from './html-elements.js' */
 
@@ -10,6 +10,7 @@ import { parse } from 'parse5';
 import { LIMITS } from '../config.js';
 import { sha1Hex } from '../util/hash.js';
 import { collapseWhitespace } from '../util/strings.js';
+import { aiRecord, aiState, emptyAi, hasNosnippet } from './ai.js';
 import { HTML_NS, SVG_NS, findBaseUrl, isAriaHidden, parsedPart } from './dom.js';
 import { reachedCaps, visitElement } from './html-elements.js';
 import { enterLandmark } from './media.js';
@@ -52,6 +53,7 @@ const SPACE = Symbol('space');
  * @property {VideoEmbedRecord[]} video_embeds
  * @property {boolean} video_markup
  * @property {SocialRecord} social
+ * @property {AiPageRecord} [ai]  The ai module's reading of the page (extract/ai.js).
  * @property {string[]} [limits_reached]  Set when a cap stopped the reading of the page (`PageRecord.limits_reached`).
  */
 
@@ -88,13 +90,13 @@ export function extractHtml(html, context) {
     html_lang: null, titles: [], meta_descriptions: [], meta_robots: [], canonicals: [], hreflang: [],
     headings: [], viewport: null, og: {}, twitter: {}, links: [], images: [], jsonld: [], mixed_content: [],
     word_count: 0, text_hash: '', text_excerpt: '', security: emptySecurity(), videos: [], video_embeds: [], video_markup: false,
-    social: emptySocial(),
+    social: emptySocial(), ai: emptyAi(),
   };
   /** @type {HtmlState} */
   const state = {
     out, baseUrl, https: context.responseUrl.startsWith('https:'), siteHost: context.siteHost, includeSubdomains: context.includeSubdomains,
     listChars: 0, upgradeInsecure: context.upgradeInsecure ?? false, nextFlight: false, bodyTitle: false, preloadImages: new Set(), pictures: new WeakMap(),
-    social: socialState(),
+    social: socialState(), ai: aiState(),
   };
   /** @type {string[]} */
   const text = [];
@@ -103,7 +105,7 @@ export function extractHtml(html, context) {
   const streamed = streamedBoundaries(document);
 
   /** @type {(Frame|typeof SPACE)[]} */
-  const stack = [{ node: document, head: false, body: false, hidden: false, replaced: false, ariaHidden: false, chrome: false, sectioned: false }];
+  const stack = [{ node: document, head: false, body: false, hidden: false, replaced: false, ariaHidden: false, chrome: false, sectioned: false, nosnippet: false }];
   while (stack.length > 0) {
     const item = /** @type {Frame|typeof SPACE} */ (stack.pop());
     if (item === SPACE) {
@@ -112,7 +114,10 @@ export function extractHtml(html, context) {
     }
     const { node } = item;
     if (node.nodeName === '#text') {
-      if (item.body && !item.hidden) (item.replaced ? replacedText : text).push(node.value ?? '');
+      if (item.body && !item.hidden) {
+        (item.replaced ? replacedText : text).push(node.value ?? '');
+        if (item.nosnippet && !item.replaced) state.ai.nosnippetText.push(node.value ?? '');
+      }
       continue;
     }
     let frame = item;
@@ -127,6 +132,7 @@ export function extractHtml(html, context) {
         replaced: item.replaced,
         ariaHidden: item.ariaHidden || (html && isAriaHidden(node)),
         ...(html ? enterLandmark(node, item) : { chrome: item.chrome, sectioned: item.sectioned }),
+        nosnippet: item.nosnippet || (html && hasNosnippet(node)),
       };
       if (!(html && INLINE.has(node.tagName))) {
         text.push(' ');
@@ -139,7 +145,7 @@ export function extractHtml(html, context) {
       const child = children[i];
       stack.push({
         node: child, head: frame.head, body: frame.body, hidden: frame.hidden, replaced: frame.replaced || streamed.replaced.has(child), ariaHidden: frame.ariaHidden,
-        chrome: frame.chrome, sectioned: frame.sectioned,
+        chrome: frame.chrome, sectioned: frame.sectioned, nosnippet: frame.nosnippet,
       });
     }
   }
@@ -159,6 +165,7 @@ export function extractHtml(html, context) {
   out.word_count = visible.match(WORD)?.length ?? 0;
   out.text_hash = visible === '' ? '' : sha1Hex(visible.toLowerCase());
   out.text_excerpt = visible.slice(0, LIMITS.textExcerptChars);
+  out.ai = aiRecord(state.ai, WORD);
   const served = replacedText.length === 0 ? visible : collapseWhitespace(`${text.join('')} ${replacedText.join('')}`);
   const identity = siteIdentity({ siteHost: context.siteHost, includeSubdomains: context.includeSubdomains, deployedOrigin: context.deployedOrigin ?? null });
   const read = documentSecurity(document, { baseUrl, identity, links: out.links, revealed: streamed.revealed }, {

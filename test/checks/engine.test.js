@@ -34,6 +34,8 @@ function def(overrides) {
   };
 }
 
+const NO_PAGE = 'Needs what robots.txt tells AI crawlers. No page of the site was recorded.';
+
 test('buildContext indexes pages, inlinks and capabilities', () => {
   const home = makePage({
     url: `${SITE}/`,
@@ -49,11 +51,12 @@ test('buildContext indexes pages, inlinks and capabilities', () => {
   assert.equal(ctx.inlinks.get(`${SITE}/a`)?.length, 2);
   assert.equal(ctx.inlinks.has('https://other.test/x'), false);
   assert.equal(ctx.sitemapUrls.has(`${SITE}/a`), true);
-  assert.deepEqual([...ctx.capabilities].sort(), ['full_crawl', 'live_site', 'robots', 'sitemap']);
+  assert.deepEqual([...ctx.capabilities].sort(), ['ai_pages', 'full_crawl', 'live_site', 'robots', 'sitemap']);
   assert.deepEqual(ctx.site, { origin: SITE, host: 'example.test', https: true, start_url: `${SITE}/` });
   assert.equal(ctx.outbound, null);
   assert.equal(ctx.vitals, null);
-  assert.deepEqual(ctx.skipReasons, {});
+  // The factory's crawl has no ai_robots, as a crawl made before rule set 0.2.0.
+  assert.deepEqual(ctx.skipReasons, { ai_robots: 'Needs what robots.txt tells AI crawlers. This crawl did not record it (crawls made before rule set 0.2.0 do not). Crawl the site again.' });
 });
 
 test('buildContext provides live_site unless the crawl was of a site on this machine', () => {
@@ -67,19 +70,19 @@ test('buildContext provides live_site unless the crawl was of a site on this mac
 test('buildContext adds lab_data and field_data only for the sources that answered, and keeps the reason of the others', () => {
   const both = buildContext(makeCrawl(), { vitals: makeVitals() });
   assert.ok(both.capabilities.has('lab_data') && both.capabilities.has('field_data'));
-  assert.deepEqual(both.skipReasons, {});
+  assert.deepEqual(both.skipReasons, { ai_robots: NO_PAGE });
   assert.deepEqual(both.vitals, makeVitals());
 
   const labOnly = buildContext(makeCrawl(), { vitals: makeVitals({ field: { available: false, reason: 'No key.', form_factor: 'phone' } }) });
   assert.equal(labOnly.capabilities.has('lab_data'), true);
   assert.equal(labOnly.capabilities.has('field_data'), false);
-  assert.deepEqual(labOnly.skipReasons, { field_data: 'No key.' });
+  assert.deepEqual(labOnly.skipReasons, { field_data: 'No key.', ai_robots: NO_PAGE });
 
   const neither = buildContext(makeCrawl(), {
     vitals: makeVitals({ lab: { available: false, reason: 'Refused.', device: 'mobile' }, field: { available: false, reason: null, form_factor: 'phone' } }),
   });
   assert.equal(neither.capabilities.has('lab_data') || neither.capabilities.has('field_data'), false);
-  assert.deepEqual(neither.skipReasons, { lab_data: 'Refused.' }, 'a source without a reason gets the default one');
+  assert.deepEqual(neither.skipReasons, { lab_data: 'Refused.', ai_robots: NO_PAGE }, 'a source without a reason gets the default one');
 });
 
 test('a check that needs missing data is skipped with the collector\'s reason, or the default one', () => {

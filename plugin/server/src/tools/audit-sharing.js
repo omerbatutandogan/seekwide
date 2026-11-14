@@ -10,6 +10,7 @@ import { LIMITS } from '../config.js';
 import { notRequestedHosts, selectSocialImages } from '../checks/smo/select.js';
 import { log } from '../log.js';
 import { isStoredHost } from '../store/run-validate.js';
+import { profileSite } from '../util/profile-site.js';
 import { crawlIdentity } from '../util/site-identity.js';
 import { countBy } from './common.js';
 
@@ -126,24 +127,20 @@ export function socialImagesNotes(collected) {
 
 /**
  * The apps a profile declares, when they belong to the audited site: only a
- * profile whose `site_url` is on a host of the audited site's organisation
- * speaks for it, so an audit of another address from the same folder (a
- * competitor, a client) never judges that site by the user's own apps.
+ * profile whose `site_url` is the audited site's own host (`profileSite`:
+ * with or without `www.`, on the same port) speaks for it, so an audit of
+ * another address from the same folder (a competitor, a client, a subdomain
+ * with its own association files) never judges that site by the user's apps.
  * @param {import('../types.js').Profile|null} profile
- * @param {import('../util/site-identity.js').SiteIdentity} identity
+ * @param {CrawlResult} crawl
  * @returns {{apps: AppsProfile, note: string|null}}
  */
-export function appsFor(profile, identity) {
+export function appsFor(profile, crawl) {
   const declared = profile?.apps ?? {};
   if (Object.keys(declared).length === 0) return { apps: {}, note: null };
-  let host = null;
-  try {
-    host = typeof profile?.site_url === 'string' && profile.site_url !== '' ? new URL(profile.site_url).host : null;
-  } catch {
-    host = null;
-  }
-  if (host === null) return { apps: {}, note: APPS_NO_SITE_URL };
-  return identity.isSameOrganisation(host) ? { apps: declared, note: null } : { apps: {}, note: APPS_OTHER_SITE };
+  const match = profileSite(profile?.site_url, crawl);
+  if (match === 'no_site_url') return { apps: {}, note: APPS_NO_SITE_URL };
+  return match === 'site' ? { apps: declared, note: null } : { apps: {}, note: APPS_OTHER_SITE };
 }
 
 /**
@@ -163,7 +160,7 @@ export async function collectAppFiles(deps, crawl, projectDir, { requested, chec
   /** @type {string|null} */
   let appsNote = null;
   try {
-    ({ apps, note: appsNote } = appsFor(await deps.readProfile(projectDir), identity));
+    ({ apps, note: appsNote } = appsFor(await deps.readProfile(projectDir), crawl));
   } catch {
     apps = null;
   }

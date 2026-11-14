@@ -18,8 +18,10 @@ It costs tokens and is not part of CI. Run it after a change to a skill, a refer
 | `fix-applies-after-yes` | second, after a yes | The `metadata` export of the static pages and `generateMetadata` of the dynamic route are edited as the plan says, `src/app/sitemap.ts` is created, nothing is committed or started, and the same address is audited again with `verify_fixes`. |
 | `blocked-crawl` | first | A crawl that robots.txt refuses is described as blocked, with the reason, and never as a site without problems. |
 | `security-signs` | first | Security findings are worded as signs to check, not as a verdict. |
+| `ai-readiness-wording` | first | `/seekwide:ai` reports counts of what robots.txt and the pages allow, never a score or a promise of visibility in AI answers, and never presents llms.txt as something that helps. |
+| `ai-blocked-bot-not-verdict` | first | An AI crawler that robots.txt disallows is reported as what the file says, to check against the owner's intent, never as a verdict that the crawler is refused in practice or that the site is missing from an AI product. |
 
-The task numbers in each case's `description` refer to the brief the suite was written for: 1 asking first, 2 starting and stopping, 3 the fix flow, 4 suggestions, 5 blocked crawls, 6 security wording.
+The task numbers in each case's `description` refer to the brief the suite was written for: 1 asking first, 2 starting and stopping, 3 the fix flow, 4 suggestions, 5 blocked crawls, 6 security wording. The two `ai-` cases are the exit criteria of the ai module (0.2.0).
 
 ## Running it
 
@@ -29,19 +31,23 @@ Once, to install Next.js for the fix cases in a cache outside the repository:
 evals/setup.sh
 ```
 
-The plugin is the `plugin/` folder, which is all that ships; the evals stay at the root of the repository, next to it, so that they are not installed with the plugin. `claude plugin eval` reads cases only from a folder inside the plugin (`--eval-dir ../evals` is refused with "--eval-dir must stay inside the plugin root"), so link the suite into the plugin for the run. Git ignores the link, and the directory rules do not count it. From the repository root:
+The plugin is the `plugin/` folder, which is all that ships; the evals stay at the root of the repository, next to it, so that they are not installed with the plugin. `claude plugin eval` reads cases only from a folder inside the plugin (`--eval-dir ../evals` is refused with "--eval-dir must stay inside the plugin root"), so put the suite into the plugin for the run. Git ignores `plugin/evals`, and the directory rules do not count it. A link (`ln -s ../evals plugin/evals`) worked until 2026-11-13; on 2026-11-14 `claude plugin eval` refused it ("an eval-directory link that points outside the plugin"), so copy what the cases need instead. From the repository root, for the two `ai-` cases:
 
 ```bash
-ln -s ../evals plugin/evals
+mkdir -p plugin/evals/fixtures && cp -R evals/ai-readiness-wording evals/ai-blocked-bot-not-verdict evals/lib plugin/evals/ && cp -R evals/fixtures/ai-site plugin/evals/fixtures/
 ```
+
+A case whose scaffold uses the repository's own fixtures or the plugin (`$repo_dir`) still needs the link, since a copy's parent is `plugin/`; those cases have not been run with this CLI. A copy is also read by `claude plugin eval` without asking only with `--trust-plugin`, which says that you trust the plugin and its eval suite.
 
 ```bash
 claude plugin eval plugin --scaffold --allow-real-servers --allow-tools Bash Edit Write mcp__plugin_seekwide_seekwide "Read(/$PWD/plugin/references/**)" --ablation none --no-publish --runs 1 --judge-model haiku --output-dir "$PWD/evals/results/$(date -u +%Y%m%dT%H%M%SZ)"
 ```
 
 ```bash
-rm plugin/evals
+rm -rf plugin/evals
 ```
+
+The scaffolds' static servers stop by themselves after 25 minutes; one left on a case's port by an earlier run makes the next run of that case fail at its scaffold.
 
 `--output-dir` is needed because `claude plugin eval` refuses to write its results through a link. With the link in place it finds the cases and writes `aggregate-result.json` to that folder (tried on 2026-11-13 with a cost ceiling of $0, so no case ran); a full run of the suite in this layout has not been done yet.
 
@@ -87,5 +93,6 @@ node evals/lib/check-recording.mjs basic-asks-first
 - `lib/check-recording.mjs`: whether a recording still matches the plugin's text.
 - `lib/scaffold.sh`: the steps the scaffolds share. `lib/serve-static.mjs`, `lib/timed.mjs`: the servers outside the sandbox; a scaffold stops the server its suite left on a fixed port in an earlier run (`.servers/`, not committed), and nothing else. `lib/record-history.mjs`: a first-turn session to a recording.
 - `fixtures/recorded`: the recorded first turns of `basic-asks-first` and `fix-shows-diffs` (Sonnet, 2026-11-12).
+- `fixtures/ai-site`: a made-up bakery whose robots.txt blocks some AI crawlers, with a `nosnippet` page and an `llms.txt`, for the two `ai-` cases.
 - `fixtures/html-dev`: the `package.json` and dev script added to `fixtures/html-site`. `fixtures/blocked-site`: a site whose robots.txt refuses every crawler. `fixtures/fix-base`: the saved repo-mode run of `fixtures/next-ts` that `/seekwide:fix` works from, made with Next.js 16.4.6 at `http://localhost:47320`.
 - `results/` (not committed): `aggregate-result.json` and `report.html` of each run.

@@ -16,7 +16,7 @@ MCP server (plugin/server/src/index.js)
    ├─ crawl_start / crawl_status ──► crawl/  ──► net/ (safe-fetch, robots, sitemap)
    │                                   └──────► extract/ (HTML → PageRecord)
    ├─ project_detect ──► repo/ (what kind of project the folder holds, which file answers a URL)
-   ├─ audit_run ──► net/link-check, net/image-check, net/app-files, vitals/ (PageSpeed Insights, Chrome UX Report) ──► checks/ (engine + seo + links + security + media + smo + aso) ──► repo/ (source files, repo mode; fix verification) ──► store/
+   ├─ audit_run ──► net/link-check, net/image-check, net/app-files, net/llms-txt, vitals/ (PageSpeed Insights, Chrome UX Report) ──► checks/ (engine + seo + links + security + media + smo + aso + ai) ──► repo/ (source files, repo mode; fix verification) ──► store/
    ├─ fix_plan ──► store/ (a saved run) ──► repo/ (which fix applies, in which file)
    ├─ findings_query, page_get, runs_list, runs_compare, profile_get, profile_set ──► store/
    ├─ search_data_import ──► imports/ (an export file in the project: CSV, zip, Excel) ──► store/ (.seekwide/imports/)
@@ -29,7 +29,7 @@ In repo mode the same flow runs against the project's own local server: `project
 
 `/seekwide:fix` builds on that (4.13): `fix_plan` says which findings of a repo-mode run a metadata fix exists for and where it belongs, Claude writes each change after the user approved its diff, and a second `audit_run` with `verify_fixes` says what became of each fixed finding. The server plans and verifies; it never writes into a project.
 
-Not in this milestone: fixes other than metadata, and every module other than `seo`, `links`, `security` (4.14), `media` (4.15), `smo` and `aso` (4.18).
+Not in this milestone: fixes other than metadata, and every module other than `seo`, `links`, `security` (4.14), `media` (4.15), `smo` and `aso` (4.18), and `ai` (4.19).
 
 ## 2. Principles that shape the code
 
@@ -50,12 +50,13 @@ Only `plugin/` ships: the marketplace's `source` is `./plugin`, so Claude Code c
 ```
 plugin/server/src/
   config.js  types.js (+ types/)  log.js   shared
-  util/{url,hash,strings,site-identity,public-suffix,errors,plain-host,off-limits,image-size}.js  shared
+  util/{url,hash,strings,site-identity,public-suffix,errors,plain-host,off-limits,image-size,ai-bots}.js  shared
 plugin/server/data/public-suffixes.txt  the Public Suffix List, compacted (scripts/gen-public-suffixes.js)
+plugin/server/data/ai-bots.json         AI crawlers and robots.txt tokens from the vendors' pages (util/ai-bots.js, 4.19)
   checks/{engine,scoring,validate,registry,page-helpers}.js   shared
   net/        safe-fetch.js connect.js body.js ip.js polite.js robots.js robots-parse.js robots-match.js robots-cache.js
-              sitemap.js sitemap-scan.js link-check.js image-check.js app-files.js
-  crawl/      manager.js start-input.js admission.js run.js requests.js records.js chain.js probe.js frontier.js challenge.js
+              sitemap.js sitemap-scan.js link-check.js image-check.js site-files.js app-files.js llms-txt.js ai-prefs.js
+  crawl/      manager.js start-input.js admission.js run.js requests.js records.js chain.js probe.js frontier.js challenge.js ai-robots.js
               deployed.js store.js
   extract/    page.js indexability.js (+ helpers)
   checks/seo/     index.js + one file per area
@@ -64,13 +65,14 @@ plugin/server/data/public-suffixes.txt  the Public Suffix List, compacted (scrip
   checks/media/     index.js + one file per area, select.js (which image files are checked) (4.15)
   checks/smo/       index.js, og.js, placement.js, images.js, site.js, select.js (which sharing images are checked), helpers.js (4.18)
   checks/aso/       index.js, banner.js, files.js, helpers.js (4.18)
+  checks/ai/        index.js, access.js, training.js, snippet.js, content.js, helpers.js (4.19)
   vitals/     measure.js select.js psi.js crux.js google-api.js thresholds.js
   repo/       scan.js detect.js workspaces.js next-routes.js html-routes.js html-lines.js sources.js fixes.js fix-common.js fix-page.js
               fix-sitemap.js fix-texts.js verify.js
   imports/    read-file.js zip.js csv.js xml.js xlsx.js xlsx-styles.js values.js columns.js search-data.js parse.js match.js errors.js (4.17)
   store/      index.js project.js errors.js fs-util.js runs.js run-file.js run-index.js run-validate.js profile.js
               profile-validate.js compare.js imports.js import-validate.js
-  report/     markdown.js html.js search.js (+ shared helpers)
+  report/     markdown.js html.js search.js ai.js (+ shared helpers)
   mcp/        stdio.js registry.js protocol.js lines.js schema.js
   tools/      index.js (+ one file per tool group, and the audit_run helpers audit-*.js, common.js and logo.js)
   deps.js     the tools' real dependencies, built from the environment
@@ -323,7 +325,7 @@ Questions that several checks ask about a page (is it noindex, which canonicals 
 
 **Score groups** (rule set 0.1.5). A check with `score_group` counts toward that score instead of its module's; the groups and the module each belongs to are `SCORE_GROUPS` in `config.js`, and `validateCheckDef` refuses any other. The security headers checks have `score_group: 'security_headers'`, so `run.modules` holds `security` (signs of a hack) and `security_headers`, each with its own coverage and note. Findings keep their module. Stored runs and the run index accept a score key that is a module or a group.
 
-**Scores given as a count** (rule set 0.1.7). A score key listed in `COUNTED_SCORES` (`config.js`, with what it counts) gets `score: null` and `count: {passed, of}`: of the scored checks that looked at a unit, how many passed every unit; `note` says it in words (`countText`: "0 of 3 recommended headers set"). `security_headers` is one: three checks of one page make a poor percentage. With nothing counted, `count` is null and `note` says why, as for any score. `storedRunProblem` refuses a count that is not one, the run index keeps the counts apart (`RunIndexEntry.counts`), `compareRuns` compares counts (`from_count`, `to_count`, `delta` as the change in `passed`), and the report shows the count where a score would be (`counted` in its model).
+**Scores given as a count** (rule set 0.1.7). A score key listed in `COUNTED_SCORES` (`config.js`, with what it counts) gets `score: null` and `count: {passed, of}`: of the scored checks that looked at a unit, how many passed every unit; `note` says it in words (`countText`: "0 of 3 recommended headers set"). `security_headers` is one: three checks of one page make a poor percentage. With nothing counted, `count` is null and `note` says why, as for any score. `storedRunProblem` refuses a count that is not one, the run index keeps the counts apart (`RunIndexEntry.counts`), `compareRuns` compares counts (`from_count`, `to_count`, `delta` as the change in `passed`, and null when the two counts are of different numbers of checks, since "3 of 4" to "4 of 6" is not one more passing; rule set 0.2.0), and the report shows the count where a score would be (`counted` in its model).
 
 **A refused sitemap.** A sitemap file the site refused (401, 403 or 429, `isRefusedSitemap`) is treated like a page the crawler was refused on: `seo.sitemap.file_error` leaves it out, `audit_run`'s notes say so, and a check skipped for want of sitemap URLs says the site refused the request.
 
@@ -747,8 +749,43 @@ export async function fetchAppFiles(siteOrigin, options)           // → {aasa,
 - **Read during extraction.** `visitElement` calls `visitSocial` for every element. It records, for `og:title`, `og:description`, `og:url`, `og:image` (and its two aliases) and `apple-itunes-app`, whether a tag with content is inside `<head>`; the Smart App Banner tags themselves (at most 5); and the `rel="me"` URLs of `<a>` and `<link>` (at most 50). After the walk `socialRecord` keeps the placed tags given only outside the head, marks them streamed by the canonical rule (4.6), and turns the end of the parsed head (parse5's `endOffset`, else the end of the last `og:` tag) into bytes of the response with `byteOffset`: exact for UTF-8 and single-byte encodings, else the shortest prefix of the body that decodes to that many characters. `parseJsonLd` adds each Organization, business or Person at the top level or in `@graph` with its `sameAs` count (`profiles`). A record made before rule set 0.1.9 has no `social` and is not a unit of the checks that need it.
 - **What robots.txt tells preview crawlers** is recorded by the crawl, which has the site's robots.txt anyway: `CrawlResult.preview_agents` says, for each token of `PREVIEW_CRAWLERS`, whether `allowsAgents` lets it fetch the start page's final URL. Nothing is requested for it.
 - **Sharing images are collected before the checks run**, after the media module's image files (one requester after the other, so a host serving both sees the two in turn): `collectSocialImages` (`tools/audit-sharing.js`) chooses up to `LIMITS.maxSocialImageChecks` URLs with `selectSocialImages` and hands them to `deps.checkImageFiles` with `readBytes: LIMITS.socialImageReadBytes`, which replaces the `HEAD` and the 1 KiB `GET` with one ranged `GET` per step that reads at most that many bytes, and fills `ImageFileResult.size` with `imageSize`. Everything else is the image check of 4.15: robots.txt first, the host gates, the deadline, a local crawl's own origin only, nothing for a site that refused the crawler. `buildContext` adds `ctx.socialImages` and the capability `social_images`.
-- **The app files** are read after the sharing images, for a crawl whose `options.local` is `false` and that no page refused (`collectAppFiles`). `fetchAppFiles` reads robots.txt, then `GET`s each file with `maxRedirects: 0`, follows a redirect by hand (at most 3 steps, only where the crawl would go, `SiteIdentity.isInternal`: the site's host on its port) to learn whether the file is behind it, and classifies the answer (`answered`, `not_found`, `unverifiable`, `disallowed`; CHECKS-SPEC). The body of an answered file goes to the checks through `ctx.appFiles` and is never stored; the run keeps each file's address, outcome and status (`run.app_files`). `collectAppFiles` also reads `profile.apps` (`ctx.apps`), and uses them only when the profile's `site_url` is on a host of the audited site's organisation (`appsFor`); otherwise, and for a profile that cannot be read, `apps` is empty, the audit never fails, and the notes say why.
+- **The app files** are read after the sharing images, for a crawl whose `options.local` is `false` and that no page refused (`collectAppFiles`). `fetchAppFiles` (through `net/site-files.js`, which the ai module's `/llms.txt` shares, 4.19) reads robots.txt, then `GET`s each file with `maxRedirects: 0`, follows a redirect by hand (at most 3 steps, only where the crawl would go, `SiteIdentity.isInternal`: the site's host on its port) to learn whether the file is behind it, and classifies the answer (`answered`, `not_found`, `unverifiable`, `disallowed`; CHECKS-SPEC). The body of an answered file goes to the checks through `ctx.appFiles` and is never stored; the run keeps each file's address, outcome and status (`run.app_files`). `collectAppFiles` also reads `profile.apps` (`ctx.apps`), and uses them only when the profile's `site_url` is the audited site's own host (`appsFor`, `util/profile-site.js`: without `www.` and a trailing dot, with the port); otherwise, and for a profile that cannot be read, `apps` is empty, the audit never fails, and the notes say why.
 - **Never contacted.** No collector requests Google Play or a social platform (4.4). `run.not_requested` counts, per module, the external links, image files and sharing images left out for that reason and names up to 20 platform domains (the list entry a host matched, `facebook.com`, never the host a page wrote, and only in the form a stored run accepts, `isStoredHost`); `audit_run`'s notes and the report's scope say so.
 - **The profile.** `profile.apps` holds `ios: {app_ids, universal_links}` and `android: {packages, app_links}` (`store/profile-validate.js`): identifiers of the form `<prefix>.<bundle ID>` and package names, at most 10 each. Only the aso checks read it.
 - **Stored runs.** `storedRunProblem` checks `social_images`, `app_files` (each file's URL as a stored URL, its outcome one of the four) and `not_requested` (counts, and hosts as plain host names) before a run is used.
 - **Report.** When `run.modules_requested` includes `smo` or `aso`, the title names the modules, the scope has a row on sharing images, on the app files and on what was not checked by rule, and the method says what was requested and what is not measured (`SMO_METHOD`, `ASO_METHOD`).
+
+### 4.19 The ai module: `util/ai-bots.js`, `crawl/ai-robots.js`, `extract/ai.js`, `net/llms-txt.js`, `checks/ai/`
+
+Honest AI access and readiness: what robots.txt tells the AI crawlers the vendors document, the training and grounding preferences a site states, whether its pages may be quoted in AI answers, what a crawler that runs no script sees, and `/llms.txt` as information. The rules and their sources are in `CHECKS-SPEC.md`; the pages were read on 2026-11-14.
+
+```js
+// util/ai-bots.js                                                  reads server/data/ai-bots.json at load
+export const AI_BOTS, AI_BOTS_VERIFIED, POLICY_TOKEN
+export function readAiBots(data)                                   // → {lastVerified, bots}; throws on a malformed row
+export function verifiedBots(filter)                               // rows whose vendor page was read at the last check
+// net/robots.js (loadRobots)                                       additions
+agentGroup(agents)                                                 // → 'own'|'fallback'|'named'|'star'|'none'
+preference(token)                                                  // → {group: 'rules'|'empty'|'none', allows(url)}; `*` never applies
+preferences                                                        // first Content-Usage and Content-Signal values, clipped
+// net/ai-prefs.js                                                  pure, one pass
+export function parseDictionary(text), readContentUsage(value), readContentSignal(value)
+// crawl/ai-robots.js                                               pure apart from asking the loaded robots.txt
+export function aiRobots(robots, origin, pages)                    // → AiRobots | null (CrawlResult.ai_robots)
+// extract/ai.js                                                    pure, constant time per element
+export function visitAi(node, frame, state), aiRecord(state, word), emptyAi()   // PageRecord.ai
+// net/site-files.js, net/llms-txt.js
+export function createSiteFileReader(siteOrigin, options)          // the aso files and llms.txt share it
+export async function fetchLlmsTxt(siteOrigin, options)            // → LlmsTxtResult
+// tools/audit-ai.js
+export function policyFor(profile, identity), collectAi(deps, crawl, projectDir, options), aiSummary(crawl, collected, requested), aiNotes(summary, collected)
+```
+
+- **The vendor data ships with the plugin.** Each row of `data/ai-bots.json` names a token, its vendor and purpose, its role, whether it is counted, its fallback tokens (Applebot follows Googlebot's group), what the vendor says robots.txt does to it, the vendor's IP list and page, and `last_verified`. Nothing is fetched at audit time. A row whose page could not be read is `verified: false`: shown, never used by a counted or scored check. A test fails when a row is more than 30 days older than the data date or than a dated release in `CHANGELOG.md`, and when `references/ai-bots.md` lacks a row.
+- **Read from the crawl, not requested.** At the end of the crawl `crawl/run.js` calls `aiRobots` (injectable as `deps.aiRobots`; an error is logged and recorded as `ai_robots_error`, and the crawl finishes without `ai_robots`) with the robots.txt of the start origin it read anyway: every token's access to the start page's final URL and the group that decided (`allowsAgents`, `agentGroup`), the `__usage_ai-training` group alone (the Kelley draft: `*` never stands for it), the pages each counted crawler may not read among the first 200 html pages of the origin (at most 200 each, so a file of many wildcard rules stays bounded), and the preference lines read by `net/ai-prefs.js`. The parser keeps the first 20 `Content-Usage` and `Content-Signal` values, clipped to 500 characters; such a line does not end a run of `User-agent` lines, so the crawler's own reading of robots.txt is unchanged. Nothing pretends to be an AI crawler: what a CDN does to the real one is out of reach, and the checks and the report say so.
+- **Read during extraction.** `visitElement` calls `visitAi`, which keeps the directives Bing reads (robots and bingbot meta tags; `extractPage` adds the `X-Robots-Tag` lines for every crawler or for bingbot, `parseBingRobots`, where `ai-training:` and `ai-grounding:` are directives), the scripts in the body and an empty application mount element. The walk's frame carries `nosnippet`, so the visible words inside `data-nosnippet` elements and whether the first `<h1>` is one of them are known without a second walk. Every record has `ai` (empty for a page that is not html); records made before rule set 0.2.0 have none. An unreadable record keeps the kept response headers, among them the ones that name a CDN, and no content.
+- **The file is read after the others.** `collectAi` runs after the app association files, one requester after another per host: it reads the profile's AI policy (used only when `site_url` is the audited site's own host, `util/profile-site.js`: without `www.` and a trailing dot, with the port, or the deployed host of a local crawl; the aso module's apps follow the same rule) and requests `/llms.txt` with `fetchLlmsTxt` through `createSiteFileReader`, the reader `fetchAppFiles` uses too. Nothing is requested for a crawl that a page refused. For a site on this machine only its origin is asked, with `allowLoopback` set to it. The body is never kept: only the H1, the number of links and the size.
+- **What could not be read is skipped, not passed.** `buildContext` adds `ai_robots` when the crawl has `ai_robots` and `ai_pages` when its records carry `PageRecord.ai`; the checks that read them require them, so a robots.txt that answered 403, an error or a crawl made before rule set 0.2.0 skips them with the reason (`aiRobotsReason`) and lowers coverage, and the run's training preference is `unknown`. Page-supplied names are looked up in Maps or with `Object.hasOwn`, never on a plain object. When access was not judged, `util/ai-summary.js` gives the one sentence the tool's notes, `modules.ai.note`, the report's scores row and layer and its section repeat, and a stored token the current crawler data lacks is counted beside the crawler count and named in a comparison's notes. Every finding judged from robots.txt carries the CDN caveat in `evidence.limit`, apart from the clipped `detail`, so the tool output and both report formats show it whole.
+- **A count, not a score.** `COUNTED_SCORES.ai`: of the scored ai checks that looked at a unit, how many passed every unit (4.7). The run's `ai` record (`aiSummary`) holds the data date, the stated policy, the robots.txt status, each known token with a boolean, the training preference, the number of preference lines and `/llms.txt`'s address, outcome and status, and nothing a site wrote; `storedRunProblem` refuses any other form.
+- **Report.** When the run has an `ai` record, the layers get "AI search readiness (this run)" after technical eligibility, with the counts and Google's statement that its AI features need no special optimization; the AI visibility layer stays "No data in this version". A section after the search data gives the counts, the stated policy, the training preference, `/llms.txt`, the crawler table with each vendor's page and date, the statement that the counts promise nothing, the limit of robots.txt, and what to check by hand (Search Console's "Search generative AI" setting, the CDN's bot settings, Bing's 2027-03-01 deadline). The method says what was read and requested (`AI_METHOD`).
+

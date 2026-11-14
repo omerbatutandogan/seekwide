@@ -3,6 +3,8 @@
 import { LIMITS, PREVIEW_CRAWLERS, SCHEMA_VERSION, USER_AGENT } from '../config.js';
 import { loadSitemaps } from '../net/sitemap.js';
 import { isInternalUrl, looksLikeHtmlUrl, originOf } from '../util/url.js';
+import { log } from '../log.js';
+import { AI_ROBOTS_FAILED, aiRobots } from './ai-robots.js';
 import { asksFirst, createChainFollower, recordsForChain } from './chain.js';
 import { localizeRecord, localizeUrls } from './deployed.js';
 import { createFrontier } from './frontier.js';
@@ -49,6 +51,7 @@ const DEV_SERVER_HINT = ' Check that the dev server is running and that the port
  * @property {number} [maxStoredChars]  Characters the page records of one crawl may hold in all; defaults
  *   to `MAX_STORED_CHARS`.
  * @property {number} [maxDurationMs]  How long the crawl may take, by `now`; defaults to `LIMITS.crawlMaxMs`.
+ * @property {typeof aiRobots} [aiRobots]  What robots.txt tells AI crawlers (crawl/ai-robots.js); injectable so a test can make it fail.
  */
 
 /**
@@ -128,6 +131,18 @@ export async function runCrawl(params, deps, onProgress) {
     const previewAgents = startPage !== undefined && robots.summary.status !== 'unreachable' && originOf(startPage) === origin
       ? Object.fromEntries(PREVIEW_CRAWLERS.map((token) => [token, robots.allowsAgents(startPage, [token])]))
       : null;
+    // What robots.txt tells the AI crawlers the ai module knows (crawl/ai-robots.js); nothing is requested for it. The
+    // crawl does not depend on it: an error there is logged and recorded, and only the ai checks that need it are skipped.
+    let ai = null;
+    let aiError = false;
+    if (robots.summary.status !== 'unreachable') {
+      try {
+        ai = (deps.aiRobots ?? aiRobots)(robots, origin, records.pages);
+      } catch (error) {
+        aiError = true;
+        log.error('reading robots.txt for AI crawlers failed', { id: params.id, message: error instanceof Error ? error.message : String(error) });
+      }
+    }
     /** @type {CrawlResult} */
     const result = {
       schema_version: SCHEMA_VERSION, id: params.id, start_url: startUrl, site_origin: origin, site_host: host,
@@ -137,6 +152,8 @@ export async function runCrawl(params, deps, onProgress) {
       robots_blocked: robotsBlocked, disallowed_links: records.disallowedLinks(), truncated: records.truncated(), blocked, user_agent: USER_AGENT,
       ...(timeUp ? { time_limit_reached: true } : {}),
       ...(previewAgents === null ? {} : { preview_agents: previewAgents }),
+      ...(ai === null ? {} : { ai_robots: ai }),
+      ...(aiError ? { ai_robots_error: AI_ROBOTS_FAILED } : {}),
     };
     return { status: blocked ? 'blocked' : 'done', result };
   };

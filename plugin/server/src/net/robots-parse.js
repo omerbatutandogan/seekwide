@@ -32,7 +32,17 @@
  *   `Crawl-delay` line follows its `User-agent` line; groups of one agent are merged (RFC 9309 2.2.1).
  * @property {Set<string>} named   Every token a `User-agent` line names, with or without a group.
  * @property {string[]} sitemaps   `Sitemap` values in file order, as written.
+ * @property {Set<string>} ruled   Every token whose group has an `Allow` or `Disallow` line, an empty one included.
+ * @property {{content_usage: string[], content_signal: string[], lines: number}} preferences  The values of the first
+ *   `MAX_PREFERENCE_LINES` `Content-Usage` (draft-ietf-aipref-attach) and `Content-Signal` (Cloudflare) lines, as written and
+ *   clipped to `MAX_PREFERENCE_CHARS`, and how many such lines the file has. They are kept for the ai module; they change
+ *   nothing about which URLs a crawler may fetch, and a line of either kind does not end a run of `User-agent` lines.
  */
+
+/** Preference lines of each kind kept from one file. */
+export const MAX_PREFERENCE_LINES = 20;
+/** Characters kept of one preference value. */
+export const MAX_PREFERENCE_CHARS = 500;
 
 /**
  * The product token a `User-agent` value names: lower case, without a version
@@ -77,7 +87,8 @@ const GROUP_RECORDS = new Set(['allow', 'disallow', 'crawl-delay']);
  * adds its agent to the group being started. An `Allow` or `Disallow` with an
  * empty value creates the group without adding a rule. A `Crawl-delay` that is
  * not a number is ignored (an empty one is 0). `Sitemap` values are kept
- * wherever they appear.
+ * wherever they appear, and so are the first `Content-Usage` and
+ * `Content-Signal` values (`preferences`), clipped.
  * @param {string} text
  * @returns {ParsedRobots}
  */
@@ -88,6 +99,10 @@ export function parseRobotsTxt(text) {
   const named = new Set();
   /** @type {string[]} */
   const sitemaps = [];
+  /** @type {Set<string>} */
+  const ruled = new Set();
+  /** @type {ParsedRobots['preferences']} */
+  const preferences = { content_usage: [], content_signal: [], lines: 0 };
   /** @type {string[]} */
   let agents = [];
   let startsGroup = true;
@@ -124,6 +139,7 @@ export function parseRobotsTxt(text) {
     if (name === 'allow' || name === 'disallow') {
       for (const agent of agents) {
         const group = groupOf(agent);
+        ruled.add(agent);
         if (value !== '') group.rules.push({ pattern: storedPattern(value), allow: name === 'allow' });
       }
     } else if (name === 'crawl-delay') {
@@ -134,10 +150,14 @@ export function parseRobotsTxt(text) {
       }
     } else if (name === 'sitemap' && value !== '') {
       sitemaps.push(value);
+    } else if (name === 'content-usage' || name === 'content-signal') {
+      preferences.lines += 1;
+      const list = name === 'content-usage' ? preferences.content_usage : preferences.content_signal;
+      if (list.length < MAX_PREFERENCE_LINES) list.push(value.slice(0, MAX_PREFERENCE_CHARS));
     }
     if (GROUP_RECORDS.has(name)) startsGroup = true;
   }
-  return { groups, named, sitemaps };
+  return { groups, named, sitemaps, ruled, preferences };
 }
 
 /**

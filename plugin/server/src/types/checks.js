@@ -5,6 +5,7 @@
 /** @import { VitalsData } from './vitals.js' */
 /** @import { ImageFileResult } from './media.js' */
 /** @import { AppFiles, AppsProfile } from './sharing.js' */
+/** @import { AiPolicy, LlmsTxtResult } from './ai.js' */
 /** @import { SiteIdentity } from '../util/site-identity.js' */
 
 export {};
@@ -35,6 +36,9 @@ export {};
  * @property {Map<string, ImageFileResult>|null} socialImages  Sharing images checked for the smo module, by URL, when they were checked.
  * @property {AppFiles|null} appFiles     The site's app association files (aso module), when they were read.
  * @property {AppsProfile} apps           The apps the site profile declares (`profile.apps`); empty without a profile.
+ * @property {AiPolicy|null} aiPolicy     The AI policy the site profile states (`profile.ai_policy`), when the profile speaks for the
+ *   audited site; null otherwise.
+ * @property {LlmsTxtResult|null} llmsTxt What the site answered at /llms.txt (ai module), when it was asked.
  * @property {(url: string) => PageRecord|undefined} resolve  Record at the end of a URL's redirect chain, if crawled.
  */
 
@@ -46,7 +50,9 @@ export {};
  * @property {string|null} url         Page the result is about; null for a site-level result.
  * @property {string} [selector]       CSS-like locator or another stable key. Part of the finding id.
  * @property {number|null} [line]
- * @property {{observed?: unknown, expected?: unknown, detail?: string}} [evidence]
+ * @property {{observed?: unknown, expected?: unknown, detail?: string, limit?: string}} [evidence]  `limit` says what the
+ *   measurement cannot see (for a finding judged from robots.txt: that a CDN can treat the real crawler differently); a short
+ *   sentence of the plugin's own, kept apart so that clipping the detail never cuts it.
  * @property {string[]} [related_urls] Other URLs involved, for example the other pages with the same title (max 20).
  * @property {{type: string, snippet?: string}} [fix]
  * @property {'likely'} [confidence]  Lowers this finding's confidence from the check's `confirmed` to `likely`, for a unit
@@ -56,7 +62,7 @@ export {};
 /**
  * @typedef {Object} CheckDef
  * @property {string} id               `<module>.<area>.<problem>`, lower-case, for example "seo.title.missing".
- * @property {'seo'|'links'|'security'|'media'|'smo'|'aso'} module
+ * @property {'seo'|'links'|'security'|'media'|'smo'|'aso'|'ai'} module
  * @property {'code'} engine           Every scripted check is 'code'. Model judgments are never checks.
  * @property {string} title            Short name of the problem, sentence case, no trailing period.
  * @property {string} description      What the check looks at and why it matters, one or two sentences.
@@ -92,7 +98,7 @@ export {};
  * @property {string|null} url
  * @property {string|null} selector
  * @property {number|null} line
- * @property {{observed?: unknown, expected?: unknown, detail?: string}} evidence
+ * @property {{observed?: unknown, expected?: unknown, detail?: string, limit?: string}} evidence
  * @property {string[]} related_urls
  * @property {string} recommendation
  * @property {{type: string, snippet?: string}|null} fix

@@ -7,7 +7,8 @@
 
 import { normalizeUrl } from '../util/url.js';
 import { byteOffset, decodeBody, isHtmlResponse, mediaTypeOf } from './decode.js';
-import { headerValues, parseLinkHeaders, parseXRobots, selectHeaders } from './headers.js';
+import { MAX_BING_TOKENS, emptyAi } from './ai.js';
+import { headerValues, parseBingRobots, parseLinkHeaders, parseXRobots, selectHeaders, unclearXRobots } from './headers.js';
 import { extractHtml } from './html.js';
 import { CAPS, upgradesInsecureRequests } from './html-elements.js';
 import { indexabilityOf } from './indexability.js';
@@ -28,7 +29,7 @@ function emptyContent() {
     html_lang: null, titles: [], meta_descriptions: [], meta_robots: [], canonicals: [], hreflang: [],
     headings: [], viewport: null, og: {}, twitter: {}, links: [], images: [], jsonld: [], mixed_content: [],
     word_count: 0, text_hash: '', text_excerpt: '', security: emptySecurity(), videos: [], video_embeds: [], video_markup: false,
-    social: emptySocial(),
+    social: emptySocial(), ai: emptyAi(),
   };
 }
 
@@ -113,6 +114,8 @@ export function extractPage(input) {
     })
     : emptyContent();
   const fromHeaders = parseLinkHeaders(headerValues(result, 'link'), responseUrl);
+  const robotsLines = headerValues(result, 'x-robots-tag');
+  const unclear = unclearXRobots(robotsLines);
 
   return buildRecord({ ...input, status: result.status, fetchError: null }, {
     content_type: mediaType,
@@ -122,6 +125,9 @@ export function extractPage(input) {
     fetch_ms: result.elapsedMs,
     ...content,
     x_robots: parseXRobots(headerValues(result, 'x-robots-tag')),
+    ...(unclear.length > 0 ? { x_robots_unclear: unclear } : {}),
+    // Bing reads the robots and bingbot meta tags and the X-Robots-Tag lines for every crawler or for bingbot (ai module).
+    ai: { ...(content.ai ?? emptyAi()), bingbot: [...(content.ai?.bingbot ?? []), ...parseBingRobots(headerValues(result, 'x-robots-tag'))].slice(0, MAX_BING_TOKENS) },
     canonicals: [...content.canonicals, ...fromHeaders.canonicals].slice(0, CAPS.canonicals),
     hreflang: [...content.hreflang, ...fromHeaders.hreflang].slice(0, CAPS.hreflang),
     // The document's own CSP and referrer meta tags, combined with the response headers.
@@ -156,11 +162,12 @@ export function redirectRecord(input) {
 /**
  * A record with no content for a URL the crawler could not read (a bot
  * challenge, persistent rate limiting): the response's status, `fetchError`,
- * and `indexability` `{indexable: false, reasons: ['fetch_error']}`.
+ * the kept response headers when they are given (they name the CDN that
+ * refused), and `indexability` `{indexable: false, reasons: ['fetch_error']}`.
  * @param {{url: string, status: number, fetchError: string, depth: number|null,
- *          discoveredVia: PageRecord['discovered_via']}} input
+ *          discoveredVia: PageRecord['discovered_via'], headers?: Record<string, string>}} input
  * @returns {PageRecord}
  */
 export function unreadableRecord(input) {
-  return buildRecord(input, {});
+  return buildRecord(input, input.headers ? { headers: selectHeaders(input.headers) } : {});
 }

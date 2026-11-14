@@ -151,6 +151,22 @@ function search(r) {
 }
 
 /** @param {Report} r */
+function aiSection(r) {
+  const a = r.ai;
+  if (a === null) return [];
+  const lines = ['## AI search readiness', '', `*${mdText(a.statements[1])}*`, ''];
+  if (a.counts.length > 0) lines.push(...a.counts.map((count) => `- **${mdText(count.label)}:** ${mdText(count.value)}`), '');
+  lines.push(`- **Stated AI policy:** ${mdText(a.policy)}`, `- **Training preference:** ${mdText(a.training)}`, `- **llms.txt:** ${mdText(a.llms)}`, '');
+  const rows = a.matrix.map((row) => [
+    `${mdCode(row.token)}${row.counted ? ' (counted)' : ''}`, mdText(row.vendor), mdText(row.role), `**${mdText(row.access)}**`, mdText(row.robots), row.source === null ? '—' : `${mdUrl(row.source, true)} (${mdText(row.verified)})`,
+  ]);
+  if (rows.length > 0) lines.push(...table(['Crawler', 'Vendor', 'Purpose', 'robots.txt', 'Vendor says', 'Source (verified)'], rows), '');
+  lines.push(...a.statements.filter((_, i) => i !== 1).map((statement) => `*${mdText(statement)}*`), '', `Crawler data verified ${mdText(a.dataDate)}.`, '');
+  lines.push('**Check by hand** (an audit from outside cannot see these):', '', ...a.manual.map((item) => `- ${mdText(item)}`), '');
+  return lines;
+}
+
+/** @param {Report} r */
 function topFixes(r) {
   const lines = ['## Top fixes', ''];
   if (r.topFixes.length === 0) return [...lines, 'No findings. Every check that ran passed.', ''];
@@ -249,7 +265,7 @@ function method(r) {
 export function renderMarkdown(run, options) {
   const r = buildReport(run, options);
   const lines = [
-    ...header(r), ...summary(r), ...scope(r), ...fixes(r), ...layers(r), ...scores(r), ...vitals(r), ...search(r), ...topFixes(r),
+    ...header(r), ...summary(r), ...scope(r), ...fixes(r), ...layers(r), ...scores(r), ...vitals(r), ...search(r), ...aiSection(r), ...topFixes(r),
     ...allFindings(r), ...suggestions(r), ...notRun(r), ...changes(r), ...method(r),
   ];
   return `${lines.join('\n').trimEnd()}\n`;

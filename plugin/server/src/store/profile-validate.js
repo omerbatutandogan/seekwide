@@ -3,8 +3,15 @@ import { normalizeUrl } from '../util/url.js';
 import { clip, collapseWhitespace, stripHidden } from '../util/strings.js';
 
 export const BUSINESS_MODELS = Object.freeze(['b2b_saas', 'ecommerce', 'local_service', 'publisher', 'mobile_app', 'international', 'other']);
+/**
+ * What the site wants AI crawlers to do (ai module): read everything, read for search but not train, or neither. Unset
+ * means not stated: a block is then reported as something to check against the owner's intent.
+ */
+export const AI_POLICIES = Object.freeze(['allow_all', 'allow_search', 'block_all']);
 
-const TOP_LEVEL = new Set(['schema_version', 'site_url', 'brand', 'business_model', 'markets', 'competitors', 'target_queries', 'report', 'apps', 'updated_at']);
+/** The fields of a profile besides `schema_version` and `updated_at`, in the order they are written. */
+export const PROFILE_FIELDS = Object.freeze(['site_url', 'brand', 'business_model', 'markets', 'competitors', 'target_queries', 'report', 'apps', 'ai_policy']);
+const TOP_LEVEL = new Set(['schema_version', ...PROFILE_FIELDS, 'updated_at']);
 /** Unknown keys named in an error, and how much of each name is shown. */
 const MAX_UNKNOWN_NAMED = 5;
 const MAX_KEY_SHOWN = 40;
@@ -251,6 +258,10 @@ export function normalizeProfile(input) {
     }
   }
   if (input.apps !== undefined) profile.apps = cleanApps(input.apps, errors);
+  if (input.ai_policy !== undefined && input.ai_policy !== null) {
+    if (AI_POLICIES.includes(/** @type {string} */ (input.ai_policy))) profile.ai_policy = input.ai_policy;
+    else errors.push({ field: 'ai_policy', message: `must be one of ${AI_POLICIES.join(', ')}, or null for not stated` });
+  }
   rejectUnknown(input, TOP_LEVEL, '', errors);
   return { profile: errors.length === 0 ? profile : null, errors };
 }

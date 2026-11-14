@@ -6,6 +6,8 @@ import { countText } from '../checks/scoring.js';
 import { SEVERITIES } from '../config.js';
 import { InputError } from '../util/errors.js';
 import { clip, collapseWhitespace } from '../util/strings.js';
+import { aiLayer, viewAi } from './ai.js';
+import { aiAccessNotJudged } from '../util/ai-summary.js';
 import { methodSections, reportTitle } from './copy.js';
 import { changeList, groupByCheck, viewFinding, withLimits } from './findings.js';
 import { viewFixes } from './fixes.js';
@@ -135,7 +137,10 @@ function viewScores(run) {
   const modules = obj(run.modules);
   return orderModules(Object.keys(modules)).map((name) => {
     const m = obj(modules[name]);
-    const counted = countView(name, m.count);
+    const notJudged = name === 'ai' ? aiAccessNotJudged(run.ai) : null;
+    const plain = countView(name, m.count);
+    // The ai count says what it could not judge, as the run's own note does.
+    const counted = plain !== null && notJudged !== null ? `${plain}. ${notJudged}` : plain;
     const score = counted === null && typeof m.score === 'number' && Number.isFinite(m.score) ? Math.min(100, Math.max(0, Math.round(m.score))) : null;
     return {
       module: name,
@@ -151,6 +156,16 @@ function viewScores(run) {
       note: score === null && counted === null ? text(m.note) || null : null,
     };
   });
+}
+
+/**
+ * The layers with the AI search readiness layer after technical eligibility, for a run of the ai module.
+ * @param {ReturnType<typeof viewLayers>} layers
+ * @param {ReturnType<typeof viewAi>} ai
+ * @returns {ReturnType<typeof viewLayers>}
+ */
+function withAiLayer(layers, ai) {
+  return ai === null ? layers : [layers[0], aiLayer(ai), ...layers.slice(1)];
 }
 
 /**
@@ -206,6 +221,7 @@ export function buildReport(run, options = {}) {
       ...startFacts(crawl),
     });
 
+  const aiView = viewAi(run);
   return {
     title: reportTitle(run.modules_requested),
     host,
@@ -227,7 +243,8 @@ export function buildReport(run, options = {}) {
     ],
     scope: viewScope(run, { host, blocked }),
     fixes: viewFixes(run),
-    layers: viewLayers(vitals, opts.search.length > 0 ? searchLayer(opts.search) : null),
+    layers: withAiLayer(viewLayers(vitals, opts.search.length > 0 ? searchLayer(opts.search) : null), aiView),
+    ai: aiView,
     search: viewSearch(opts.search, findings),
     scores,
     vitals,
@@ -245,6 +262,7 @@ export function buildReport(run, options = {}) {
       media: Array.isArray(run.modules_requested) && run.modules_requested.includes('media'), search: opts.search.length > 0,
       smo: Array.isArray(run.modules_requested) && run.modules_requested.includes('smo'),
       aso: Array.isArray(run.modules_requested) && run.modules_requested.includes('aso'),
+      ai: aiView !== null,
     }),
     pluginVersion: text(run.plugin_version, 'unknown'),
     rulesVersion: text(run.rules_version, 'unknown'),

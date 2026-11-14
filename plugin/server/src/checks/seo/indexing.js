@@ -26,6 +26,32 @@ function noindexDetail(page) {
   return 'An X-Robots-Tag header tells search engines not to index the page.';
 }
 
+/**
+ * A failed result for a noindex page. When the noindex comes only from an
+ * `X-Robots-Tag` line that gives Bing's `ai-training:` or `ai-grounding:`
+ * first, Google's reading is not documented, so the finding is `likely` and says why.
+ * @param {PageRecord} page
+ * @returns {import('../../types.js').CheckResult}
+ */
+function noindexFailure(page) {
+  // Likely only when every noindex of the header is one Google's reading is unclear for, and the meta tag gives none.
+  const noindex = (/** @type {string[]} */ tokens) => tokens.filter((token) => token === 'noindex' || token === 'none').length;
+  const unclear = !page.indexability.reasons.includes('noindex_meta') && noindex(page.x_robots_unclear ?? []) > 0
+    && noindex(page.x_robots_unclear ?? []) >= noindex(page.x_robots);
+  return {
+    status: 'fail',
+    url: page.url,
+    ...(unclear ? { confidence: /** @type {const} */ ('likely') } : {}),
+    evidence: {
+      observed: noindexSources(page),
+      expected: 'No noindex or none directive',
+      detail: unclear
+        ? `${noindexDetail(page)} The header line gives Bing's ai-training or ai-grounding directive first; Bing documents those as directives, Google documents nothing about them and might read the name as a user agent the noindex is meant for, so whether Google applies it is not certain.`
+        : noindexDetail(page),
+    },
+  };
+}
+
 /** @type {CheckDef} */
 const homepageNoindex = {
   ...SEO,
@@ -47,13 +73,7 @@ const homepageNoindex = {
     const start = ctx.resolve(ctx.crawl.start_url);
     if (!start || start.status !== 200 || !start.is_html) return [];
     if (!isNoindex(start)) return [{ status: 'pass', url: start.url }];
-    return [
-      {
-        status: 'fail',
-        url: start.url,
-        evidence: { observed: noindexSources(start), expected: 'No noindex or none directive', detail: noindexDetail(start) },
-      },
-    ];
+    return [noindexFailure(start)];
   },
 };
 
@@ -79,11 +99,7 @@ const noindexInSitemap = {
       .filter((page) => ctx.sitemapUrls.has(page.url))
       .map((page) => {
         if (!isNoindex(page)) return { status: 'pass', url: page.url };
-        return {
-          status: 'fail',
-          url: page.url,
-          evidence: { observed: noindexSources(page), expected: 'No noindex or none directive', detail: noindexDetail(page) },
-        };
+        return noindexFailure(page);
       });
   },
 };

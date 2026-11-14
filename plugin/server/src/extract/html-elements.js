@@ -11,6 +11,7 @@ import { isInternalUrl, normalizeUrl } from '../util/url.js';
 import { MAX_LIST_CHARS, attr, insecureUrl, isAriaHidden, lineOf, textChars, textOf, tokens } from './dom.js';
 import { parseJsonLd } from './jsonld.js';
 import { MAX_VIDEOS, MAX_VIDEO_EMBEDS, visitMedia } from './media.js';
+import { visitAi } from './ai.js';
 import { visitSocial } from './social.js';
 
 /** Script types a browser runs as JavaScript. */
@@ -71,6 +72,7 @@ const HEADING_LEVELS = new Map([['h1', 1], ['h2', 2], ['h3', 3], ['h4', 4], ['h5
  * @property {boolean} chrome  Inside the page's frame rather than its content: navigation, a complementary block, or the
  *   header or footer of the page (media.js, `enterLandmark`).
  * @property {boolean} sectioned  Inside `<article>`, `<main>`, `<section>`, `<aside>` or `<nav>`, where a header or footer belongs to that part.
+ * @property {boolean} nosnippet  Inside an element with a `data-nosnippet` attribute, or that element itself (ai.js).
  */
 
 /**
@@ -90,6 +92,7 @@ const HEADING_LEVELS = new Map([['h1', 1], ['h2', 2], ['h3', 3], ['h4', 4], ['h5
  * @property {Set<string>} preloadImages  URLs that a `<link rel="preload" as="image">` named so far (media.js).
  * @property {WeakMap<DomNode, import('./media-image.js').PictureSummary>} pictures  What each `<picture>` offers, read once (media-image.js).
  * @property {import('./social.js').SocialState} social  Meta tag places, Smart App Banners and rel="me" links so far (social.js).
+ * @property {import('./ai.js').AiState} ai  What the ai module reads so far (ai.js).
  */
 
 /**
@@ -150,6 +153,7 @@ export function visitElement(node, frame, state) {
   const line = lineOf(node);
   visitMedia(node, frame, state, MAX_IMAGES);
   visitSocial(node, frame, state.social, state.baseUrl);
+  visitAi(node, frame, state.ai);
   if (tag === 'html') {
     const lang = attr(node, 'lang')?.trim();
     if (lang) state.out.html_lang = clip(lang, LIMITS.maxStringLength);

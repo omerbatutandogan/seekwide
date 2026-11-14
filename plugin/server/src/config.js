@@ -10,7 +10,7 @@ const pkg = JSON.parse(readFileSync(path.join(PLUGIN_ROOT, 'package.json'), 'utf
 export const VERSION = /** @type {string} */ (pkg.version);
 
 /** Version of the rule set. Bump it whenever a check changes what it reports. */
-export const RULES_VERSION = '0.1.9';
+export const RULES_VERSION = '0.2.0';
 
 /** Version of the JSON written under `.seekwide/`. */
 export const SCHEMA_VERSION = 1;
@@ -72,9 +72,11 @@ export const LIMITS = Object.freeze({
   socialImageReadBytes: 64 * 1024,
   // App association files (aso module): read whole up to this size.
   appFileMaxBytes: 1024 * 1024,
+  // /llms.txt (ai module): only its first part is read, enough for its title line and links.
+  llmsTxtMaxBytes: 256 * 1024,
 });
 
-export const MODULES = Object.freeze(['seo', 'links', 'security', 'media', 'smo', 'aso']);
+export const MODULES = Object.freeze(['seo', 'links', 'security', 'media', 'smo', 'aso', 'ai']);
 
 /**
  * Scores a module's checks can count toward instead of the module's own, with
@@ -88,10 +90,12 @@ export const SCORE_GROUPS = Object.freeze({ security_headers: 'security' });
  * Scores given as a count of the scored checks that passed instead of 0–100,
  * with what they count. The security headers are three checks of one page: as
  * "0/100" a site without them read like a verdict on the site, while "0 of 3
- * recommended headers set" says what was measured. Such a score is null and
- * comes with `count` (`checks/scoring.js`).
+ * recommended headers set" says what was measured. The ai module is counted
+ * for the same reason, and so that it is never read as an "AI score": a few
+ * documented readiness checks make a poor percentage and promise nothing about
+ * AI answers. Such a score is null and comes with `count` (`checks/scoring.js`).
  */
-export const COUNTED_SCORES = Object.freeze({ security_headers: 'recommended headers set' });
+export const COUNTED_SCORES = Object.freeze({ security_headers: 'recommended headers set', ai: 'AI readiness checks passed' });
 
 export const SEVERITIES = Object.freeze(['critical', 'high', 'medium', 'low', 'info']);
 
@@ -99,11 +103,13 @@ export const SEVERITIES = Object.freeze(['critical', 'high', 'medium', 'low', 'i
  * Things a check may require before it can run. The engine skips checks whose requirements are not met.
  * The crawl provides the first three, the external link check `outbound`, the check of image files
  * (media module) `image_files`, the check of sharing images (smo module) `social_images`, the read of the app association
- * files (aso module) `app_files`, and the Core Web Vitals measurement `lab_data` and `field_data`. `live_site` is provided for
+ * files (aso module) `app_files`, the read of /llms.txt (ai module) `llms_txt`, and the Core Web Vitals measurement
+ * `lab_data` and `field_data`. The crawl provides `ai_robots` when it recorded what robots.txt tells AI crawlers, and `ai_pages`
+ * when its page records carry the ai module's page signals (rule set 0.2.0 and later). `live_site` is provided for
  * a crawl of a site that is not on this machine: the response headers of a local development server say nothing about the
  * deployed site.
  */
-export const CAPABILITIES = Object.freeze(['full_crawl', 'sitemap', 'robots', 'outbound', 'lab_data', 'field_data', 'live_site', 'image_files', 'social_images', 'app_files']);
+export const CAPABILITIES = Object.freeze(['full_crawl', 'sitemap', 'robots', 'outbound', 'lab_data', 'field_data', 'live_site', 'image_files', 'social_images', 'app_files', 'llms_txt', 'ai_robots', 'ai_pages']);
 
 /** An API key is sent in a request header, so it must be printable ASCII without spaces. */
 const API_KEY_PATTERN = /^[\x21-\x7E]{1,256}$/;

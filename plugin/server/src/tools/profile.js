@@ -32,6 +32,13 @@ const PROFILE_SCHEMA = {
       type: 'object',
       properties: { brand_name: { type: 'string', maxLength: 200 }, logo_path: { type: 'string', maxLength: 4096 } },
     },
+    ai_policy: {
+      type: ['string', 'null'],
+      enum: ['allow_all', 'allow_search', 'block_all', null],
+      description: 'What the site wants AI crawlers to do, for the ai module: allow_all (AI search and training may read it), ' +
+        'allow_search (AI search may, training may not), block_all (neither may). Null or absent: not stated. A robots.txt block that matches ' +
+        'the stated policy is not reported; one that contradicts it is.',
+    },
     apps: {
       type: 'object',
       description: 'The site\'s apps, for the aso module. universal_links and app_links say that the app opens the site\'s links, which needs the association file.',

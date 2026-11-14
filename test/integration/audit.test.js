@@ -209,12 +209,13 @@ test('scores and coverage are reported for every module', () => {
   for (const module of [seo, links, security]) {
     assert.ok(module.score !== null && module.score >= 0 && module.score <= 100);
   }
-  // Neither Core Web Vitals, external links, image files, sharing images nor app files were collected in this test, so
-  // exactly the checks that need them are skipped, and coverage shows it. The
-  // site runs on this machine, so the header checks, which need the deployed
+  // Neither Core Web Vitals, external links, image files, sharing images, app files nor /llms.txt were collected in this
+  // test, so exactly the checks that need them are skipped, and coverage shows it. The
+  // site runs on this machine, so the header checks and the ai module's refusal check, which need the deployed
   // site, are skipped as well.
   const skipped = audit.checks.filter((stat) => stat.status !== 'run');
   assert.deepEqual(skipped.map((stat) => stat.id), [
+    'ai.access.self_refused', 'ai.llms_txt.malformed',
     'aso.aasa.invalid', 'aso.aasa.missing', 'aso.assetlinks.invalid', 'aso.assetlinks.missing',
     'links.outbound.broken',
     'media.image.broken', 'media.image.large_file', 'media.image.legacy_format', 'media.image.robots_blocked',

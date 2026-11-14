@@ -15,6 +15,7 @@ import { allChecks } from '../../plugin/server/src/checks/registry.js';
 import { USER_AGENT } from '../../plugin/server/src/config.js';
 import { createCrawlManager } from '../../plugin/server/src/crawl/manager.js';
 import { fetchAppFiles } from '../../plugin/server/src/net/app-files.js';
+import { fetchLlmsTxt } from '../../plugin/server/src/net/llms-txt.js';
 import { checkImageFiles } from '../../plugin/server/src/net/image-check.js';
 import { checkExternalLinks } from '../../plugin/server/src/net/link-check.js';
 import { safeFetch } from '../../plugin/server/src/net/safe-fetch.js';
@@ -73,6 +74,7 @@ before(async () => {
     checkExternalLinks: (urls, options) => checkExternalLinks(urls, { ...options, sleep: async () => {}, fetch: logged() }),
     checkImageFiles: (urls, options) => checkImageFiles(urls, { ...options, sleep: async () => {}, fetch: logged() }),
     fetchAppFiles: (origin, options) => fetchAppFiles(origin, { ...options, sleep: async () => {}, fetch: logged() }),
+    fetchLlmsTxt: (origin, options) => fetchLlmsTxt(origin, { ...options, sleep: async () => {}, fetch: logged() }),
     measureVitals: async () => {
       throw new Error('Core Web Vitals are not measured for a site on this machine');
     },

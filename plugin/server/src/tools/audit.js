@@ -11,6 +11,8 @@ import { notRequestedImages } from '../checks/media/select.js';
 import { externalLinkUrls, notRequestedLinks } from './audit-links.js';
 import { runNotes, skippedChecks, startPage, topGroups } from './audit-summary.js';
 import { MEDIA_ARGUMENTS, collectImageFiles, imageFilesNotes } from './audit-media.js';
+import { AI_ARGUMENTS, aiNotes, aiSummary, collectAi } from './audit-ai.js';
+import { aiAccessNotJudged } from '../util/ai-summary.js';
 import { SHARING_ARGUMENTS, appFilesNotes, collectAppFiles, collectSocialImages, notRequestedNotes, notRequestedSummary, socialImagesNotes } from './audit-sharing.js';
 import { VITALS_ARGUMENTS, collectVitals, vitalsOutput } from './audit-vitals.js';
 import { JOB_ID_SCHEMA, PROJECT_DIR_SCHEMA, UNTRUSTED_NOTE, countBy, resolveProjectDir, withStoreErrors } from './common.js';
@@ -66,12 +68,14 @@ export function auditTools(deps) {
       name: 'audit_run',
       title: 'Run the audit',
       description:
-        'Run the SEO, link, security, media, social sharing (smo) and app (aso) checks on a finished crawl, save the run under <project>/.seekwide/runs/ and return ' +
+        'Run the SEO, link, security, media, social sharing (smo), app (aso) and AI access and readiness (ai) checks on a finished crawl, save the run under <project>/.seekwide/runs/ and return ' +
         'scores, totals, the top problems and notes on coverage. Accepts crawls that are done or blocked. ' +
         'The security module only reads the crawled pages and sends no request of its own. ' +
         `The media module checks up to ${LIMITS.maxImageChecks} image files the pages show (robots.txt first, then a HEAD request each), which can take a minute. ` +
         `The smo module reads the first ${LIMITS.socialImageReadBytes / 1024} KiB of up to ${LIMITS.maxSocialImageChecks} sharing images (og:image); the aso module reads the site's ` +
         '/.well-known/apple-app-site-association and /.well-known/assetlinks.json, and the apps the site profile declares. ' +
+        'The ai module reads what robots.txt tells known AI crawlers (from the crawl; it never pretends to be one), the snippet and Bing directives of the pages, ' +
+        'and requests the site\'s /llms.txt once; it is given as a count, never a score, and uses the AI policy the site profile states. ' +
         'No check ever sends a request to Google Play or a social platform. ' +
         'External links are checked only when the links module runs. With the seo module, Core Web Vitals are measured ' +
         'for a few pages through Google (PageSpeed Insights and the Chrome UX Report), which can take a minute; ' +
@@ -92,6 +96,7 @@ export function auditTools(deps) {
           ...VITALS_ARGUMENTS,
           ...MEDIA_ARGUMENTS,
           ...SHARING_ARGUMENTS,
+          ...AI_ARGUMENTS,
           project_dir: PROJECT_DIR_SCHEMA,
           source_dir: {
             ...SOURCE_DIR_SCHEMA,
@@ -130,6 +135,8 @@ export function auditTools(deps) {
         // Sharing images (smo) and the app association files (aso) come after the image files, one requester after another.
         const smoRequested = modules.includes('smo');
         const asoRequested = modules.includes('aso');
+        // The ai module's /llms.txt comes last, after the app association files: one requester after another per host.
+        const aiRequested = modules.includes('ai');
         /** @type {Promise<Map<string, OutboundResult>|null>} */
         const links = Promise.resolve(!checkOutbound ? null : external.length === 0
           ? new Map()
@@ -137,14 +144,16 @@ export function auditTools(deps) {
         const imagesDone = links.catch(() => null).then(() => collectImageFiles(deps, crawl, { requested: mediaRequested, check: args.check_image_files ?? true, signal }));
         const socialDone = imagesDone.catch(() => null).then(() => collectSocialImages(deps, crawl, { requested: smoRequested, check: args.check_social_images ?? true, signal }));
         const appsDone = socialDone.catch(() => null).then(() => collectAppFiles(deps, crawl, projectDir, { requested: asoRequested, check: args.check_app_files ?? true, signal }));
+        const aiDone = appsDone.catch(() => null).then(() => collectAi(deps, crawl, projectDir, { requested: aiRequested, check: args.check_llms_txt ?? true, signal }));
         /** @type {[Map<string, OutboundResult>|null, VitalsData|null, Awaited<ReturnType<typeof collectImageFiles>>,
-         *   Awaited<ReturnType<typeof collectSocialImages>>, Awaited<ReturnType<typeof collectAppFiles>>]} */
-        const [outbound, vitals, images, social, apps] = await Promise.all([
+         *   Awaited<ReturnType<typeof collectSocialImages>>, Awaited<ReturnType<typeof collectAppFiles>>, Awaited<ReturnType<typeof collectAi>>]} */
+        const [outbound, vitals, images, social, apps, ai] = await Promise.all([
           links,
           checkVitals ? collectVitals(deps, crawl, args.core_web_vitals_pages ?? LIMITS.vitalsPagesDefault, pendingVitals, signal) : null,
           imagesDone,
           socialDone,
           appsDone,
+          aiDone,
         ]);
         signal?.throwIfAborted();
         const notRequested = notRequestedSummary({
@@ -157,6 +166,7 @@ export function auditTools(deps) {
         const ctx = buildContext(crawl, {
           outbound, vitals, imageFiles: images.files, imageFilesReason: images.reason,
           socialImages: social.files, socialImagesReason: social.reason, appFiles: apps.files, appFilesReason: apps.reason, apps: apps.apps,
+          llmsTxt: ai.llms, llmsTxtReason: ai.reason, aiPolicy: ai.policy,
         });
         const date = deps.now();
         const detectedAt = date.toISOString();
@@ -204,7 +214,11 @@ export function auditTools(deps) {
           social_images: social.summary,
           app_files: apps.summary,
           not_requested: notRequested,
+          ai: aiSummary(crawl, ai, aiRequested),
         };
+        // A count of what could be judged says what could not: robots.txt refused, failed or not recorded for AI crawlers.
+        const notJudged = aiAccessNotJudged(run.ai);
+        if (notJudged !== null && run.modules.ai) run.modules.ai = { ...run.modules.ai, note: [run.modules.ai.note, notJudged].filter(Boolean).join(' ') };
         run.fixes = fixVerification(deps, fixRequest, run, crawl);
         signal?.throwIfAborted();
         const saved = await saveWithNewId(deps, projectDir, run, date);
@@ -238,6 +252,7 @@ export function auditTools(deps) {
             ...imageFilesNotes(images),
             ...socialImagesNotes(social),
             ...appFilesNotes(apps),
+            ...aiNotes(run.ai ?? null, ai),
             ...notRequestedNotes(notRequested),
           ],
           _note: UNTRUSTED_NOTE,

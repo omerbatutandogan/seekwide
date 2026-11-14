@@ -12,6 +12,9 @@ import { LIMITS, RULES_VERSION, VERSION } from '../../plugin/server/src/config.j
 import { makeCrawl, makeField, makeLab, makeLink, makePage, makeRedirect, makeVitals } from '../helpers/factories.js';
 import { NOW, PROJECT, jobFor, makeCheck, makeDeps, sampleCrawl, toolNamed } from './fakes.js';
 
+/** The factory's crawls have no ai_robots, like a crawl made before rule set 0.2.0: the ai module says access was not judged. */
+const OLD_CRAWL_AI = 'robots.txt was not read for AI crawlers in this crawl, so what it tells them was not judged. The checks that read it were skipped.';
+
 /** @param {ReturnType<typeof makeDeps>} fake */
 const audit = (fake) => toolNamed(createTools(fake.deps), 'audit_run');
 
@@ -89,7 +92,7 @@ describe('audit_run', () => {
     assert.equal(run.rules_version, RULES_VERSION);
     assert.equal(run.plugin_version, VERSION);
     assert.equal(run.schema_version, 1);
-    assert.deepEqual(run.modules_requested, ['seo', 'links', 'security', 'media', 'smo', 'aso']);
+    assert.deepEqual(run.modules_requested, ['seo', 'links', 'security', 'media', 'smo', 'aso', 'ai']);
     assert.deepEqual(run.crawl, {
       id: 'c-1', pages_crawled: 2, html_pages: 2, indexable_pages: 2, unreadable_pages: 0, truncated: false, blocked: null,
       robots_status: 'ok', sitemap_urls: 0, max_pages: 25, user_agent: 'seekwide/test',
@@ -113,7 +116,7 @@ describe('audit_run', () => {
       count: 1, example_urls: ['https://example.test/about'], recommendation: 'Fix seo.title.missing.',
     }]);
     assert.deepEqual(result.skipped_checks, []);
-    assert.deepEqual(result.notes, []);
+    assert.deepEqual(result.notes, [OLD_CRAWL_AI]);
     assert.equal(result._note, UNTRUSTED_NOTE);
     assert.equal(result.findings, undefined, 'findings stay in the run file');
   });
@@ -150,7 +153,7 @@ describe('audit_run', () => {
       ['https://example.test/', 'Start page'],
       ['https://example.test/about', 'Top-level page'],
     ]);
-    assert.deepEqual(result.notes, vitals.notes);
+    assert.deepEqual(result.notes, [...vitals.notes, OLD_CRAWL_AI]);
     assert.equal(fake.runs[0].findings.find((f) => f.check_id === 'seo.cwv.lab_lcp')?.url, 'https://example.test/');
   });
 
@@ -171,7 +174,7 @@ describe('audit_run', () => {
     assert.equal(fake.calls.measureVitals, undefined);
     assert.equal(result.core_web_vitals, null);
     assert.equal(fake.runs[0].core_web_vitals, null);
-    assert.deepEqual(result.notes, [VITALS_NOT_ASKED]);
+    assert.deepEqual(result.notes, [VITALS_NOT_ASKED, OLD_CRAWL_AI]);
     assert.deepEqual(result.skipped_checks, [
       { id: 'seo.cwv.field_lcp', status: 'skipped', reason: 'Needs field data from the Chrome UX Report. It was not collected.' },
     ]);
@@ -208,7 +211,7 @@ describe('audit_run', () => {
       { id: 'seo.cwv.field_lcp', status: 'skipped', reason: noKey },
       { id: 'seo.cwv.lab_lcp', status: 'skipped', reason },
     ]);
-    assert.deepEqual(result.notes, [reason, noKey]);
+    assert.deepEqual(result.notes, [reason, noKey, OLD_CRAWL_AI]);
     assert.equal(result.modules.seo.coverage, 0.33, 'coverage shows what did not run');
     assert.equal(result.modules.seo.score, 50, 'and the score comes from the checks that did');
   });
@@ -218,7 +221,7 @@ describe('audit_run', () => {
     fake.deps.checks = [...fake.deps.checks, makeCheck({ id: 'seo.cwv.lab_lcp', requires: ['lab_data'], run: () => [] })];
     const result = await audit(fake).handler({ job_id: 'c-1' });
     assert.equal(fake.runs.length, 1);
-    assert.deepEqual(result.notes, [VITALS_FAILED]);
+    assert.deepEqual(result.notes, [VITALS_FAILED, OLD_CRAWL_AI]);
     assert.deepEqual(result.skipped_checks, [{ id: 'seo.cwv.lab_lcp', status: 'skipped', reason: VITALS_FAILED }]);
     assert.deepEqual(result.core_web_vitals.pages, []);
     assert.ok(!JSON.stringify(result).includes('AIzaSecretKey'), 'the error text stays in the log');

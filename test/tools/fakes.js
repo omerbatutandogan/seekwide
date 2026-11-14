@@ -105,7 +105,7 @@ function codedError(message, code) {
  * Fake dependencies with call logs. `jobs` and `results` seed the crawl manager.
  * @param {{jobs?: CrawlJob[], results?: CrawlResult[], runs?: Run[], profile?: object|null, env?: NodeJS.ProcessEnv,
  *          projectDir?: string, outbound?: (url: string) => 'ok'|'broken'|'unverifiable',
- *          vitals?: VitalsData|Error, imageFile?: (url: string) => ImageFileResult}} [seed]  `vitals`: what the measurement returns,
+ *          vitals?: VitalsData|Error, imageFile?: (url: string) => ImageFileResult, llmsTxt?: (origin: string) => import('../../plugin/server/src/types.js').LlmsTxtResult}} [seed]  `vitals`: what the measurement returns,
  *   or the error it throws. `imageFile`: what the check of an image file finds; by default a small WebP that Google may fetch.
  */
 export function makeDeps(seed = {}) {
@@ -253,6 +253,13 @@ export function makeDeps(seed = {}) {
         url: `${origin}${path}`, outcome: 'not_found', status: 404, reason: 'status_404', location: null, final_url: null, content_type: 'text/html', body: null,
       });
       return seed.appFiles?.(origin) ?? { aasa: file('/.well-known/apple-app-site-association'), assetlinks: file('/.well-known/assetlinks.json') };
+    },
+    /** @param {string} origin @param {object} options */
+    async fetchLlmsTxt(origin, options) {
+      record('fetchLlmsTxt', [origin, options]);
+      return seed.llmsTxt?.(origin) ?? {
+        url: `${origin}/llms.txt`, outcome: 'not_found', status: 404, reason: 'status_404', final_url: null, content_type: 'text/html', h1: null, links: 0, bytes: 0, truncated: false,
+      };
     },
     /** @param {CrawlResult} crawl @param {{maxPages: number}} options */
     async measureVitals(crawl, options) {

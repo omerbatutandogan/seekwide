@@ -203,7 +203,7 @@ async function stopBefore(ctx, target, mode) {
  * @typedef {Object} Extractor
  * @property {(input: {url: string, result: FetchResult, depth: number|null, discoveredVia: PageRecord['discovered_via'], siteHost: string, includeSubdomains?: boolean, deployedOrigin?: string|null}) => PageRecord} extractPage
  * @property {(input: {url: string, hops: RedirectHop[], finalUrl: string, finalStatus: number, finalExternal: boolean, fetchError: string|null, depth: number|null, discoveredVia: PageRecord['discovered_via']}) => PageRecord} redirectRecord
- * @property {(input: {url: string, status: number, fetchError: string, depth: number|null, discoveredVia: PageRecord['discovered_via']}) => PageRecord} unreadableRecord
+ * @property {(input: {url: string, status: number, fetchError: string, depth: number|null, discoveredVia: PageRecord['discovered_via'], headers?: Record<string, string>}) => PageRecord} unreadableRecord
  */
 
 /**
@@ -221,7 +221,7 @@ export function recordsForChain({ url, chain, depth, discoveredVia, extract, sit
   if (chain.notPage === true) return [];
   /** @param {string} target @param {FetchResult} result @param {PageRecord['discovered_via']} via */
   const answer = (target, result, via) => (chain.refusal
-    ? extract.unreadableRecord({ url: target, status: result.status, fetchError: chain.refusal, depth, discoveredVia: via })
+    ? extract.unreadableRecord({ url: target, status: result.status, fetchError: chain.refusal, depth, discoveredVia: via, headers: result.headers })
     : extract.extractPage({ url: target, result, depth, discoveredVia: via, siteHost, includeSubdomains }));
 
   if (chain.hops.length === 0) return [answer(url, /** @type {FetchResult} */ (chain.result), discoveredVia)];

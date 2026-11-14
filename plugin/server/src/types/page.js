@@ -2,6 +2,7 @@
 
 /** @import { RedirectHop } from './net.js' */
 /** @import { PageSecurity } from './security.js' */
+/** @import { AiPageRecord } from './ai.js' */
 
 export {};
 
@@ -190,6 +191,8 @@ export {};
  * @property {string[]} meta_descriptions  `content` of each `<meta name="description">`, whitespace-collapsed.
  * @property {string[]} meta_robots     Lower-cased directive tokens from `<meta name="robots">` and `<meta name="googlebot">`.
  * @property {string[]} x_robots        Lower-cased directive tokens from `X-Robots-Tag` values that apply to all crawlers or to googlebot.
+ * @property {string[]} [x_robots_unclear]  The `X-Robots-Tag` rules that come after Bing's `ai-training:` or `ai-grounding:` directive
+ *   given with no user agent, which Google might read as scoped to a user agent of that name (`unclearXRobots`); absent when none.
  * @property {CanonicalRef[]} canonicals
  * @property {HreflangRef[]} hreflang
  * @property {Heading[]} headings
@@ -210,6 +213,8 @@ export {};
  * @property {boolean} [video_markup]  An element whose `itemtype` (microdata) or `typeof` (RDFa) names `VideoObject`.
  * @property {SocialRecord} [social]  Meta tag places, the end of the head, Smart App Banners and rel="me" links (smo and aso
  *   modules). Absent in records made before rule set 0.1.9.
+ * @property {AiPageRecord} [ai]  What the ai module reads on the page: Bing's directives, data-nosnippet, scripts and an empty
+ *   application mount element. Absent in records made before rule set 0.2.0.
  * @property {string[]} [limits_reached]  The caps that stopped the reading of this page, when any did: `tags` (the
  *   document was parsed up to its 200,000th tag), a list at its cap by field name (`links`, `images`, `headings`…),
  *   `list_chars`, and the security scan's (`security.hosts`, `security.hidden_hosts`, `security.visible_hosts`,

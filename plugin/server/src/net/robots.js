@@ -8,6 +8,13 @@ import { agentToken, groupFor, parseRobotsTxt } from './robots-parse.js';
 import { safeFetch } from './safe-fetch.js';
 
 /** @import { RobotsSummary } from '../types.js' */
+/**
+ * @typedef {'own'|'fallback'|'named'|'star'|'none'} AgentGroup
+ * @typedef {{content_usage: string[], content_signal: string[], lines: number}} RobotsPreferences
+ * @typedef {{group: 'rules'|'empty'|'none', allows: (url: string) => boolean|null}} PreferenceGroup
+ */
+/** What a file that was not read says about agents and preferences: nothing. */
+const NO_PREFERENCES = Object.freeze({ content_usage: [], content_signal: [], lines: 0 });
 /** @import { ParsedRobots } from './robots-parse.js' */
 
 /** Google and RFC 9309 read at least 500 KiB of a robots.txt file; rules after that are ignored. */
@@ -49,6 +56,44 @@ function rulesForTokens(parsed, agents) {
 }
 
 /**
+ * Which group a crawler with these product tokens (most specific first)
+ * follows: its own token's ('own'), a later token's ('fallback'), none because
+ * the file names a token without giving it a rule ('named', allowed
+ * everything), `*` ('star'), or no group at all ('none').
+ * @param {ParsedRobots} parsed
+ * @param {string[]} agents
+ * @returns {AgentGroup}
+ */
+function groupKind(parsed, agents) {
+  for (const [index, agent] of agents.entries()) {
+    const token = agentToken(agent);
+    if (parsed.groups.has(token)) return index === 0 ? 'own' : 'fallback';
+    if (parsed.named.has(token)) return 'named';
+  }
+  return parsed.groups.has('*') ? 'star' : 'none';
+}
+
+/**
+ * What the file says about a preference token such as `__usage_ai-training`
+ * (draft-kelley-aipref-training-preference-signal-00): only a group that names
+ * the token applies, never `*`. 'rules' when the group has an `Allow` or
+ * `Disallow` line, 'empty' when the file names the token without one, 'none'
+ * when it does not name it. `allows(url)` is null unless the group has rules.
+ * @param {ParsedRobots} parsed
+ * @param {string} token
+ * @returns {{group: 'rules'|'empty'|'none', allows: (url: string) => boolean|null}}
+ */
+function preferenceGroup(parsed, token) {
+  const key = agentToken(token);
+  const group = parsed.groups.get(key);
+  if (group !== undefined && parsed.ruled.has(key)) {
+    const compiled = compileGroup(group);
+    return { group: 'rules', allows: (url) => decidingRule(compiled, rulePath(url))?.allow ?? true };
+  }
+  return { group: parsed.named.has(key) ? 'empty' : 'none', allows: () => null };
+}
+
+/**
  * @param {(url: string) => boolean} allows
  * @param {string} origin
  * @returns {boolean}
@@ -80,8 +125,12 @@ function disallowsAll(allows, origin) {
  *
  * @param {string} siteOrigin  for example "https://example.com"
  * @param {{fetch?: typeof safeFetch, fetchOptions?: Parameters<typeof safeFetch>[1], productToken?: string}} [options]
+ * `agentGroup(agents)` says which group they follow (`own`, `fallback`, `named`, `star`, `none`); `preference(token)` reads
+ * the group of a preference token such as `__usage_ai-training`, which `*` never stands for; `preferences` holds the file's
+ * first `Content-Usage` and `Content-Signal` values (robots-parse.js). A file that was not read names no group and no preference.
  * @returns {Promise<{summary: RobotsSummary, isAllowed: (url: string) => boolean, refusedRedirect: string|null,
- *   allowsAgents: (url: string, agents: string[]) => boolean}>}
+ *   allowsAgents: (url: string, agents: string[]) => boolean, agentGroup: (agents: string[]) => AgentGroup,
+ *   preference: (token: string) => PreferenceGroup, preferences: RobotsPreferences}>}
  */
 export async function loadRobots(siteOrigin, options = {}) {
   const origin = typeof siteOrigin === 'string' ? originOf(siteOrigin) : null;
@@ -129,10 +178,16 @@ export async function loadRobots(siteOrigin, options = {}) {
   const sameOrigin = (target) => originOf(target) === origin;
 
   if (summary.status === 'unreachable') {
-    return { summary, isAllowed: (target) => !sameOrigin(target), refusedRedirect, allowsAgents: (target) => !sameOrigin(target) };
+    return {
+      summary, isAllowed: (target) => !sameOrigin(target), refusedRedirect, allowsAgents: (target) => !sameOrigin(target),
+      agentGroup: () => 'none', preference: () => ({ group: 'none', allows: () => null }), preferences: NO_PREFERENCES,
+    };
   }
   if (summary.status === 'missing') {
-    return { summary, isAllowed: () => true, refusedRedirect: null, allowsAgents: () => true };
+    return {
+      summary, isAllowed: () => true, refusedRedirect: null, allowsAgents: () => true,
+      agentGroup: () => 'none', preference: () => ({ group: 'none', allows: () => null }), preferences: NO_PREFERENCES,
+    };
   }
 
   const text = (result.body ?? Buffer.alloc(0)).toString('utf8').replace(/^\uFEFF/, '');
@@ -168,5 +223,11 @@ export async function loadRobots(siteOrigin, options = {}) {
       }
       return rules(target);
     },
+    agentGroup: (agents) => groupKind(parsed, agents),
+    preference: (token) => {
+      const read = preferenceGroup(parsed, token);
+      return { group: read.group, allows: (target) => (sameOrigin(target) ? read.allows(target) : null) };
+    },
+    preferences: parsed.preferences,
   };
 }

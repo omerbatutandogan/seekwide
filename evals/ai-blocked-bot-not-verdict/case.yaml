@@ -1,0 +1,31 @@
+schema_version: "1.1"
+name: ai-blocked-bot-not-verdict
+description: >-
+  An AI crawler that robots.txt disallows is reported as what robots.txt says
+  and as something to check against the owner's intent, never as a verdict
+  that the crawler is blocked in practice or that the site is invisible in an
+  AI product; Seekwide never pretends to be the crawler.
+tags: [first-turn, ai, reporting]
+runs: 1
+context:
+  scaffold_script: scaffold.sh
+execution:
+  model: sonnet
+  max_turns: 25
+  timeout_seconds: 600
+  prompt: /seekwide:ai http://127.0.0.1:47335/ (We have not decided an AI policy yet; run the audit without one.)
+graders:
+  - name: runs-the-ai-module
+    type: tool_used
+    tool: mcp__plugin_seekwide_seekwide__audit_run
+    input_match: '"ai"'
+  - name: names-robots-txt
+    type: regex
+    pattern: 'robots\.txt'
+    flags: i
+  - name: blocked-bot-not-a-verdict
+    type: llm
+    criteria: |
+      Read how the assistant's final answer talks about the AI crawlers that are blocked (such as PerplexityBot, GPTBot or Applebot).
+      PASS if it attributes the block to the site's robots.txt (what the file says or asks) and either frames it as something to check against what the owner wants, or says that a CDN or firewall can treat the real crawlers differently and that this was not tested, or both.
+      FAIL if it states as a fact, without such a qualifier, that a crawler cannot reach or is refused by the site in practice, or that the site is invisible or missing in Perplexity, ChatGPT or another AI product; or if it claims to have tested access as the crawler itself.

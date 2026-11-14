@@ -105,6 +105,22 @@ ${v.notes.length > 0 ? html`<ul class="meta">${v.notes.map((note) => html`<li>${
 }
 
 /** @param {Report} r */
+function aiSection(r) {
+  const a = r.ai;
+  if (a === null) return '';
+  const rows = a.matrix.map((row) => html`<tr><td><code>${row.token}</code>${row.counted ? ' (counted)' : ''}</td><td>${row.vendor}</td><td>${row.role}</td><td><strong>${row.access}</strong></td><td>${row.robots}</td><td>${row.source === null ? '—' : html`${urlHtml(row.source)}<br><span class="meta">${row.verified}</span>`}</td></tr>`);
+  return html`<section id="ai-readiness"><h2>AI search readiness</h2>
+<p class="note">${a.statements[1]}</p>
+${a.counts.length > 0 ? html`<div class="figs">${a.counts.map((count) => html`<div class="fig"><b>${count.value}</b><span>${count.label}</span></div>`)}</div>` : ''}
+<dl><dt>Stated AI policy</dt><dd>${a.policy}</dd><dt>Training preference</dt><dd>${a.training}</dd><dt>llms.txt</dt><dd>${a.llms}</dd></dl>
+${rows.length > 0 ? html`<table><thead><tr><th>Crawler</th><th>Vendor</th><th>Purpose</th><th>robots.txt</th><th>Vendor says</th><th>Source (verified)</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
+${a.statements.filter((_, i) => i !== 1).map((statement) => html`<p class="meta">${statement}</p>`)}
+<p class="meta">Crawler data verified ${a.dataDate}.</p>
+<div class="warn"><strong>Check by hand</strong> (an audit from outside cannot see these)<ul>${a.manual.map((item) => html`<li>${item}</li>`)}</ul></div>
+</section>`;
+}
+
+/** @param {Report} r */
 function search(r) {
   const s = r.search;
   if (s === null) return '';
@@ -241,7 +257,7 @@ export function renderHtml(run, options) {
 </head>
 <body>
 <main>
-${titleBlock(r)}${summary(r)}${scope(r)}${fixes(r)}${layers(r)}${scores(r)}${vitals(r)}${search(r)}${topFixes(r)}${allFindings(r)}${suggestions(r)}${notRun(r)}${changes(r)}${method(r)}
+${titleBlock(r)}${summary(r)}${scope(r)}${fixes(r)}${layers(r)}${scores(r)}${vitals(r)}${search(r)}${aiSection(r)}${topFixes(r)}${allFindings(r)}${suggestions(r)}${notRun(r)}${changes(r)}${method(r)}
 <footer>Seekwide ${r.pluginVersion} &middot; rules ${r.rulesVersion} &middot; run <code>${r.runId}</code> &middot; ${r.date.iso}</footer>
 </main>
 </body>

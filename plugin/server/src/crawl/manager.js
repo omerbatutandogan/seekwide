@@ -55,7 +55,7 @@ function defaultId(date) {
  *
  * @param {{dataDir?: string, fetch?: typeof safeFetch, extract?: Extractor, lookup?: Lookup,
  *          now?: () => Date, sleep?: (ms: number) => Promise<void>, idFactory?: () => string, maxStoredChars?: number,
- *          hosts?: HostGates, robotsCache?: RobotsCache}} [deps]  `hosts` and `robotsCache` default to the ones the
+ *          hosts?: HostGates, robotsCache?: RobotsCache, aiRobots?: import('./run.js').CrawlDeps['aiRobots']}} [deps]  `hosts` and `robotsCache` default to the ones the
  *   whole process shares (net/polite.js, net/robots-cache.js).
  */
 export function createCrawlManager(deps = {}) {
@@ -96,7 +96,7 @@ export function createCrawlManager(deps = {}) {
       const { allowLoopback, ...rest } = input;
       const outcome = await runCrawl(
         { id: job.id, startedAt: job.started_at, ...rest, loopbackOrigin: allowLoopback ? originOf(input.startUrl) : null },
-        { fetch, extract, now, sleep, hosts, robotsCache, ...(deps.maxStoredChars === undefined ? {} : { maxStoredChars: deps.maxStoredChars }) },
+        { fetch, extract, now, sleep, hosts, robotsCache, ...(deps.maxStoredChars === undefined ? {} : { maxStoredChars: deps.maxStoredChars }), ...(deps.aiRobots ? { aiRobots: deps.aiRobots } : {}) },
         (progress) => Object.assign(job, progress),
       );
       if (outcome.status === 'failed') {

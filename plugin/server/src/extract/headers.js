@@ -13,6 +13,8 @@ const KEPT_HEADERS = [
   'cache-control', 'expires', 'last-modified', 'etag', 'vary',
   'x-robots-tag', 'link', 'location', 'refresh', 'retry-after',
   'strict-transport-security', 'content-security-policy', 'server',
+  // Which CDN or host answered, so a refusal can name it (ai module): Cloudflare, Vercel, CloudFront, Fastly, Akamai, Netlify.
+  'cf-ray', 'cf-mitigated', 'x-vercel-id', 'x-amz-cf-id', 'via', 'x-served-by', 'akamai-grn', 'x-nf-request-id',
 ];
 
 /** Most robots tokens kept from `X-Robots-Tag` headers (ARCHITECTURE.md 4.6). */
@@ -20,6 +22,8 @@ export const MAX_HEADER_ROBOTS_TOKENS = 50;
 
 /** Rules that look like `name: value` but are not user-agent prefixes. */
 const VALUE_DIRECTIVES = new Set(['max-snippet', 'max-image-preview', 'max-video-preview', 'unavailable_after']);
+/** Bing's AI preferences are `name:value` directives too (Bing blog, 2026-10-30): `ai-training:disallow`, `ai-grounding:disallow`. */
+const BING_VALUE_DIRECTIVES = new Set([...VALUE_DIRECTIVES, 'ai-training', 'ai-grounding']);
 
 /**
  * Every value of a header, one entry per header line.
@@ -60,6 +64,63 @@ export function selectHeaders(headers) {
  * @returns {string[]}
  */
 export function parseXRobots(lines) {
+  // Bing documents `ai-training:` and `ai-grounding:` as directives; Google documents nothing about them. Reading them as
+  // a user agent would scope away the rules after them (`ai-training:disallow, noindex`), so they are read as directives,
+  // and `unclearXRobots` marks the line so a finding that rests on it is `likely`.
+  return robotsHeaderTokens(lines, 'googlebot', BING_VALUE_DIRECTIVES);
+}
+
+/**
+ * The rules of `X-Robots-Tag` lines that come after Bing's `ai-training:`
+ * or `ai-grounding:` directive given with no user agent before it, in the
+ * form `parseXRobots` keeps them (lower case, at most
+ * `MAX_HEADER_ROBOTS_TOKENS`). Google documents neither directive and might
+ * read the name as a user agent the rules after it are meant for (Google's own
+ * example: `otherbot: noindex, nofollow`), so whether Google applies these
+ * rules is not certain. A rule on another line, or before the directive, is
+ * not one of them; a user agent after the directive ends the list.
+ * @param {string[]} lines
+ * @returns {string[]}
+ */
+export function unclearXRobots(lines) {
+  /** @type {string[]} */
+  const unclear = [];
+  for (const line of lines) {
+    const parts = line.split(',').map((raw) => collapseWhitespace(raw).toLowerCase()).filter((part) => part !== '');
+    let after = false;
+    for (const part of parts) {
+      const prefixed = /^([a-z0-9_.*-]+)\s*:/.exec(part);
+      if (prefixed !== null && (prefixed[1] === 'ai-training' || prefixed[1] === 'ai-grounding')) {
+        after = true;
+        continue;
+      }
+      // A user agent scopes what follows it, and Google's reading of that is the documented one.
+      if (prefixed !== null && !VALUE_DIRECTIVES.has(prefixed[1])) break;
+      if (after && unclear.length < MAX_HEADER_ROBOTS_TOKENS) unclear.push(clip(part, LIMITS.maxStringLength));
+    }
+  }
+  return unclear;
+}
+
+/**
+ * Directive tokens from `X-Robots-Tag` header lines that Bing reads: those
+ * for every crawler and those after a `bingbot:` prefix, in header order, at
+ * most `MAX_HEADER_ROBOTS_TOKENS`. `ai-training:` and `ai-grounding:` are
+ * directives, not user agents.
+ * @param {string[]} lines
+ * @returns {string[]}
+ */
+export function parseBingRobots(lines) {
+  return robotsHeaderTokens(lines, 'bingbot', BING_VALUE_DIRECTIVES);
+}
+
+/**
+ * @param {string[]} lines
+ * @param {string} crawler  The user agent prefix whose directives are kept besides the unprefixed ones.
+ * @param {Set<string>} valueDirectives  Names that are directives with a value, not user agents.
+ * @returns {string[]}
+ */
+function robotsHeaderTokens(lines, crawler, valueDirectives) {
   /** @type {string[]} */
   const tokens = [];
   for (const line of lines) {
@@ -79,13 +140,13 @@ export function parseXRobots(lines) {
     }
     for (let part of parts) {
       const prefixed = /^([a-z0-9_.*-]+)\s*:\s*(.*)$/.exec(part);
-      if (prefixed && !VALUE_DIRECTIVES.has(prefixed[1])) {
+      if (prefixed && !valueDirectives.has(prefixed[1])) {
         agent = prefixed[1];
         part = prefixed[2];
       }
       if (part === '') continue;
       if (tokens.length >= MAX_HEADER_ROBOTS_TOKENS) return tokens;
-      if (agent === null || agent === 'googlebot') tokens.push(clip(part, LIMITS.maxStringLength));
+      if (agent === null || agent === crawler) tokens.push(clip(part, LIMITS.maxStringLength));
     }
   }
   return tokens;

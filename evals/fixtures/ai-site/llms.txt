@@ -1,0 +1,7 @@
+# Lindenhof Bakery
+
+> A made-up bakery for the Seekwide eval suite.
+
+## Pages
+
+- [Menu]({origin}/menu.html): breads, cakes and coffee
