@@ -6,13 +6,14 @@
 /** @import { HtmlFields } from './html.js' */
 
 import { normalizeUrl } from '../util/url.js';
-import { decodeBody, isHtmlResponse, mediaTypeOf } from './decode.js';
+import { byteOffset, decodeBody, isHtmlResponse, mediaTypeOf } from './decode.js';
 import { headerValues, parseLinkHeaders, parseXRobots, selectHeaders } from './headers.js';
 import { extractHtml } from './html.js';
 import { CAPS, upgradesInsecureRequests } from './html-elements.js';
 import { indexabilityOf } from './indexability.js';
 import { securityHeaders } from './security-headers.js';
 import { emptySecurity } from './security.js';
+import { emptySocial } from './social.js';
 
 /**
  * @typedef {Object} RecordBase
@@ -27,6 +28,7 @@ function emptyContent() {
     html_lang: null, titles: [], meta_descriptions: [], meta_robots: [], canonicals: [], hreflang: [],
     headings: [], viewport: null, og: {}, twitter: {}, links: [], images: [], jsonld: [], mixed_content: [],
     word_count: 0, text_hash: '', text_excerpt: '', security: emptySecurity(), videos: [], video_embeds: [], video_markup: false,
+    social: emptySocial(),
   };
 }
 
@@ -102,9 +104,12 @@ export function extractPage(input) {
   const isHtml = isHtmlResponse(mediaType, result.body);
   const upgradeInsecure = headerValues(result, 'content-security-policy').some(upgradesInsecureRequests);
 
-  const content = isHtml && result.body && result.body.length > 0
-    ? extractHtml(decodeBody(result.body, contentType).text, {
+  const body = result.body;
+  const decoded = isHtml && body && body.length > 0 ? decodeBody(body, contentType) : null;
+  const content = body && decoded
+    ? extractHtml(decoded.text, {
       responseUrl, siteHost: input.siteHost, includeSubdomains: input.includeSubdomains ?? false, deployedOrigin: input.deployedOrigin ?? null, upgradeInsecure,
+      byteOffset: (chars) => byteOffset(body, decoded.encoding, decoded.text, chars),
     })
     : emptyContent();
   const fromHeaders = parseLinkHeaders(headerValues(result, 'link'), responseUrl);

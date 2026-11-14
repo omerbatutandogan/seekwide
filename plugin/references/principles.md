@@ -9,7 +9,7 @@ Read this when a user asks how scores are built, what a label means, or why the 
 
 ## Scores
 
-Each module (SEO, links, security, media) gets a score from 0 to 100.
+Each module (SEO, links, security, media, social sharing, app links) gets a score from 0 to 100.
 
 - Every check looks at a set of units, such as pages or links, and each unit passes or fails.
 - A check's pass rate is passed units divided by all its units.
@@ -62,6 +62,7 @@ Measuring sends the URLs of those pages to Google. It needs a Google API key, se
 - It sends one request at a time, about one per second.
 - It stops when a site challenges it (a firewall or CAPTCHA page) and reports that. It never tries to get past a block.
 - It refuses to connect to private network addresses.
+- It never sends a request to Google Play or to a social platform (Facebook, Instagram, X, LinkedIn, Pinterest, TikTok, YouTube, Telegram, Discord and the like), not even for their robots.txt. Links and images there are listed as not checked, so what a platform finally shows in a preview is not measured.
 - It reads HTML only. It does not run JavaScript, so content that appears only after scripts run is not seen. Many crawlers work the same way, which makes this a useful view, but it is not the whole picture for script-heavy sites.
 
 ## Why there are no promises
@@ -72,6 +73,6 @@ Search engines and AI search products still rest on the same foundation: pages t
 
 ## What this version covers
 
-Four modules: `seo` (crawling, indexing, canonicals, sitemaps, redirects, HTTPS, titles, descriptions, headings, duplicate content, structured data syntax, Core Web Vitals), `links` (internal, outbound, anchors, orphans), `security` (signs of a hacked site that can be seen from outside: hidden links and frames, spam terms, pages in another writing system, scripts from sites no other page uses, and the security headers of the start page) and `media` (alt text, image sizes, lazy loading, broken images, image formats and file sizes, images robots.txt keeps from Google, video captions and video structured data; up to 50 image files are checked with a HEAD request each, never downloaded whole). A clean security result is not proof of a clean site: many hacks show their spam only to Google's crawler, and this crawler never pretends to be Google.
+Six modules: `seo` (crawling, indexing, canonicals, sitemaps, redirects, HTTPS, titles, descriptions, headings, duplicate content, structured data syntax, Core Web Vitals), `links` (internal, outbound, anchors, orphans), `security` (signs of a hacked site that can be seen from outside: hidden links and frames, spam terms, pages in another writing system, scripts from sites no other page uses, and the security headers of the start page) and `media` (alt text, image sizes, lazy loading, broken images, image formats and file sizes, images robots.txt keeps from Google, video captions and video structured data; up to 50 image files are checked with a HEAD request each, never downloaded whole), `smo` (what social platforms and messaging apps need for a link preview: Open Graph tags, where they stand in the HTML, the sharing image's size and weight read from its first 64 KiB, and whether robots.txt keeps Meta's preview crawler out) and `aso` (the site's side of its apps: Apple's Smart App Banner and the association files for universal links and App Links, against the apps the profile declares). A clean security result is not proof of a clean site: many hacks show their spam only to Google's crawler, and this crawler never pretends to be Google.
 
-Not in this version: AI search visibility, local SEO and international targeting. Fixes to code cover metadata only (titles, descriptions, canonicals, Open Graph tags and the sitemap), through `/seekwide:fix` in the project's own folder; nothing else is changed. The report marks the layers it has no data for instead of leaving them out.
+Not in this version: AI search visibility, local SEO, international targeting, and app store listings. Fixes to code cover metadata only (titles, descriptions, canonicals, Open Graph tags and the sitemap), through `/seekwide:fix` in the project's own folder; nothing else is changed. The report marks the layers it has no data for instead of leaving them out.

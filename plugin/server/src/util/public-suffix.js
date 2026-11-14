@@ -37,6 +37,8 @@ const MAX_NAME = 253;
  * @property {Set<string>} rules       Plain rules (`co.uk`).
  * @property {Set<string>} wildcards   The part after `*.` of a wildcard rule (`ck` for `*.ck`).
  * @property {Set<string>} exceptions  The part after `!` of an exception rule (`www.ck`).
+ * @property {Set<string>} private     The plain and wildcard rules (as in `rules` and `wildcards`) of the list's private
+ *   section, which hosting services add for their own domains, and `TENANT_DOMAINS`.
  * @property {string} version          The list's VERSION line.
  */
 
@@ -50,21 +52,27 @@ let loaded = null;
  */
 export function parseSuffixRules(text) {
   /** @type {SuffixRules} */
-  const parsed = { rules: new Set(), wildcards: new Set(), exceptions: new Set(), version: '' };
+  const parsed = { rules: new Set(), wildcards: new Set(), exceptions: new Set(), private: new Set(), version: '' };
   for (const line of text.split('\n')) {
     if (line.startsWith('# VERSION: ')) parsed.version = line.slice(11).trim();
     if (line === '' || line.startsWith('#')) continue;
     const colon = line.indexOf(':');
     const top = line.slice(0, colon);
-    for (const rest of line.slice(colon + 1).split(',')) {
+    for (const entry of line.slice(colon + 1).split(',')) {
+      const isPrivate = entry.startsWith('+');
+      const rest = isPrivate ? entry.slice(1) : entry;
       const exception = rest.startsWith('!');
       const name = (exception ? rest.slice(1) : rest) === '' ? top : `${exception ? rest.slice(1) : rest}.${top}`;
       if (exception) parsed.exceptions.add(name);
       else if (name.startsWith('*.')) parsed.wildcards.add(name.slice(2));
       else parsed.rules.add(name);
+      if (isPrivate && !exception) parsed.private.add(name.startsWith('*.') ? name.slice(2) : name);
     }
   }
-  for (const domain of TENANT_DOMAINS) parsed.rules.add(domain);
+  for (const domain of TENANT_DOMAINS) {
+    parsed.rules.add(domain);
+    parsed.private.add(domain);
+  }
   return parsed;
 }
 
@@ -95,6 +103,22 @@ export function publicSuffix(name) {
     if (rules.has(endings[i]) || (i + 1 < endings.length && wildcards.has(endings[i + 1]))) return endings[i];
   }
   return /** @type {string} */ (endings.at(-1));
+}
+
+/**
+ * True when a host name's public suffix comes from the ICANN section of the
+ * list (a country or generic ending such as `de`, `co.uk`, `com.mx`), and not
+ * from its private section or `TENANT_DOMAINS` (a hosting service's own
+ * domain, such as `github.io` or `wordpress.com`, under which each customer
+ * has a name).
+ * @param {string} name  A host name in lower-case ASCII, without a port or a trailing dot.
+ * @returns {boolean}
+ */
+export function hasIcannSuffix(name) {
+  const suffix = publicSuffix(name);
+  const { private: owned } = suffixRules();
+  // A wildcard rule of the private section (`*.example.app`) gives a suffix one label longer than the rule.
+  return !owned.has(suffix) && !owned.has(suffix.slice(suffix.indexOf('.') + 1));
 }
 
 /**

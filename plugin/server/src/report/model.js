@@ -243,6 +243,8 @@ export function buildReport(run, options = {}) {
       pluginVersion: text(run.plugin_version, 'unknown'), rulesVersion: text(run.rules_version, 'unknown'), vitals: vitals !== null,
       repo: REPO_FRAMEWORKS.includes(str(obj(run.repo).framework)), security: Array.isArray(run.modules_requested) && run.modules_requested.includes('security'),
       media: Array.isArray(run.modules_requested) && run.modules_requested.includes('media'), search: opts.search.length > 0,
+      smo: Array.isArray(run.modules_requested) && run.modules_requested.includes('smo'),
+      aso: Array.isArray(run.modules_requested) && run.modules_requested.includes('aso'),
     }),
     pluginVersion: text(run.plugin_version, 'unknown'),
     rulesVersion: text(run.rules_version, 'unknown'),

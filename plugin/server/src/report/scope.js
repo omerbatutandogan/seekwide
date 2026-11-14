@@ -78,6 +78,49 @@ function viewImageFiles(run) {
 }
 
 /**
+ * The scope rows of the smo and aso modules and of what no check requested by
+ * rule, each only when the run has it.
+ * @param {Run} run
+ * @returns {{label: string, value: string, code?: boolean}[]}
+ */
+function viewSharing(run) {
+  /** @type {{label: string, value: string, code?: boolean}[]} */
+  const rows = [];
+  const social = run.social_images;
+  if (social !== null && typeof social === 'object' && !Array.isArray(social)) {
+    const files = obj(social);
+    const images = Math.max(0, Math.floor(num(files.images)));
+    const selected = Math.min(images, Math.max(0, Math.floor(num(files.selected))));
+    const outcomes = obj(files.outcomes);
+    const answered = Math.min(selected, Math.max(0, Math.floor(num(outcomes.ok))) + Math.max(0, Math.floor(num(outcomes.broken))));
+    const sized = Math.min(answered, Math.max(0, Math.floor(num(files.sized))));
+    rows.push({
+      label: 'Sharing images',
+      value: images === 0 ? 'The crawled pages give no sharing image (og:image or twitter:image).'
+        : `${selected} of ${plural(images, 'distinct sharing image')} checked (robots.txt first, then one GET of at most 64 KiB each); ${answered} answered, and the pixel size of ${sized} was read from the file.`,
+    });
+  }
+  const apps = run.app_files;
+  if (apps !== null && typeof apps === 'object' && !Array.isArray(apps)) {
+    /** @param {unknown} file */
+    const said = (file) => ({ answered: 'served', not_found: 'not found', unverifiable: 'could not be verified', disallowed: 'not requested, robots.txt disallows it' })[str(obj(file).outcome)] ?? 'unknown';
+    rows.push({ label: 'App association files', value: `apple-app-site-association: ${said(obj(apps).aasa)}. assetlinks.json: ${said(obj(apps).assetlinks)}.` });
+  }
+  const skipped = run.not_requested;
+  if (skipped !== null && typeof skipped === 'object' && !Array.isArray(skipped)) {
+    const counts = obj(skipped);
+    const parts = [
+      [num(counts.links), 'external link'], [num(counts.images), 'image file'], [num(counts.social_images), 'sharing image'],
+    ].filter(([count]) => /** @type {number} */ (count) > 0).map(([count, noun]) => plural(Math.floor(/** @type {number} */ (count)), /** @type {string} */ (noun)));
+    const hosts = Array.isArray(counts.hosts) ? counts.hosts.filter((host) => typeof host === 'string').join(', ') : '';
+    if (parts.length > 0) {
+      rows.push({ label: 'Not checked, by rule', value: `${parts.join(', ')} on Google Play or social platforms${hosts === '' ? '' : ` (${hosts})`}. Seekwide never sends a request there.` });
+    }
+  }
+  return rows;
+}
+
+/**
  * @param {Run} run
  * @param {{host: string, blocked: ReturnType<typeof viewBlock>}} derived
  */
@@ -107,6 +150,7 @@ export function viewScope(run, { host, blocked }) {
     { label: 'Modules', value: modules.length > 0 ? modules.join(', ') : 'None recorded.' },
     ...(repo ? [repo] : []),
     ...(imageFiles ? [imageFiles] : []),
+    ...viewSharing(run),
     { label: 'User agent', value: text(crawl.user_agent, 'Not recorded.'), code: true },
   ];
 }

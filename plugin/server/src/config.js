@@ -10,7 +10,7 @@ const pkg = JSON.parse(readFileSync(path.join(PLUGIN_ROOT, 'package.json'), 'utf
 export const VERSION = /** @type {string} */ (pkg.version);
 
 /** Version of the rule set. Bump it whenever a check changes what it reports. */
-export const RULES_VERSION = '0.1.8';
+export const RULES_VERSION = '0.1.9';
 
 /** Version of the JSON written under `.seekwide/`. */
 export const SCHEMA_VERSION = 1;
@@ -19,6 +19,14 @@ export const SCHEMA_VERSION = 1;
 export const PRODUCT_TOKEN = 'seekwide';
 
 export const HOMEPAGE = /** @type {string} */ (pkg.homepage);
+
+/**
+ * Link-preview crawlers whose own documentation says they obey robots.txt, by their robots.txt token (smo module).
+ * Meta's page on its crawlers (read 2026-11-13) asks sites to block FacebookExternalHit with a robots.txt rule and says it
+ * bypasses robots.txt only for security and integrity checks. LinkedIn and X document nothing about robots.txt, and
+ * Slack says it does not honor it, so they are not listed.
+ */
+export const PREVIEW_CRAWLERS = Object.freeze(['facebookexternalhit']);
 
 /** The crawler always identifies itself; it never pretends to be a browser or another bot. */
 export const USER_AGENT = `${PRODUCT_TOKEN}/${VERSION} (+${HOMEPAGE})`;
@@ -58,9 +66,15 @@ export const LIMITS = Object.freeze({
   imageCheckConcurrency: 4,
   // No new image request starts once this much time has passed.
   imageCheckDeadlineMs: 90_000,
+  // Sharing images (smo module): the og:image files of the crawled pages, each read for its first 64 KiB to learn
+  // its pixel size, so fewer of them than of the media module's images.
+  maxSocialImageChecks: 20,
+  socialImageReadBytes: 64 * 1024,
+  // App association files (aso module): read whole up to this size.
+  appFileMaxBytes: 1024 * 1024,
 });
 
-export const MODULES = Object.freeze(['seo', 'links', 'security', 'media']);
+export const MODULES = Object.freeze(['seo', 'links', 'security', 'media', 'smo', 'aso']);
 
 /**
  * Scores a module's checks can count toward instead of the module's own, with
@@ -84,10 +98,12 @@ export const SEVERITIES = Object.freeze(['critical', 'high', 'medium', 'low', 'i
 /**
  * Things a check may require before it can run. The engine skips checks whose requirements are not met.
  * The crawl provides the first three, the external link check `outbound`, the check of image files
- * (media module) `image_files`, and the Core Web Vitals measurement `lab_data` and `field_data`. `live_site` is provided for a crawl of a site that is not on
- * this machine: the response headers of a local development server say nothing about the deployed site.
+ * (media module) `image_files`, the check of sharing images (smo module) `social_images`, the read of the app association
+ * files (aso module) `app_files`, and the Core Web Vitals measurement `lab_data` and `field_data`. `live_site` is provided for
+ * a crawl of a site that is not on this machine: the response headers of a local development server say nothing about the
+ * deployed site.
  */
-export const CAPABILITIES = Object.freeze(['full_crawl', 'sitemap', 'robots', 'outbound', 'lab_data', 'field_data', 'live_site', 'image_files']);
+export const CAPABILITIES = Object.freeze(['full_crawl', 'sitemap', 'robots', 'outbound', 'lab_data', 'field_data', 'live_site', 'image_files', 'social_images', 'app_files']);
 
 /** An API key is sent in a request header, so it must be printable ASCII without spaces. */
 const API_KEY_PATTERN = /^[\x21-\x7E]{1,256}$/;

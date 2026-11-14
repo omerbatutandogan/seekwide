@@ -13,6 +13,7 @@
 
 /** @import { FetchResult, RedirectHop } from '../types.js' */
 
+import { NOT_REQUESTED, offLimitsReason } from '../util/off-limits.js';
 import { normalizeUrl } from '../util/url.js';
 
 export const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
@@ -237,4 +238,45 @@ export async function followRedirects(url, { maxHops, request, resolve = normali
     seen.add(target);
     current = target;
   }
+}
+
+/**
+ * The answer a request to Google Play or a social platform gets without being
+ * sent: a failed fetch with `blocked_address` and the rule in its message.
+ * Null for any other URL.
+ * @param {string} url
+ * @returns {FetchResult|null}
+ */
+export function offLimitsRefusal(url) {
+  const reason = offLimitsReason(url);
+  if (reason === null) return null;
+  return {
+    url, finalUrl: url, status: 0, headers: {}, headerLines: {}, redirectChain: [], body: null, truncated: false, bytes: 0, elapsedMs: 0,
+    error: { code: 'blocked_address', message: NOT_REQUESTED[reason] },
+  };
+}
+
+/** @type {WeakMap<Function, Function>} */
+const guarded = new WeakMap();
+
+/**
+ * A fetch that never sends a request to Google Play or a social platform:
+ * such a URL gets `offLimitsRefusal` and `fetch` is not called. Every
+ * requester wraps the fetch it was given (the crawler, the link check, the
+ * image check, the app files), so robots.txt and every redirect hop they send
+ * pass here too, whatever fetch a caller or a test injects; `safeFetch` refuses
+ * the same URLs on its own redirects. The wrapper of one fetch is always the
+ * same function, so the robots.txt cache, which is keyed by the fetch, is
+ * still shared between requesters.
+ * @template {(url: string, options?: any) => Promise<FetchResult>} F
+ * @param {F} fetch
+ * @returns {F}
+ */
+export function guardFetch(fetch) {
+  const known = guarded.get(fetch);
+  if (known) return /** @type {F} */ (known);
+  const wrapper = /** @type {F} */ (/** @type {unknown} */ (async (/** @type {string} */ url, /** @type {any} */ options) => offLimitsRefusal(url) ?? fetch(url, options)));
+  guarded.set(fetch, wrapper);
+  guarded.set(wrapper, wrapper);
+  return wrapper;
 }

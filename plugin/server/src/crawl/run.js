@@ -1,6 +1,6 @@
 // One crawl, start to finish (ARCHITECTURE.md 4.5).
 
-import { LIMITS, SCHEMA_VERSION, USER_AGENT } from '../config.js';
+import { LIMITS, PREVIEW_CRAWLERS, SCHEMA_VERSION, USER_AGENT } from '../config.js';
 import { loadSitemaps } from '../net/sitemap.js';
 import { isInternalUrl, looksLikeHtmlUrl, originOf } from '../util/url.js';
 import { asksFirst, createChainFollower, recordsForChain } from './chain.js';
@@ -123,6 +123,11 @@ export async function runCrawl(params, deps, onProgress) {
 
   /** @returns {CrawlOutcome} */
   const finish = () => {
+    // What robots.txt tells the link-preview crawlers that say they obey it (smo module): only about the start page.
+    const startPage = records.pages[0]?.final_url;
+    const previewAgents = startPage !== undefined && robots.summary.status !== 'unreachable' && originOf(startPage) === origin
+      ? Object.fromEntries(PREVIEW_CRAWLERS.map((token) => [token, robots.allowsAgents(startPage, [token])]))
+      : null;
     /** @type {CrawlResult} */
     const result = {
       schema_version: SCHEMA_VERSION, id: params.id, start_url: startUrl, site_origin: origin, site_host: host,
@@ -131,6 +136,7 @@ export async function runCrawl(params, deps, onProgress) {
       robots: robots.summary, sitemap, http_probe: httpProbe, pages: records.pages,
       robots_blocked: robotsBlocked, disallowed_links: records.disallowedLinks(), truncated: records.truncated(), blocked, user_agent: USER_AGENT,
       ...(timeUp ? { time_limit_reached: true } : {}),
+      ...(previewAgents === null ? {} : { preview_agents: previewAgents }),
     };
     return { status: blocked ? 'blocked' : 'done', result };
   };

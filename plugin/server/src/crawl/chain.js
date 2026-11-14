@@ -3,6 +3,8 @@
 
 import { LIMITS } from '../config.js';
 import { followRedirects } from '../net/polite.js';
+import { neverContacted, offLimitsReason } from '../util/off-limits.js';
+import { clip } from '../util/strings.js';
 import { isInternalUrl, looksLikeHtmlUrl, originOf } from '../util/url.js';
 import { isBotChallenge } from './challenge.js';
 
@@ -163,6 +165,12 @@ export function createChainFollower(ctx) {
 async function stopBefore(ctx, target, mode) {
   const targetOrigin = /** @type {string} */ (originOf(target));
   if (mode === 'start') {
+    // The start URL's redirects may cross origins, but never to Google Play or a social platform: the crawl stops
+    // before that request, as it does for a local site that redirects away.
+    const offLimits = offLimitsReason(target);
+    if (offLimits !== null) {
+      return { outcome: { kind: 'fail', message: `The start URL redirects to ${clip(target, 300)}, which is not crawled: ${neverContacted(offLimits)}. Audit the site's own address instead.` } };
+    }
     if (ctx.loopbackOrigin !== null && targetOrigin !== ctx.loopbackOrigin) {
       return {
         outcome: {

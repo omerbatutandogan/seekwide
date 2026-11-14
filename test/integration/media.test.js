@@ -100,7 +100,7 @@ const stat = (id) => {
 const failing = (id) => saved.findings.filter((/** @type {any} */ finding) => finding.check_id === id).map((/** @type {any} */ finding) => new URL(finding.url).pathname + (finding.selector ? ` ${finding.selector}` : ''));
 
 test('an audit without a module list runs the media module and scores it', () => {
-  assert.deepEqual(saved.modules_requested, ['seo', 'links', 'security', 'media']);
+  assert.deepEqual(saved.modules_requested, ['seo', 'links', 'security', 'media', 'smo', 'aso']);
   assert.equal(saved.modules.media.coverage, 1);
   assert.ok(saved.modules.media.score > 0 && saved.modules.media.score < 100);
   assert.deepEqual(saved.image_files, { images: 7, selected: 6, outcomes: { ok: 5, broken: 1 }, local: true });
@@ -154,7 +154,7 @@ test('the notes and both reports say what the media module checked', async () =>
   assert.ok(audit.notes.includes('The pages show 7 distinct images; 6 of them were chosen to check, page by page in crawl order, and 6 answered.'));
   assert.ok(audit.notes.some((/** @type {string} */ note) => note.startsWith('This is a site on this machine, so only images on its own address were checked')));
   const md = renderMarkdown(saved, {});
-  assert.match(md, /^# SEO, link, security and media audit/);
+  assert.match(md, /^# SEO, link, security, media, social sharing and app audit/);
   assert.match(md, /6 of 7 distinct images chosen to check \(robots\.txt first, then a HEAD request each\); 6 answered\./);
   assert.match(md, /\| Media \| \d+ \/ 100 \|/);
   assert.match(renderHtml(saved, {}), /How images and videos are checked/);

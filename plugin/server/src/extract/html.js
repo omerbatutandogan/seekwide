@@ -1,7 +1,7 @@
 // HTML document → content fields of a PageRecord. Pure. This file walks the
 // document and collects the visible text; html-elements.js reads each element.
 
-/** @import { CanonicalRef, Heading, HreflangRef, ImageRecord, JsonLdBlock, LinkRecord, PageSecurity, VideoEmbedRecord, VideoRecord } from '../types.js' */
+/** @import { CanonicalRef, Heading, HreflangRef, ImageRecord, JsonLdBlock, LinkRecord, PageSecurity, SocialRecord, VideoEmbedRecord, VideoRecord } from '../types.js' */
 /** @import { DomNode } from './dom.js' */
 /** @import { Frame, HtmlState } from './html-elements.js' */
 
@@ -15,6 +15,7 @@ import { reachedCaps, visitElement } from './html-elements.js';
 import { enterLandmark } from './media.js';
 import { streamedBoundaries } from './react-stream.js';
 import { documentSecurity, emptySecurity } from './security.js';
+import { emptySocial, socialRecord, socialState } from './social.js';
 import { siteIdentity } from '../util/site-identity.js';
 
 /** Elements whose text is not part of the visible body text. */
@@ -50,6 +51,7 @@ const SPACE = Symbol('space');
  * @property {VideoRecord[]} videos
  * @property {VideoEmbedRecord[]} video_embeds
  * @property {boolean} video_markup
+ * @property {SocialRecord} social
  * @property {string[]} [limits_reached]  Set when a cap stopped the reading of the page (`PageRecord.limits_reached`).
  */
 
@@ -70,7 +72,10 @@ const SPACE = Symbol('space');
  * @param {string} html
  * A cap that stops the reading (the document's tags, a list, the security
  * scan's hosts) is named in `limits_reached`.
- * @param {{responseUrl: string, siteHost: string, includeSubdomains: boolean, deployedOrigin?: string|null, upgradeInsecure?: boolean}} context
+ * `social.head_end` counts bytes with `context.byteOffset`, which turns characters of `html` into bytes of the
+ * response; without it, characters count as their UTF-8 bytes.
+ * @param {{responseUrl: string, siteHost: string, includeSubdomains: boolean, deployedOrigin?: string|null, upgradeInsecure?: boolean,
+ *          byteOffset?: (chars: number) => number}} context
  * @returns {HtmlFields}
  */
 export function extractHtml(html, context) {
@@ -83,11 +88,13 @@ export function extractHtml(html, context) {
     html_lang: null, titles: [], meta_descriptions: [], meta_robots: [], canonicals: [], hreflang: [],
     headings: [], viewport: null, og: {}, twitter: {}, links: [], images: [], jsonld: [], mixed_content: [],
     word_count: 0, text_hash: '', text_excerpt: '', security: emptySecurity(), videos: [], video_embeds: [], video_markup: false,
+    social: emptySocial(),
   };
   /** @type {HtmlState} */
   const state = {
     out, baseUrl, https: context.responseUrl.startsWith('https:'), siteHost: context.siteHost, includeSubdomains: context.includeSubdomains,
     listChars: 0, upgradeInsecure: context.upgradeInsecure ?? false, nextFlight: false, bodyTitle: false, preloadImages: new Set(), pictures: new WeakMap(),
+    social: socialState(),
   };
   /** @type {string[]} */
   const text = [];
@@ -146,6 +153,8 @@ export function extractHtml(html, context) {
       if (canonical.source === 'html' && !canonical.in_head) canonical.streamed = true;
     }
   }
+  const toBytes = context.byteOffset ?? ((/** @type {number} */ chars) => Buffer.byteLength(markup.slice(0, chars), 'utf8'));
+  out.social = socialRecord(state.social, document, toBytes, state.nextFlight && state.bodyTitle);
   const visible = collapseWhitespace(text.join(''));
   out.word_count = visible.match(WORD)?.length ?? 0;
   out.text_hash = visible === '' ? '' : sha1Hex(visible.toLowerCase());

@@ -18,7 +18,7 @@ export const SVG_NS = 'http://www.w3.org/2000/svg';
  * @property {string} [value]   Text of a text node.
  * @property {string} [data]    Text of a comment node.
  * @property {DomNode} [content]  The inert contents of a `<template>`.
- * @property {{startLine: number}|null} [sourceCodeLocation]
+ * @property {{startLine: number, endOffset?: number}|null} [sourceCodeLocation]
  */
 
 /** Elements whose text never contributes to anchor text, headings or titles. */

@@ -4,6 +4,7 @@
 /** @import { LinkRecord, PageRecord } from './page.js' */
 /** @import { VitalsData } from './vitals.js' */
 /** @import { ImageFileResult } from './media.js' */
+/** @import { AppFiles, AppsProfile } from './sharing.js' */
 /** @import { SiteIdentity } from '../util/site-identity.js' */
 
 export {};
@@ -31,6 +32,9 @@ export {};
  * @property {Map<string, OutboundResult>|null} outbound  External link results, when they were collected.
  * @property {VitalsData|null} vitals         Core Web Vitals, when they were measured.
  * @property {Map<string, ImageFileResult>|null} imageFiles  Image files checked for the media module, by URL, when they were checked.
+ * @property {Map<string, ImageFileResult>|null} socialImages  Sharing images checked for the smo module, by URL, when they were checked.
+ * @property {AppFiles|null} appFiles     The site's app association files (aso module), when they were read.
+ * @property {AppsProfile} apps           The apps the site profile declares (`profile.apps`); empty without a profile.
  * @property {(url: string) => PageRecord|undefined} resolve  Record at the end of a URL's redirect chain, if crawled.
  */
 
@@ -52,7 +56,7 @@ export {};
 /**
  * @typedef {Object} CheckDef
  * @property {string} id               `<module>.<area>.<problem>`, lower-case, for example "seo.title.missing".
- * @property {'seo'|'links'|'security'|'media'} module
+ * @property {'seo'|'links'|'security'|'media'|'smo'|'aso'} module
  * @property {'code'} engine           Every scripted check is 'code'. Model judgments are never checks.
  * @property {string} title            Short name of the problem, sentence case, no trailing period.
  * @property {string} description      What the check looks at and why it matters, one or two sentences.

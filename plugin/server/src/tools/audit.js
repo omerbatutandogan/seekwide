@@ -7,9 +7,11 @@
 import { LIMITS, MODULES, RULES_VERSION, SCHEMA_VERSION, SEVERITIES, VERSION } from '../config.js';
 import { buildContext, runChecks } from '../checks/engine.js';
 import { isUnverifiable } from '../checks/page-helpers.js';
-import { externalLinkUrls } from './audit-links.js';
+import { notRequestedImages } from '../checks/media/select.js';
+import { externalLinkUrls, notRequestedLinks } from './audit-links.js';
 import { runNotes, skippedChecks, startPage, topGroups } from './audit-summary.js';
 import { MEDIA_ARGUMENTS, collectImageFiles, imageFilesNotes } from './audit-media.js';
+import { SHARING_ARGUMENTS, appFilesNotes, collectAppFiles, collectSocialImages, notRequestedNotes, notRequestedSummary, socialImagesNotes } from './audit-sharing.js';
 import { VITALS_ARGUMENTS, collectVitals, vitalsOutput } from './audit-vitals.js';
 import { JOB_ID_SCHEMA, PROJECT_DIR_SCHEMA, UNTRUSTED_NOTE, countBy, resolveProjectDir, withStoreErrors } from './common.js';
 import { finishedCrawl } from './crawl.js';
@@ -64,10 +66,13 @@ export function auditTools(deps) {
       name: 'audit_run',
       title: 'Run the audit',
       description:
-        'Run the SEO, link, security and media checks on a finished crawl, save the run under <project>/.seekwide/runs/ and return ' +
+        'Run the SEO, link, security, media, social sharing (smo) and app (aso) checks on a finished crawl, save the run under <project>/.seekwide/runs/ and return ' +
         'scores, totals, the top problems and notes on coverage. Accepts crawls that are done or blocked. ' +
         'The security module only reads the crawled pages and sends no request of its own. ' +
         `The media module checks up to ${LIMITS.maxImageChecks} image files the pages show (robots.txt first, then a HEAD request each), which can take a minute. ` +
+        `The smo module reads the first ${LIMITS.socialImageReadBytes / 1024} KiB of up to ${LIMITS.maxSocialImageChecks} sharing images (og:image); the aso module reads the site's ` +
+        '/.well-known/apple-app-site-association and /.well-known/assetlinks.json, and the apps the site profile declares. ' +
+        'No check ever sends a request to Google Play or a social platform. ' +
         'External links are checked only when the links module runs. With the seo module, Core Web Vitals are measured ' +
         'for a few pages through Google (PageSpeed Insights and the Chrome UX Report), which can take a minute; ' +
         'when Google refuses or does not answer, those checks are skipped and the audit still completes. ' +
@@ -86,6 +91,7 @@ export function auditTools(deps) {
           check_outbound_links: { type: 'boolean', default: true, description: `With the links module, check up to ${LIMITS.maxOutboundChecks} external links for broken targets.` },
           ...VITALS_ARGUMENTS,
           ...MEDIA_ARGUMENTS,
+          ...SHARING_ARGUMENTS,
           project_dir: PROJECT_DIR_SCHEMA,
           source_dir: {
             ...SOURCE_DIR_SCHEMA,
@@ -121,19 +127,37 @@ export function auditTools(deps) {
         // Image files belong to the media module. They are checked after the external links, never at the same time:
         // an image and a link can be on one host, and that host must see one request at a time.
         const mediaRequested = modules.includes('media');
+        // Sharing images (smo) and the app association files (aso) come after the image files, one requester after another.
+        const smoRequested = modules.includes('smo');
+        const asoRequested = modules.includes('aso');
         /** @type {Promise<Map<string, OutboundResult>|null>} */
         const links = Promise.resolve(!checkOutbound ? null : external.length === 0
           ? new Map()
           : deps.checkExternalLinks(external, { maxLinks: LIMITS.maxOutboundChecks, concurrency: LIMITS.outboundConcurrency, ...(signal ? { signal } : {}) }));
-        /** @type {[Map<string, OutboundResult>|null, VitalsData|null, Awaited<ReturnType<typeof collectImageFiles>>]} */
-        const [outbound, vitals, images] = await Promise.all([
+        const imagesDone = links.catch(() => null).then(() => collectImageFiles(deps, crawl, { requested: mediaRequested, check: args.check_image_files ?? true, signal }));
+        const socialDone = imagesDone.catch(() => null).then(() => collectSocialImages(deps, crawl, { requested: smoRequested, check: args.check_social_images ?? true, signal }));
+        const appsDone = socialDone.catch(() => null).then(() => collectAppFiles(deps, crawl, projectDir, { requested: asoRequested, check: args.check_app_files ?? true, signal }));
+        /** @type {[Map<string, OutboundResult>|null, VitalsData|null, Awaited<ReturnType<typeof collectImageFiles>>,
+         *   Awaited<ReturnType<typeof collectSocialImages>>, Awaited<ReturnType<typeof collectAppFiles>>]} */
+        const [outbound, vitals, images, social, apps] = await Promise.all([
           links,
           checkVitals ? collectVitals(deps, crawl, args.core_web_vitals_pages ?? LIMITS.vitalsPagesDefault, pendingVitals, signal) : null,
-          links.catch(() => null).then(() => collectImageFiles(deps, crawl, { requested: mediaRequested, check: args.check_image_files ?? true, signal })),
+          imagesDone,
+          socialDone,
+          appsDone,
         ]);
         signal?.throwIfAborted();
+        const notRequested = notRequestedSummary({
+          // Only an external link check that ran leaves links out by rule; without one, no link was checked at all.
+          links: checkOutbound ? notRequestedLinks(crawl) : [],
+          images: mediaRequested ? notRequestedImages(crawl) : [],
+          socialImages: social.notRequested,
+        });
 
-        const ctx = buildContext(crawl, { outbound, vitals, imageFiles: images.files, imageFilesReason: images.reason });
+        const ctx = buildContext(crawl, {
+          outbound, vitals, imageFiles: images.files, imageFilesReason: images.reason,
+          socialImages: social.files, socialImagesReason: social.reason, appFiles: apps.files, appFilesReason: apps.reason, apps: apps.apps,
+        });
         const date = deps.now();
         const detectedAt = date.toISOString();
         const result = runChecks(deps.checks, ctx, { modules, detectedAt });
@@ -177,6 +201,9 @@ export function auditTools(deps) {
           repo: mapped === null ? null : mapped.summary,
           fixes: null,
           image_files: images.summary,
+          social_images: social.summary,
+          app_files: apps.summary,
+          not_requested: notRequested,
         };
         run.fixes = fixVerification(deps, fixRequest, run, crawl);
         signal?.throwIfAborted();
@@ -209,6 +236,9 @@ export function auditTools(deps) {
               mapped === null ? [] : mapped.notes,
             ),
             ...imageFilesNotes(images),
+            ...socialImagesNotes(social),
+            ...appFilesNotes(apps),
+            ...notRequestedNotes(notRequested),
           ],
           _note: UNTRUSTED_NOTE,
         };

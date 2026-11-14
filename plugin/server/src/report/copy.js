@@ -3,17 +3,17 @@
 
 export const TITLE = 'SEO and link audit';
 
-const TITLE_WORDS = /** @type {Record<string, string>} */ ({ seo: 'SEO', links: 'link', security: 'security', media: 'media' });
+const TITLE_WORDS = /** @type {Record<string, string>} */ ({ seo: 'SEO', links: 'link', security: 'security', media: 'media', smo: 'social sharing', aso: 'app' });
 
 /**
- * The report's title. A run without the security or media module keeps the
- * title reports have always had; one with either names the modules it ran.
+ * The report's title. A run of only the seo and links modules keeps the title
+ * reports have always had; one with any other module names the modules it ran.
  * @param {unknown} modules  `run.modules_requested`.
  * @returns {string}
  */
 export function reportTitle(modules) {
-  const names = Array.isArray(modules) ? ['seo', 'links', 'security', 'media'].filter((name) => modules.includes(name)) : [];
-  if (!names.includes('security') && !names.includes('media')) return TITLE;
+  const names = Array.isArray(modules) ? ['seo', 'links', 'security', 'media', 'smo', 'aso'].filter((name) => modules.includes(name)) : [];
+  if (names.every((name) => name === 'seo' || name === 'links')) return TITLE;
   const words = names.map((name) => TITLE_WORDS[name]);
   const joined = words.length === 1 ? words[0] : `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`;
   return `${joined.charAt(0).toUpperCase()}${joined.slice(1)} audit`;
@@ -23,7 +23,9 @@ export const SEVERITY_LABELS = Object.freeze({ critical: 'Critical', high: 'High
 
 export const CONFIDENCE_LABELS = Object.freeze({ confirmed: 'Confirmed', likely: 'Likely' });
 
-export const MODULE_LABELS = Object.freeze({ seo: 'SEO', links: 'Links', security: 'Security', security_headers: 'Security headers', media: 'Media' });
+export const MODULE_LABELS = Object.freeze({
+  seo: 'SEO', links: 'Links', security: 'Security', security_headers: 'Security headers', media: 'Media', smo: 'Social sharing', aso: 'App links',
+});
 
 export const BLOCK_REASONS = Object.freeze({
   robots_unreachable: 'robots.txt could not be read, so the crawler did not continue',
@@ -120,16 +122,30 @@ export const MEDIA_METHOD = Object.freeze({
   text: "The media checks read the <img> and <video> elements, embedded video players and JSON-LD of the crawled pages. Up to 50 of the image files the pages show are then checked, chosen page by page: the robots.txt of each image host is read first and obeyed, then each file gets a HEAD request that says AVIF and WebP are accepted, and a GET that reads at most 1 KiB when the HEAD says too little. No image is downloaded whole, so formats and sizes come from the server's headers. Images that scripts add, images in CSS backgrounds, and whether alt text describes the image well are not measured; neither are captions that are part of the picture or loaded by a player.",
 });
 
+/** What the smo module looks at, what it requests, and what it cannot see. */
+export const SMO_METHOD = Object.freeze({
+  label: 'How sharing previews are checked',
+  text: "The social sharing checks read the Open Graph and Twitter card tags of the crawled pages, where they stand in the HTML and how many bytes come before the end of the <head>, against what Facebook, WhatsApp, LinkedIn and the Open Graph protocol document. Up to 20 sharing images (og:image) are then checked: the robots.txt of each image host is read first and obeyed, then one GET reads at most the first 64 KiB of the file, enough for its pixel size; no image is downloaded whole. robots.txt is asked whether Meta's preview crawler, the one that documents that it obeys robots.txt, may fetch the start page. No request is ever sent to a social platform, and the crawler never pretends to be one of their crawlers, so what a platform shows after its own caching and its own rules is not measured: check a page in the platform's own preview tool.",
+});
+
+/** What the aso module looks at, what it requests, and what it cannot see. */
+export const ASO_METHOD = Object.freeze({
+  label: 'How app links are checked',
+  text: "The app checks read Apple's Smart App Banner tag on the crawled pages, then request the site's /.well-known/apple-app-site-association and /.well-known/assetlinks.json once each, after robots.txt, the way Apple and Google expect them: over https, without a redirect, as JSON. Whether the files are required, and which app identifiers they must list, comes from the apps the site profile declares; without a profile only a file the site serves is judged. Apple reads the file through its own content delivery network, which can get another answer than this crawler (a region, a firewall). App store pages are not requested: no request is ever sent to Google Play.",
+});
+
 /**
- * @param {{pluginVersion: string, rulesVersion: string, vitals?: boolean, repo?: boolean, security?: boolean, media?: boolean, search?: boolean}} run
+ * @param {{pluginVersion: string, rulesVersion: string, vitals?: boolean, repo?: boolean, security?: boolean, media?: boolean,
+ *          smo?: boolean, aso?: boolean, search?: boolean}} run
  *   `vitals`: the run asked for Core Web Vitals, so the method says how they are measured.
  *   `repo`: the findings name source files, so the method says how those were found.
  *   `security`: the run included the security module, so the method says what it can and cannot see.
  *   `media`: the run included the media module, so the method says what it requests and what it cannot see.
+ *   `smo`, `aso`: the run included the social sharing or app module, so the method says what it requests and cannot see.
  *   `search`: the report shows imported search data, so the method says where it comes from and what it changes.
  * @returns {{label: string, text: string}[]}
  */
-export function methodSections({ pluginVersion, rulesVersion, vitals = false, repo = false, security = false, media = false, search = false }) {
+export function methodSections({ pluginVersion, rulesVersion, vitals = false, repo = false, security = false, media = false, smo = false, aso = false, search = false }) {
   const vitalsMethod = {
     label: 'How Core Web Vitals are measured',
     text: 'Only a few pages are measured, because each test takes many seconds: the start page, then one page from each of the largest groups of similar pages. Google loads each of them once on an emulated mid-range phone (PageSpeed Insights); that is the lab data, and it changes from run to run. Field data is what real Chrome users on phones experienced over 28 days (Chrome UX Report); it exists only for sites and pages with enough visits, and collecting it needs a Google API key. The URLs of the measured pages are sent to Google.',
@@ -150,6 +166,8 @@ export function methodSections({ pluginVersion, rulesVersion, vitals = false, re
     }] : []),
     ...(security ? SECURITY_METHOD : []),
     ...(media ? [MEDIA_METHOD] : []),
+    ...(smo ? [SMO_METHOD] : []),
+    ...(aso ? [ASO_METHOD] : []),
     ...(search ? [SEARCH_METHOD] : []),
     { label: 'How scores work', text: SCORE_NOTE },
     {

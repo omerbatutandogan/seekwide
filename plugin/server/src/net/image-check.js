@@ -2,9 +2,11 @@
 // GET when the HEAD says too little. No image is ever downloaded whole.
 
 import { LIMITS } from '../config.js';
+import { imageSize } from '../util/image-size.js';
+import { NOT_REQUESTED, offLimitsReason } from '../util/off-limits.js';
 import { clip } from '../util/strings.js';
 import { originOf } from '../util/url.js';
-import { REDIRECT_STATUSES, SHARED_HOST_GATES, createPacer, followRedirects, hostOf, rawTarget, sleep as wait } from './polite.js';
+import { REDIRECT_STATUSES, SHARED_HOST_GATES, createPacer, followRedirects, guardFetch, hostOf, rawTarget, sleep as wait } from './polite.js';
 import { SHARED_ROBOTS, readRobots } from './robots-cache.js';
 import { safeFetch } from './safe-fetch.js';
 
@@ -82,26 +84,35 @@ function mediaType(result) {
  * once `deadlineMs` has passed by `now`; what was not reached is
  * 'not_checked'. No request starts after `signal` fired: the call rejects with
  * its reason. `google` says whether robots.txt lets Googlebot and
- * Googlebot-Image fetch the URL and every redirect step that was followed. The
- * map iterates in the order of `urls`.
+ * Googlebot-Image fetch the URL and every redirect step that was followed.
+ * Nothing is ever sent to Google Play or a social platform (`offLimitsReason`),
+ * robots.txt included: such a URL, or a redirect step to such a host, is
+ * 'unverifiable'. With `readBytes` (the smo module's sharing images), each
+ * step gets one GET with `Range: bytes=0-<readBytes - 1>` that reads at most
+ * `readBytes`, instead of the HEAD and the 1 KiB GET, and an answer below 400
+ * gets `size`: the format and pixel size its first bytes declare
+ * (`imageSize`), or null. The map iterates in the order of `urls`.
  *
  * @param {string[]} urls
  * @param {{fetch?: typeof safeFetch, fetchOptions?: Parameters<typeof safeFetch>[1], maxImages?: number, concurrency?: number,
  *          perHostDelayMs?: number, sleep?: (ms: number, signal?: AbortSignal) => Promise<void>, now?: () => number, deadlineMs?: number,
- *          onlyOrigin?: string|null, signal?: AbortSignal, hosts?: HostGates, robotsCache?: RobotsCache}} [options]
+ *          onlyOrigin?: string|null, signal?: AbortSignal, hosts?: HostGates, robotsCache?: RobotsCache, readBytes?: number}} [options]
  * @returns {Promise<Map<string, ImageFileResult>>}
  */
 export async function checkImageFiles(urls, options = {}) {
   if (!Array.isArray(urls)) throw new TypeError('checkImageFiles needs an array of URLs');
   const {
-    fetch = safeFetch, fetchOptions = {}, maxImages = LIMITS.maxImageChecks, concurrency = LIMITS.imageCheckConcurrency,
+    fetch: given = safeFetch, fetchOptions = {}, maxImages = LIMITS.maxImageChecks, concurrency = LIMITS.imageCheckConcurrency,
     perHostDelayMs = 1000 / LIMITS.ratePerSecDefault, sleep = wait, now = Date.now, deadlineMs = LIMITS.imageCheckDeadlineMs,
-    onlyOrigin = null, signal, hosts = SHARED_HOST_GATES, robotsCache = SHARED_ROBOTS,
+    onlyOrigin = null, signal, hosts = SHARED_HOST_GATES, robotsCache = SHARED_ROBOTS, readBytes = 0,
   } = options;
+  // Every request of the check, robots.txt and its redirects included, goes through the off-limits guard.
+  const fetch = guardFetch(given);
   if (!Number.isInteger(maxImages) || maxImages < 0) throw new TypeError('checkImageFiles maxImages must be a non-negative integer');
   if (!Number.isInteger(concurrency) || concurrency < 1) throw new TypeError('checkImageFiles concurrency must be a positive integer');
   if (!Number.isFinite(perHostDelayMs) || perHostDelayMs < 0) throw new TypeError('checkImageFiles perHostDelayMs must be a non-negative number');
   if (!Number.isFinite(deadlineMs) || deadlineMs < 0) throw new TypeError('checkImageFiles deadlineMs must be a non-negative number');
+  if (!Number.isInteger(readBytes) || readBytes < 0) throw new TypeError('checkImageFiles readBytes must be a non-negative integer');
 
   const selected = [...new Set(urls.filter((u) => typeof u === 'string'))].slice(0, maxImages);
   const startedAt = now();
@@ -166,6 +177,9 @@ export async function checkImageFiles(urls, options = {}) {
       resolve: rawTarget,
       before: async (current) => {
         if (!reachable(current)) return stop('unverifiable', 'Not on the address of the local site, so not requested', false);
+        // Google Play and social platforms are never contacted, robots.txt included (rule set 0.1.9).
+        const rule = offLimitsReason(current);
+        if (rule !== null) return stop('unverifiable', NOT_REQUESTED[rule], false);
         if (expired()) return stop('not_checked', 'The time for image checks ran out', false);
         const { robots, firstError, complete } = await robotsFor(/** @type {string} */ (originOf(current)));
         if (!complete) return stop('not_checked', 'The time for image checks ran out', false);
@@ -186,6 +200,11 @@ export async function checkImageFiles(urls, options = {}) {
       },
       request: async (current) => {
         const headers = { accept: IMAGE_ACCEPT };
+        if (readBytes > 0) {
+          // The first bytes, for the pixel size: one ranged GET per step, never more than `readBytes` read.
+          method = 'GET';
+          return request(current, { method, headers: { ...headers, range: `bytes=0-${readBytes - 1}` }, maxBytes: readBytes });
+        }
         method = 'HEAD';
         const head = await request(current, { method, headers });
         if (head === null) return null;
@@ -218,6 +237,7 @@ export async function checkImageFiles(urls, options = {}) {
     out.content_type = mediaType(result);
     out.bytes = fileSize(result, method);
     out.vary = result.headers.vary === undefined ? null : clip(result.headers.vary, 200);
+    if (readBytes > 0) out.size = result.body === null ? null : imageSize(result.body);
     return out;
   };
 

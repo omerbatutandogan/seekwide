@@ -112,12 +112,43 @@ export {};
  */
 
 /**
+ * One `<meta name="apple-itunes-app">`, Apple's Smart App Banner (aso module).
+ * @typedef {Object} AppBannerRecord
+ * @property {string} content         The `content` attribute, whitespace-collapsed and clipped.
+ * @property {boolean} in_head        The tag is inside `<head>`.
+ * @property {number|null} line
+ */
+
+/**
+ * What the smo and aso modules read from a page (rule set 0.1.9).
+ * @typedef {Object} SocialRecord
+ * @property {{key: string, line: number|null}[]} outside_head  `og:title`, `og:description`, `og:url`, `og:image` (also
+ *   given by `og:image:url` or `og:image:secure_url`) and `apple-itunes-app` when the page gives them with content only
+ *   outside `<head>`, in that order, with the line of the first.
+ * @property {boolean} streamed       A Next.js App Router page sent its metadata in `<body>` (as for canonicals, `streamed`),
+ *   and something is in `outside_head`.
+ * @property {{bytes: number, by: 'head'|'og'}|null} head_end  Where the parsed `<head>` ends ('head'), or else where the
+ *   last `og:` meta tag ends ('og'), in bytes of the response; null when neither is known.
+ * @property {AppBannerRecord[]} app_banners  Every Smart App Banner meta tag, at most 5.
+ * @property {string[]} rel_me        Normalized URLs of the `<a>` and `<link>` elements with `rel="me"`, each once, at most 50.
+ */
+
+/**
+ * An organisation, business or person described in JSON-LD, and how many `sameAs` URLs it gives (smo module).
+ * @typedef {Object} ProfileEntity
+ * @property {string} type
+ * @property {number} same_as
+ */
+
+/**
  * @typedef {Object} JsonLdBlock
  * @property {boolean} valid          False when the script content is not valid JSON.
  * @property {string[]} types         `@type` values found at the top level and in `@graph`.
  * @property {string|null} error      Parser message when `valid` is false.
  * @property {number|null} line
  * @property {VideoObjectSummary[]} [videos]  Every `VideoObject` in the block, anywhere in it, in document order (media module).
+ * @property {ProfileEntity[]} [profiles]  Every Organization, business or Person at the top level of the block or in its
+ *   `@graph`, in document order (smo module, rule set 0.1.9). Absent in records made before.
  */
 
 /**
@@ -177,6 +208,8 @@ export {};
  * @property {VideoRecord[]} [videos]   Every `<video>` element (media module). Absent in records made before it existed.
  * @property {VideoEmbedRecord[]} [video_embeds]  Players of known video platforms in `<iframe>`, `<embed>` or `<object>`.
  * @property {boolean} [video_markup]  An element whose `itemtype` (microdata) or `typeof` (RDFa) names `VideoObject`.
+ * @property {SocialRecord} [social]  Meta tag places, the end of the head, Smart App Banners and rel="me" links (smo and aso
+ *   modules). Absent in records made before rule set 0.1.9.
  * @property {string[]} [limits_reached]  The caps that stopped the reading of this page, when any did: `tags` (the
  *   document was parsed up to its 200,000th tag), a list at its cap by field name (`links`, `images`, `headings`…),
  *   `list_chars`, and the security scan's (`security.hosts`, `security.hidden_hosts`, `security.visible_hosts`,

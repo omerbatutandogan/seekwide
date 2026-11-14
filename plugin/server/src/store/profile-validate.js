@@ -4,7 +4,7 @@ import { clip, collapseWhitespace, stripHidden } from '../util/strings.js';
 
 export const BUSINESS_MODELS = Object.freeze(['b2b_saas', 'ecommerce', 'local_service', 'publisher', 'mobile_app', 'international', 'other']);
 
-const TOP_LEVEL = new Set(['schema_version', 'site_url', 'brand', 'business_model', 'markets', 'competitors', 'target_queries', 'report', 'updated_at']);
+const TOP_LEVEL = new Set(['schema_version', 'site_url', 'brand', 'business_model', 'markets', 'competitors', 'target_queries', 'report', 'apps', 'updated_at']);
 /** Unknown keys named in an error, and how much of each name is shown. */
 const MAX_UNKNOWN_NAMED = 5;
 const MAX_KEY_SHOWN = 40;
@@ -135,6 +135,68 @@ function cleanMarkets(value, errors) {
   return markets;
 }
 
+/** An app identifier: the Application Identifier Prefix (the Team ID), a dot, and the bundle ID (Apple, Supporting associated domains). */
+const IOS_APP_ID = /^[A-Za-z0-9]{1,20}\.[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*$/;
+/** An Android package name: two or more segments of letters, digits and underscores, each starting with a letter. */
+const ANDROID_PACKAGE = /^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+$/;
+const MAX_APPS = 10;
+
+/**
+ * @param {unknown} value
+ * @param {string} field
+ * @param {RegExp} pattern
+ * @param {string} form  The expected form of one entry, for the error message.
+ * @param {FieldError[]} errors
+ * @returns {string[]|null}
+ */
+function idList(value, field, pattern, form, errors) {
+  if (!Array.isArray(value) || value.length > MAX_APPS) {
+    errors.push({ field, message: `must be an array of at most ${MAX_APPS} entries, each ${form}` });
+    return null;
+  }
+  const ids = value.map((item) => (typeof item === 'string' ? item.trim() : ''));
+  const bad = ids.findIndex((id) => id.length > 255 || !pattern.test(id));
+  if (bad !== -1) {
+    errors.push({ field: `${field}[${bad}]`, message: `must be ${form}` });
+    return null;
+  }
+  return [...new Set(ids)];
+}
+
+/**
+ * @param {unknown} value
+ * @param {FieldError[]} errors
+ * @returns {Record<string, unknown>|null}
+ */
+function cleanApps(value, errors) {
+  if (!isPlainObject(value)) {
+    errors.push({ field: 'apps', message: 'must be an object with ios and/or android' });
+    return null;
+  }
+  rejectUnknown(value, ['ios', 'android'], 'apps.', errors);
+  /** @type {Record<string, unknown>} */
+  const apps = {};
+  /** @type {[string, string, string, RegExp, string][]} */
+  const platforms = [
+    ['ios', 'app_ids', 'universal_links', IOS_APP_ID, 'an app identifier such as "ABCDE12345.com.example.app" (Team ID, a dot, bundle ID)'],
+    ['android', 'packages', 'app_links', ANDROID_PACKAGE, 'a package name such as "com.example.app"'],
+  ];
+  for (const [platform, listKey, flagKey, pattern, form] of platforms) {
+    const entry = value[platform];
+    if (entry === undefined) continue;
+    if (!isPlainObject(entry)) {
+      errors.push({ field: `apps.${platform}`, message: `must be an object with ${listKey} and ${flagKey}` });
+      continue;
+    }
+    rejectUnknown(entry, [listKey, flagKey], `apps.${platform}.`, errors);
+    const list = entry[listKey] === undefined ? [] : idList(entry[listKey], `apps.${platform}.${listKey}`, pattern, form, errors);
+    const flag = entry[flagKey] ?? false;
+    if (typeof flag !== 'boolean') errors.push({ field: `apps.${platform}.${flagKey}`, message: 'must be true or false' });
+    apps[platform] = { [listKey]: list, [flagKey]: flag };
+  }
+  return apps;
+}
+
 /**
  * Validate and normalize a profile. Every problem is collected, so the caller
  * can name all bad fields at once. `schema_version` and `updated_at` are not
@@ -188,6 +250,7 @@ export function normalizeProfile(input) {
       profile.report = report;
     }
   }
+  if (input.apps !== undefined) profile.apps = cleanApps(input.apps, errors);
   rejectUnknown(input, TOP_LEVEL, '', errors);
   return { profile: errors.length === 0 ? profile : null, errors };
 }

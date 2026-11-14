@@ -32,6 +32,26 @@ const PROFILE_SCHEMA = {
       type: 'object',
       properties: { brand_name: { type: 'string', maxLength: 200 }, logo_path: { type: 'string', maxLength: 4096 } },
     },
+    apps: {
+      type: 'object',
+      description: 'The site\'s apps, for the aso module. universal_links and app_links say that the app opens the site\'s links, which needs the association file.',
+      properties: {
+        ios: {
+          type: 'object',
+          properties: {
+            app_ids: { type: 'array', items: { type: 'string', maxLength: 255 }, maxItems: 10, description: 'Team ID, a dot, bundle ID: "ABCDE12345.com.example.app".' },
+            universal_links: { type: 'boolean' },
+          },
+        },
+        android: {
+          type: 'object',
+          properties: {
+            packages: { type: 'array', items: { type: 'string', maxLength: 255 }, maxItems: 10, description: 'Package names: "com.example.app".' },
+            app_links: { type: 'boolean' },
+          },
+        },
+      },
+    },
   },
 };
 
@@ -49,7 +69,7 @@ export function profileTools(deps) {
     {
       name: 'profile_get',
       title: 'Read the site profile',
-      description: 'Read the site profile saved in <project>/.seekwide/profile.json (site URL, brand, markets, report branding).',
+      description: 'Read the site profile saved in <project>/.seekwide/profile.json (site URL, brand, markets, report branding, apps).',
       inputSchema: {
         type: 'object',
         properties: { project_dir: PROJECT_DIR_SCHEMA },

@@ -1,8 +1,9 @@
 // Checking external (outbound) links: HEAD first, GET once on failure.
 
 import { LIMITS } from '../config.js';
+import { NOT_REQUESTED, offLimitsReason } from '../util/off-limits.js';
 import { originOf } from '../util/url.js';
-import { SHARED_HOST_GATES, createPacer, followRedirects, hostOf, rawTarget, sleep as wait } from './polite.js';
+import { SHARED_HOST_GATES, createPacer, followRedirects, guardFetch, hostOf, rawTarget, sleep as wait } from './polite.js';
 import { SHARED_ROBOTS, readRobots } from './robots-cache.js';
 import { safeFetch } from './safe-fetch.js';
 
@@ -14,6 +15,7 @@ import { safeFetch } from './safe-fetch.js';
 const RETRY_MAX_BYTES = 16 * 1024;
 /** Redirect hops followed for one external link. */
 const MAX_HOPS = 5;
+
 
 /**
  * @param {string} url
@@ -45,7 +47,9 @@ function classify(url, result) {
  * the process-wide host gates (`hosts`), which space them from the requests of
  * other crawls and audits. At most `concurrency` hosts are checked at once. At
  * most 5 redirects are followed, one request per hop, and a hop is requested
- * only when its origin's robots.txt allows it. 'broken' means 404, 410 or a
+ * only when its origin's robots.txt allows it. Nothing is ever sent to Google
+ * Play or a social platform (`offLimitsReason`), robots.txt included: such a
+ * link, or a redirect step to such a host, is 'unverifiable'. 'broken' means 404, 410 or a
  * name that does not exist (`dns_error`); anything that may be a refusal of
  * automated requests or a temporary failure is 'unverifiable'. No request
  * starts after `signal` fired: the call rejects with its reason. The map
@@ -60,9 +64,11 @@ function classify(url, result) {
 export async function checkExternalLinks(urls, options = {}) {
   if (!Array.isArray(urls)) throw new TypeError('checkExternalLinks needs an array of URLs');
   const {
-    fetch = safeFetch, fetchOptions = {}, maxLinks = LIMITS.maxOutboundChecks, concurrency = LIMITS.outboundConcurrency,
+    fetch: given = safeFetch, fetchOptions = {}, maxLinks = LIMITS.maxOutboundChecks, concurrency = LIMITS.outboundConcurrency,
     perHostDelayMs = 1000 / LIMITS.ratePerSecDefault, sleep = wait, signal, hosts = SHARED_HOST_GATES, robotsCache = SHARED_ROBOTS,
   } = options;
+  // Every request of the check, robots.txt and its redirects included, goes through the off-limits guard.
+  const fetch = guardFetch(given);
   if (!Number.isInteger(maxLinks) || maxLinks < 0) throw new TypeError('checkExternalLinks maxLinks must be a non-negative integer');
   if (!Number.isInteger(concurrency) || concurrency < 1) throw new TypeError('checkExternalLinks concurrency must be a positive integer');
   if (!Number.isFinite(perHostDelayMs) || perHostDelayMs < 0) throw new TypeError('checkExternalLinks perHostDelayMs must be a non-negative number');
@@ -114,6 +120,9 @@ export async function checkExternalLinks(urls, options = {}) {
       before: async (current) => {
         const origin = originOf(current);
         if (origin === null || !/^https?:/.test(origin)) return undefined;
+        // Google Play and social platforms are never contacted, robots.txt included (rule set 0.1.9).
+        const rule = offLimitsReason(current);
+        if (rule !== null) return unverifiable(NOT_REQUESTED[rule]);
         const { robots, firstError } = await robotsFor(origin);
         if (robots.summary.status === 'unreachable') {
           return firstError?.code === 'dns_error'

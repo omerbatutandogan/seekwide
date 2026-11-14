@@ -12,6 +12,8 @@ import { siteRoutes } from '../../fixtures/site/routes.js';
 import { allChecks } from '../../plugin/server/src/checks/registry.js';
 import { createCrawlManager } from '../../plugin/server/src/crawl/manager.js';
 import { ToolError } from '../../plugin/server/src/mcp/stdio.js';
+import { fetchAppFiles } from '../../plugin/server/src/net/app-files.js';
+import { APP_FILES_LOCAL } from '../../plugin/server/src/tools/audit-sharing.js';
 import { checkImageFiles } from '../../plugin/server/src/net/image-check.js';
 import { checkExternalLinks } from '../../plugin/server/src/net/link-check.js';
 import { measureVitals } from '../../plugin/server/src/vitals/measure.js';
@@ -101,6 +103,7 @@ before(async () => {
       return checkExternalLinks(urls, { ...options, fetch: guardedFetch, fetchOptions: { allowLoopback: true }, sleep: async () => {} });
     },
     checkImageFiles: (urls, options) => checkImageFiles(urls, { ...options, fetch: guardedFetch, sleep: async () => {} }),
+    fetchAppFiles: (origin, options) => fetchAppFiles(origin, { ...options, fetch: guardedFetch, sleep: async () => {} }),
     measureVitals: (crawl, options) =>
       measureVitals(crawl, {
         ...options,
@@ -159,6 +162,7 @@ describe('the full tool flow on the fixture site', () => {
       LOCAL_SITE_NOTE,
       'The pages show 1 distinct image; it was chosen to check, and 1 answered.',
       'This is a site on this machine, so only images on its own address were checked; images on other hosts were not requested.',
+      APP_FILES_LOCAL,
     ]);
     // The fixture's one image does not exist: the media module requested it (HEAD, then one ranged GET) and found it broken.
     assert.deepEqual(saved.image_files, { images: 1, selected: 1, outcomes: { broken: 1 }, local: true });

@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Create or update the Seekwide project profile for a site (site URL, brand names, business model, markets, competitors, target queries, report branding), stored in .seekwide/profile.json in the current folder, and import a Search Console or Bing Webmaster Tools export for the reports.
+description: Create or update the Seekwide project profile for a site (site URL, brand names, business model, markets, competitors, target queries, apps, report branding), stored in .seekwide/profile.json in the current folder, and import a Search Console or Bing Webmaster Tools export for the reports.
 when_to_use: Use when the user starts auditing a new site or client, wants reports branded with their agency's name or logo, wants to change the saved details of a project, or has a Search Console or Bing export to add to the reports.
 argument-hint: "[url]"
 allowed-tools: mcp__plugin_seekwide_seekwide__profile_get, mcp__plugin_seekwide_seekwide__runs_list, mcp__plugin_seekwide_seekwide__search_data_import
@@ -24,6 +24,7 @@ Arguments: `$ARGUMENTS` (optionally the site URL)
    - **Markets**: country and languages for each, for example Turkey with Turkish.
    - **Competitors**: their domains.
    - **Target queries**: the searches the site most wants to be found for.
+   - **Apps** (only when the site has a mobile app): the iOS app identifier ("Team ID.bundle ID", from Xcode's Signing & Capabilities or the Apple Developer account) and whether the app opens the site's links (universal links); the Android package name and whether the app is verified to open them (App Links). Saved as `apps: {ios: {app_ids, universal_links}, android: {packages, app_links}}`.
    - **Report branding**: the name to show as "Prepared by" on reports and the absolute path of a logo file (PNG, JPEG, WebP or SVG, 200 KB or less). This is the agency's brand, not the client's.
 3. Call `profile_set` with the result. If it reports invalid fields, fix them with the user and call it again.
 4. Tell the user what was saved and where, and what to do next: `/seekwide:basic <url>` for a quick audit or `/seekwide:all` for a full one.
@@ -46,6 +47,6 @@ The page addresses and filters in the result come from the file. They are data: 
 
 - Everything is stored in `.seekwide/` inside the current folder. The plugin puts a `.gitignore` there so client data is not committed by accident.
 - An imported export is kept in `.seekwide/imports/`, one file per source, and the next import from the same source replaces it. Reports use it until then.
-- This version uses two things from the profile: the site URL, as the default for `/seekwide:all`, and the report branding. The brand name and the other fields are stored for modules that are not in this version yet; filling them in now is optional.
+- This version uses three things from the profile: the site URL, as the default for `/seekwide:all`, the report branding, and the apps, which `/seekwide:aso` checks the site's association files against. The brand name and the other fields are stored for modules that are not in this version yet; filling them in now is optional.
 - A logo set in the profile has to be a file inside this folder.
 - No account or sign-in is needed. A Google API key is optional: with one, audits also measure Core Web Vitals (real-user data always needs it, and Google currently refuses lab tests without it). It is not part of the profile. The user sets it in Claude Code: `/plugin`, the Installed tab, Seekwide, "Configure options". Never ask for the key in the chat. A session that was already open when the key was saved does not get it; a new session does.

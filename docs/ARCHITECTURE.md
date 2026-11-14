@@ -16,7 +16,7 @@ MCP server (plugin/server/src/index.js)
    ├─ crawl_start / crawl_status ──► crawl/  ──► net/ (safe-fetch, robots, sitemap)
    │                                   └──────► extract/ (HTML → PageRecord)
    ├─ project_detect ──► repo/ (what kind of project the folder holds, which file answers a URL)
-   ├─ audit_run ──► net/link-check, net/image-check, vitals/ (PageSpeed Insights, Chrome UX Report) ──► checks/ (engine + seo + links + security + media) ──► repo/ (source files, repo mode; fix verification) ──► store/
+   ├─ audit_run ──► net/link-check, net/image-check, net/app-files, vitals/ (PageSpeed Insights, Chrome UX Report) ──► checks/ (engine + seo + links + security + media + smo + aso) ──► repo/ (source files, repo mode; fix verification) ──► store/
    ├─ fix_plan ──► store/ (a saved run) ──► repo/ (which fix applies, in which file)
    ├─ findings_query, page_get, runs_list, runs_compare, profile_get, profile_set ──► store/
    ├─ search_data_import ──► imports/ (an export file in the project: CSV, zip, Excel) ──► store/ (.seekwide/imports/)
@@ -29,7 +29,7 @@ In repo mode the same flow runs against the project's own local server: `project
 
 `/seekwide:fix` builds on that (4.13): `fix_plan` says which findings of a repo-mode run a metadata fix exists for and where it belongs, Claude writes each change after the user approved its diff, and a second `audit_run` with `verify_fixes` says what became of each fixed finding. The server plans and verifies; it never writes into a project.
 
-Not in this milestone: fixes other than metadata, and every module other than `seo`, `links`, `security` (4.14) and `media` (4.15).
+Not in this milestone: fixes other than metadata, and every module other than `seo`, `links`, `security` (4.14), `media` (4.15), `smo` and `aso` (4.18).
 
 ## 2. Principles that shape the code
 
@@ -50,11 +50,11 @@ Only `plugin/` ships: the marketplace's `source` is `./plugin`, so Claude Code c
 ```
 plugin/server/src/
   config.js  types.js (+ types/)  log.js   shared
-  util/{url,hash,strings,site-identity,public-suffix,errors,plain-host}.js  shared
+  util/{url,hash,strings,site-identity,public-suffix,errors,plain-host,off-limits,image-size}.js  shared
 plugin/server/data/public-suffixes.txt  the Public Suffix List, compacted (scripts/gen-public-suffixes.js)
   checks/{engine,scoring,validate,registry,page-helpers}.js   shared
   net/        safe-fetch.js connect.js body.js ip.js polite.js robots.js robots-parse.js robots-match.js robots-cache.js
-              sitemap.js sitemap-scan.js link-check.js image-check.js
+              sitemap.js sitemap-scan.js link-check.js image-check.js app-files.js
   crawl/      manager.js start-input.js admission.js run.js requests.js records.js chain.js probe.js frontier.js challenge.js
               deployed.js store.js
   extract/    page.js indexability.js (+ helpers)
@@ -62,6 +62,8 @@ plugin/server/data/public-suffixes.txt  the Public Suffix List, compacted (scrip
   checks/links/   index.js + one file per area
   checks/security/  index.js + one file per area (4.14)
   checks/media/     index.js + one file per area, select.js (which image files are checked) (4.15)
+  checks/smo/       index.js, og.js, placement.js, images.js, site.js, select.js (which sharing images are checked), helpers.js (4.18)
+  checks/aso/       index.js, banner.js, files.js, helpers.js (4.18)
   vitals/     measure.js select.js psi.js crux.js google-api.js thresholds.js
   repo/       scan.js detect.js workspaces.js next-routes.js html-routes.js html-lines.js sources.js fixes.js fix-common.js fix-page.js
               fix-sitemap.js fix-texts.js verify.js
@@ -103,6 +105,7 @@ export async function safeFetch(url, options)
 - **`allowLoopback`** is `true` (any loopback address; for tests) or an origin string such as `"http://localhost:3000"`, which permits loopback only for requests to exactly that origin. Production code passes the string. Nothing else is ever permitted.
 - Export `classifyAddress(ip)` from `net/ip.js` (`'public' | 'loopback' | 'private' | 'link_local' | 'cgnat' | 'unspecified' | 'multicast' | 'reserved'`).
 - Only `http:` and `https:`. Anything else is `unsupported_protocol`.
+- **Never Google Play or a social platform** (rule set 0.1.9). A URL, or a redirect `safeFetch` would follow, on a host of `util/off-limits.js` is `blocked_address` with the rule as its message, before any lookup. Every requester also wraps the fetch it is given in `guardFetch` (`net/polite.js`), so the rule holds for an injected fetch and for every robots.txt and redirect hop a requester sends itself.
 - **`POST` is for API calls** (4.11). `body` is accepted only with `POST`, and `content-length` is set from it. A `POST` is never redirected: a 3xx answer is its final response whatever `maxRedirects` says, so a request body and the headers sent with it reach the URL the caller named and no other.
 - Sends `user-agent` (default `USER_AGENT`), `accept` (default `text/html,application/xhtml+xml;q=0.9,*/*;q=0.5`) and `accept-encoding: gzip, deflate, br`, and decompresses those three encodings. `user-agent` and `accept-encoding` cannot be overridden through `headers`.
 - **Credentials.** A user name and password in a URL are removed before the request, in the URL the caller passes and in every redirect target. They are never stored, and no `Authorization` header is ever sent.
@@ -194,6 +197,7 @@ export async function checkExternalLinks(urls, options)
 - **Pacing is shared by the whole process** (`net/polite.js`). Every request also passes the gate of its host, which the crawler and the image check use too: one request at a time per host, and a request that follows another requester's waits until that one is the host's delay old. Parallel `audit_run` calls therefore send a host no more than one of them would.
 - No request starts after `signal` fired; the call then rejects with its reason (a cancelled `audit_run`, 4.10).
 - The returned map is in the order given.
+- **Hosts that are never contacted** (rule set 0.1.9). A URL, or a redirect step, on Google Play or a social platform (`offLimitsReason` in `util/off-limits.js`) is `unverifiable` with a fixed reason (`NOT_REQUESTED`) before anything is sent, its robots.txt included. `externalLinkUrls` leaves such links out of the list in the first place; `notRequestedLinks` returns them for the run's `not_requested` count. The image check (4.15) and the app files (4.18) apply the same rule. Below those per-hop checks, which give a clean reason, every requester's fetch passes `guardFetch`, so a robots.txt redirect (which `loadRobots` follows without the requester's per-hop check) cannot reach such a host either; the wrapper of one fetch is always the same function, so the robots.txt cache keyed by the fetch stays shared.
 
 **The polite layer** (`net/polite.js`). `createHostGates` (one set, `SHARED_HOST_GATES`, for the process; tests make their own), `createPacer` (a requester's own spacing per host, through the gates), `followRedirects` (one request per hop; each caller passes its hop limit, how a `Location` is read, and what to check before each request), `REDIRECT_STATUSES` and an abortable `sleep`. The crawler, robots.txt, sitemaps, the http probe, the link check and the image check all follow redirects with it, each with the policy it had before.
 
@@ -216,7 +220,7 @@ export function createCrawlManager(deps)
 // }
 ```
 
-`start` validates its input (rejecting with `TypeError`), resolves with a job snapshot as soon as the input is checked, and crawls in the background. `get` and `wait` return copies. `result` returns the stored result once the job is `done` or `blocked`, from memory or from `<dataDir>/crawls/<id>.json`.
+`start` validates its input (rejecting with `TypeError`; a start URL on Google Play or a social platform is refused with an `InputError` that names the rule), resolves with a job snapshot as soon as the input is checked, and crawls in the background. `get` and `wait` return copies. `result` returns the stored result once the job is `done` or `blocked`, from memory or from `<dataDir>/crawls/<id>.json`.
 
 **A local site.** `allowLoopback` is honoured only when every address the start host resolves to is loopback; otherwise `start` rejects. When it is honoured, the crawl sends no request to any origin but the start origin: every request of the crawl goes through one function, which refuses another origin with `blocked_address` before anything is sent. So a link, a sitemap or a redirect to another local port is refused, and so is a robots.txt, a sitemap or a page of the local server that redirects to a host on the internet. A robots.txt that redirects away therefore counts as one that could not be read, and the crawl ends as `blocked: robots_unreachable`. The result records it as `options.local: true`, which keeps the site from being named to an outside service (4.11).
 
@@ -232,7 +236,7 @@ The crawl requests nothing from the deployed address (the rule above), and `audi
 The crawl, in order:
 
 1. Normalize the start URL. Load robots.txt for its origin. `unreachable` → stop, `blocked: robots_unreachable`. Start URL disallowed → stop, `blocked: robots_disallow`. When the robots.txt request never reached the site (`dns_error` or `blocked_address`), the job ends as `failed` with a clear message, because nothing blocked it. So does a crawl of a local site (`loopbackOrigin`) whose robots.txt request got no answer (`connection_error`: refused or cut; or `timeout`): "Nothing answered at http://127.0.0.1:3000 (…). Check that the dev server is running and that the port is right." (rule set 0.1.7; it was reported as a robots.txt that could not be read). A public site keeps `blocked: robots_unreachable` with status 0 in that case.
-2. Fetch the start URL. A failed request ends the job as `failed` with a clear message; for a local site that did not answer it says to check the dev server and the port. The start URL's redirects are followed across origins, because that URL is what the user asked for; each new origin's robots.txt is read before it is requested, and the last origin becomes the site. (A start URL on a local address that redirects to another origin ends the job as `failed`.)
+2. Fetch the start URL. A failed request ends the job as `failed` with a clear message; for a local site that did not answer it says to check the dev server and the port. The start URL's redirects are followed across origins, because that URL is what the user asked for; each new origin's robots.txt is read before it is requested, and the last origin becomes the site. (A start URL on a local address that redirects to another origin ends the job as `failed`, and so does one that redirects to Google Play or a social platform, before that request, with a reason that names the rule.)
 3. Load sitemaps: the URLs robots.txt lists, or `<origin>/sitemap.xml` with `probe: true`. Every sitemap request is checked against the robots.txt of its own origin (`isAllowed` in 4.3).
 4. If the site is https on the default port, request `http://<host>/` once and follow its redirects by hand (`crawl/probe.js`) until the first https URL, the first URL off the site, a URL it has already requested, or `LIMITS.maxRedirects` requests; record `http_probe`. Each request is sent only when the robots.txt of its origin allows it. `http_probe` is null when a request is not allowed, fails or is refused (429 or a bot challenge), and for a site on another port, because port 80 of that host is a different site.
 5. Crawl breadth-first by click depth. Within one depth, take URLs round-robin across `templateSignature` groups (groups sorted by signature, URLs sorted inside a group), so a small budget still covers every section. After all linked URLs, take sitemap URLs that no page linked to (depth null).
@@ -426,7 +430,7 @@ export class ToolError extends Error {}
 | `crawl_start` | `url` (required), `max_pages` 1–500 (default 25), `include_subdomains` (false), `allow_localhost` (false; accepted only when the start host is a loopback address), `site_url` (only with `allow_localhost`: the address the project is deployed at, 4.5) | `{job_id, status, start_url, max_pages}` |
 | `crawl_status` | `job_id`, `wait_seconds` 0–25 (default 0) | job snapshot; when finished also `summary: {pages, html_pages, by_status, robots_status, sitemap_urls, truncated, blocked}`, with `time_limit_reached: true` when the crawl stopped at its time limit and `site_url` when it was told the deployed address |
 | `project_detect` | `project_dir`, `source_dir` (defaults to the project folder) | `{project_dir, source_dir, framework, label, supported, message, app_dir, workspace_projects, dev_server, routes_total, routes, routes_truncated}` |
-| `audit_run` | `job_id`, `modules` (default all), `check_outbound_links` (true), `check_core_web_vitals` (true), `check_image_files` (true), `core_web_vitals_pages` 1–10 (default 3), `project_dir`, `source_dir` (repo mode), `verify_fixes: {base_run_id, finding_ids ≤ 200}` (a re-audit after fixes) | `{run_id, project_dir, files, crawl, modules, totals, top, core_web_vitals, repo, fix_verification, skipped_checks, notes}` |
+| `audit_run` | `job_id`, `modules` (default all), `check_outbound_links` (true), `check_core_web_vitals` (true), `check_image_files` (true), `check_social_images` (true), `check_app_files` (true), `core_web_vitals_pages` 1–10 (default 3), `project_dir`, `source_dir` (repo mode), `verify_fixes: {base_run_id, finding_ids ≤ 200}` (a re-audit after fixes) | `{run_id, project_dir, files, crawl, modules, totals, top, core_web_vitals, repo, fix_verification, skipped_checks, notes}` |
 | `fix_plan` | `run_id` ('last'), `project_dir`, `site_url`, `check_id`, `limit` 1–200 (50), `offset` | `{run_id, project_dir, source_dir, framework, audited, max_pages, modules, site_url, site_url_source, fixable_total, returned, next_offset, fixes, not_fixable, not_fixable_total, out_of_scope, in_scope_checks, notes}`; `limit` and `offset` page `fixes` only |
 | `findings_query` | `run_id` ('last'), `project_dir`, `module`, `severity`, `check_id`, `url_contains`, `limit` 1–200 (50), `offset` | `{run_id, total, returned, next_offset, findings}`; `next_offset` is null on the last page |
 | `page_get` | `job_id`, `url` | selected `PageRecord` fields and counts |
@@ -719,3 +723,32 @@ export function viewSearch(entries, findings), searchLayer(entries), prioritize(
 - **Ordering** (`prioritize`). With imported data, groups of findings are ordered by severity, then by the impressions of their distinct pages added up over the sources (a finding about the whole site counts the site's totals, a page the export does not list counts 0), then as before; findings inside a group by their page's impressions. Nothing else depends on the data: no check runs differently, no finding is added or removed, and scores are those of the run. The report says so (`SEARCH_ORDER_NOTE`, `SEARCH_METHOD`).
 - **The report** (4.9) shows it as "Imported data", supplied by the user and not measured, with the source, file, period and filters. In Markdown the file name and the filters are code spans, so an address in them is never linked by a renderer that links bare addresses. A page with more clicks than impressions in the export is kept as stated and named in a note. `report_render` uses every stored import unless `search_data` names the sources to use; a source it names that was never imported is a `ToolError`.
 - **Not supported.** Search Console's generative AI report and Bing's AI Performance report: their columns are not documented. The AI visibility layer stays "No data in this version".
+
+### 4.18 The smo and aso modules: `extract/social.js`, `checks/smo/`, `checks/aso/`, `net/app-files.js`
+
+Social sharing previews (smo) and the site's side of its apps (aso). The rules and their sources are in `CHECKS-SPEC.md`; the pages were read on 2026-11-13.
+
+```js
+// extract/social.js                                               pure
+export function visitSocial(node, frame, state, baseUrl)          // meta tag places, Smart App Banners, rel="me" links
+export function socialRecord(state, document, toBytes, streamed)  // → SocialRecord (PageRecord.social)
+// extract/decode.js
+export function byteOffset(body, encoding, text, chars)           // characters of the decoded document → bytes of the response
+// util/image-size.js, util/off-limits.js                          pure
+export function imageSize(bytes)                                   // → {format, width, height} | null   (PNG, GIF, WebP, JPEG)
+export function offLimitsReason(url)                               // → 'google_play' | 'social_platform' | null
+// checks/smo/select.js                                            pure
+export function selectSocialImages(crawl, max, skipSite)           // → {urls, images, notRequested}
+export function sharingUses(ctx)                                   // sharing image URL → the pages that give it
+// net/app-files.js
+export async function fetchAppFiles(siteOrigin, options)           // → {aasa, assetlinks}: AppFileResult each
+```
+
+- **Read during extraction.** `visitElement` calls `visitSocial` for every element. It records, for `og:title`, `og:description`, `og:url`, `og:image` (and its two aliases) and `apple-itunes-app`, whether a tag with content is inside `<head>`; the Smart App Banner tags themselves (at most 5); and the `rel="me"` URLs of `<a>` and `<link>` (at most 50). After the walk `socialRecord` keeps the placed tags given only outside the head, marks them streamed by the canonical rule (4.6), and turns the end of the parsed head (parse5's `endOffset`, else the end of the last `og:` tag) into bytes of the response with `byteOffset`: exact for UTF-8 and single-byte encodings, else the shortest prefix of the body that decodes to that many characters. `parseJsonLd` adds each Organization, business or Person at the top level or in `@graph` with its `sameAs` count (`profiles`). A record made before rule set 0.1.9 has no `social` and is not a unit of the checks that need it.
+- **What robots.txt tells preview crawlers** is recorded by the crawl, which has the site's robots.txt anyway: `CrawlResult.preview_agents` says, for each token of `PREVIEW_CRAWLERS`, whether `allowsAgents` lets it fetch the start page's final URL. Nothing is requested for it.
+- **Sharing images are collected before the checks run**, after the media module's image files (one requester after the other, so a host serving both sees the two in turn): `collectSocialImages` (`tools/audit-sharing.js`) chooses up to `LIMITS.maxSocialImageChecks` URLs with `selectSocialImages` and hands them to `deps.checkImageFiles` with `readBytes: LIMITS.socialImageReadBytes`, which replaces the `HEAD` and the 1 KiB `GET` with one ranged `GET` per step that reads at most that many bytes, and fills `ImageFileResult.size` with `imageSize`. Everything else is the image check of 4.15: robots.txt first, the host gates, the deadline, a local crawl's own origin only, nothing for a site that refused the crawler. `buildContext` adds `ctx.socialImages` and the capability `social_images`.
+- **The app files** are read after the sharing images, for a crawl whose `options.local` is `false` and that no page refused (`collectAppFiles`). `fetchAppFiles` reads robots.txt, then `GET`s each file with `maxRedirects: 0`, follows a redirect by hand (at most 3 steps, only where the crawl would go, `SiteIdentity.isInternal`: the site's host on its port) to learn whether the file is behind it, and classifies the answer (`answered`, `not_found`, `unverifiable`, `disallowed`; CHECKS-SPEC). The body of an answered file goes to the checks through `ctx.appFiles` and is never stored; the run keeps each file's address, outcome and status (`run.app_files`). `collectAppFiles` also reads `profile.apps` (`ctx.apps`), and uses them only when the profile's `site_url` is on a host of the audited site's organisation (`appsFor`); otherwise, and for a profile that cannot be read, `apps` is empty, the audit never fails, and the notes say why.
+- **Never contacted.** No collector requests Google Play or a social platform (4.4). `run.not_requested` counts, per module, the external links, image files and sharing images left out for that reason and names up to 20 platform domains (the list entry a host matched, `facebook.com`, never the host a page wrote, and only in the form a stored run accepts, `isStoredHost`); `audit_run`'s notes and the report's scope say so.
+- **The profile.** `profile.apps` holds `ios: {app_ids, universal_links}` and `android: {packages, app_links}` (`store/profile-validate.js`): identifiers of the form `<prefix>.<bundle ID>` and package names, at most 10 each. Only the aso checks read it.
+- **Stored runs.** `storedRunProblem` checks `social_images`, `app_files` (each file's URL as a stored URL, its outcome one of the four) and `not_requested` (counts, and hosts as plain host names) before a run is used.
+- **Report.** When `run.modules_requested` includes `smo` or `aso`, the title names the modules, the scope has a row on sharing images, on the app files and on what was not checked by rule, and the method says what was requested and what is not measured (`SMO_METHOD`, `ASO_METHOD`).

@@ -83,6 +83,9 @@ export {};
  * @property {boolean} [time_limit_reached]  True when the crawl stopped at `LIMITS.crawlMaxMs` with URLs left to fetch; absent otherwise.
  * @property {CrawlBlock|null} blocked Set when the crawl had to stop.
  * @property {string} user_agent
+ * @property {Record<string, boolean>} [preview_agents]  For each link-preview crawler that says it obeys robots.txt
+ *   (`PREVIEW_CRAWLERS`), whether the site's robots.txt lets it fetch the start page. Absent when robots.txt could not be
+ *   read, when no start page was recorded, and in crawls made before rule set 0.1.9.
  */
 
 /**

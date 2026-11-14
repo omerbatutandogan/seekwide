@@ -158,9 +158,11 @@ test('the audit reports every problem the fixture site was built with', () => {
 
 test('each scored finding in the fixture is one the fixture intends', () => {
   // Scored findings (everything except info) may only come from pages that were
-  // built with a problem. A finding on a clean page is a false positive.
+  // built with a problem. A finding on a clean page is a false positive. The
+  // site was built for these modules; the smo and aso modules have sites of their own.
   const cleanPages = ['/new-page', '/blog/', '/nofollow-target', '/x-robots'].map(url);
-  const unexpected = audit.findings.filter((finding) => finding.severity !== 'info' && cleanPages.includes(finding.url ?? ''));
+  const built = new Set(['seo', 'links', 'security', 'media']);
+  const unexpected = audit.findings.filter((finding) => finding.severity !== 'info' && built.has(finding.module) && cleanPages.includes(finding.url ?? ''));
   assert.deepEqual(
     unexpected.map((finding) => `${finding.check_id} ${finding.url}`),
     [],
@@ -207,17 +209,19 @@ test('scores and coverage are reported for every module', () => {
   for (const module of [seo, links, security]) {
     assert.ok(module.score !== null && module.score >= 0 && module.score <= 100);
   }
-  // Neither Core Web Vitals, external links nor image files were collected in this test, so
+  // Neither Core Web Vitals, external links, image files, sharing images nor app files were collected in this test, so
   // exactly the checks that need them are skipped, and coverage shows it. The
   // site runs on this machine, so the header checks, which need the deployed
   // site, are skipped as well.
   const skipped = audit.checks.filter((stat) => stat.status !== 'run');
   assert.deepEqual(skipped.map((stat) => stat.id), [
+    'aso.aasa.invalid', 'aso.aasa.missing', 'aso.assetlinks.invalid', 'aso.assetlinks.missing',
     'links.outbound.broken',
     'media.image.broken', 'media.image.large_file', 'media.image.legacy_format', 'media.image.robots_blocked',
     'security.headers.csp_missing', 'security.headers.framing_missing', 'security.headers.hsts_missing',
     'security.headers.nosniff_missing', 'security.headers.referrer_leaky',
     'seo.cwv.field_cls', 'seo.cwv.field_inp', 'seo.cwv.field_lcp', 'seo.cwv.lab_cls', 'seo.cwv.lab_lcp', 'seo.cwv.lab_tbt',
+    'smo.og.image_broken', 'smo.og.image_heavy', 'smo.og.image_preview_shape', 'smo.og.image_too_small',
   ]);
   assert.equal(seo.checks_skipped, 6);
   assert.equal(seo.checks_total, 47);

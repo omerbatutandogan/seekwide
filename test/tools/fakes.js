@@ -246,6 +246,14 @@ export function makeDeps(seed = {}) {
         modern_accepted: true, google: 'allowed', google_agent: null, google_host: null,
       }]));
     },
+    /** @param {string} origin @param {object} options */
+    async fetchAppFiles(origin, options) {
+      record('fetchAppFiles', [origin, options]);
+      const file = (/** @type {string} */ path) => ({
+        url: `${origin}${path}`, outcome: 'not_found', status: 404, reason: 'status_404', location: null, final_url: null, content_type: 'text/html', body: null,
+      });
+      return seed.appFiles?.(origin) ?? { aasa: file('/.well-known/apple-app-site-association'), assetlinks: file('/.well-known/assetlinks.json') };
+    },
     /** @param {CrawlResult} crawl @param {{maxPages: number}} options */
     async measureVitals(crawl, options) {
       // The signal that stops a measurement is checked by tests of its own; the calls keep the other options.

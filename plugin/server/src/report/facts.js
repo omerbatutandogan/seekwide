@@ -45,7 +45,7 @@ export function describeBlock(blocked) {
  */
 export function blockedRedirect(blocked) {
   if (typeof blocked.redirected_to !== 'string') return '';
-  return `robots.txt redirects to ${blocked.redirected_to}, and the crawl did not follow it there: a crawl of a site on this machine requests nothing from any other address, and no crawl requests an address that is not public. ` +
+  return `robots.txt redirects to ${blocked.redirected_to}, and the crawl did not follow it there: a crawl of a site on this machine requests nothing from any other address, no crawl requests an address that is not public, and nothing is ever requested from Google Play or a social platform. ` +
     'Serve robots.txt from the audited address itself, or audit the address it redirects to.';
 }
 

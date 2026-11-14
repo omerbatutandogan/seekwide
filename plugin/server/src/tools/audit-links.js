@@ -4,6 +4,7 @@
 // do not take every check.
 
 import { hostOf } from '../net/polite.js';
+import { offLimitsReason } from '../util/off-limits.js';
 import { crawlIdentity } from '../util/site-identity.js';
 
 /** @import { CrawlResult } from '../types.js' */
@@ -34,6 +35,37 @@ export function inTurn(lists) {
 }
 
 /**
+ * The external link targets and off-site redirect destinations of a crawl, by
+ * page in crawl order, without those on the deployed site of a local crawl.
+ * @param {CrawlResult} crawl
+ * @returns {string[][]}
+ */
+function externalByPage(crawl) {
+  // A local crawl that knows where the project is deployed never has that address contacted: its pages
+  // name it, and a request there would say nothing about the project being audited.
+  const identity = crawlIdentity(crawl);
+  return crawl.pages.map((page) => {
+    /** @type {string[]} */
+    const urls = page.final_external ? [page.final_url] : [];
+    if (page.status === 200 && page.is_html) {
+      for (const link of page.links) if (link.url !== null && !link.internal) urls.push(link.url);
+    }
+    return urls.filter((url) => !identity.isDeployed(url));
+  });
+}
+
+/**
+ * The external URLs the link check leaves out by rule, each once, in crawl
+ * order: those on Google Play or a social platform (`offLimitsReason`), which
+ * the plugin never contacts.
+ * @param {CrawlResult} crawl
+ * @returns {string[]}
+ */
+export function notRequestedLinks(crawl) {
+  return [...new Set(externalByPage(crawl).flat().filter((url) => offLimitsReason(url) !== null))];
+}
+
+/**
  * URLs for the external link check, each once, in the order they are checked:
  * the external link targets on the crawled HTML pages (status 200), in
  * document order, plus the `final_url` of every record whose redirect chain
@@ -41,24 +73,13 @@ export function inTurn(lists) {
  * then in turn from each host in the order its first URL came. The check takes
  * the first `LIMITS.maxOutboundChecks`. Every URL on the host of the deployed
  * site of a local crawl (`options.deployed_origin`) is left out, whatever its
- * scheme or port, with or without "www.".
+ * scheme or port, with or without "www.", and so is every URL on Google Play
+ * or a social platform (`notRequestedLinks`).
  * @param {CrawlResult} crawl
  * @returns {string[]}
  */
 export function externalLinkUrls(crawl) {
-  // A local crawl that knows where the project is deployed never has that address contacted: its pages
-  // name it, and a request there would say nothing about the project being audited.
-  const identity = crawlIdentity(crawl);
-  /** @param {string} url */
-  const kept = (url) => !identity.isDeployed(url);
-  const byPage = inTurn(crawl.pages.map((page) => {
-    /** @type {string[]} */
-    const urls = page.final_external ? [page.final_url] : [];
-    if (page.status === 200 && page.is_html) {
-      for (const link of page.links) if (link.url !== null && !link.internal) urls.push(link.url);
-    }
-    return urls.filter(kept);
-  }));
+  const byPage = inTurn(externalByPage(crawl).map((urls) => urls.filter((url) => offLimitsReason(url) === null)));
   /** @type {Map<string, string[]>} */
   const byHost = new Map();
   for (const url of byPage) {

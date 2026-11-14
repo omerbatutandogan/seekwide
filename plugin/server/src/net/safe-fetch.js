@@ -8,6 +8,7 @@ import https from 'node:https';
 import { LIMITS, USER_AGENT } from '../config.js';
 import { readBody } from './body.js';
 import { FetchFailure, pinnedLookup, resolveAndCheck, toFailure } from './connect.js';
+import { NOT_REQUESTED, offLimitsReason } from '../util/off-limits.js';
 import { REDIRECT_STATUSES } from './polite.js';
 
 export { pinnedLookup };
@@ -145,6 +146,7 @@ function collectHeaders(rawHeaders) {
  *   address before a connection is made, and the socket connects only to an
  *   address that passed the check;
  * - loopback is reachable only with `allowLoopback` (with an origin string, only for that origin), other non-public ranges never;
+ * - Google Play and social platforms (`offLimitsReason`) are never contacted: such a URL or redirect is `blocked_address`;
  * - user names and passwords in the URL or a redirect are removed before the request, never reported and never sent;
  * - when `error` is set, `status` is 0 and there are no headers, except for `too_many_redirects` and `redirect_loop`,
  *   which keep the last redirect's status and headers;
@@ -203,6 +205,9 @@ export async function safeFetch(url, options = {}) {
       if (current.protocol !== 'http:' && current.protocol !== 'https:') {
         throw new FetchFailure('unsupported_protocol', `Only http and https are supported, not ${current.protocol}`);
       }
+      // Google Play and social platforms are never contacted, on the first request or on a redirect (rule set 0.1.9).
+      const offLimits = offLimitsReason(current.href);
+      if (offLimits !== null) throw new FetchFailure('blocked_address', NOT_REQUESTED[offLimits]);
       const permitLoopback = opts.allowLoopback || current.origin === opts.loopbackOrigin;
       const addresses = await abortable(resolveAndCheck(current, permitLoopback), signal).catch((error) => {
         if (error === timeoutError) throw new FetchFailure('dns_temporary', `DNS lookup did not finish within ${opts.timeoutMs} ms`);

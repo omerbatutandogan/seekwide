@@ -109,3 +109,35 @@ export function decodeBody(body, contentType) {
     ?? 'utf-8';
   return { text: new TextDecoder(encoding).decode(body), encoding };
 }
+
+/**
+ * The number of bytes of `body` that decode to the first `chars` UTF-16 code
+ * units of `text`, where `text` is `decodeBody(body).text` and `encoding` the
+ * encoding it names. Exact for UTF-8 text without replacement characters and
+ * for single-byte encodings; otherwise the smallest prefix of the body that
+ * decodes to at least `chars` units, which can end inside the last character.
+ * A UTF-8 byte order mark counts.
+ * @param {Buffer} body
+ * @param {string} encoding
+ * @param {string} text
+ * @param {number} chars
+ * @returns {number}
+ */
+export function byteOffset(body, encoding, text, chars) {
+  if (chars <= 0) return 0;
+  const prefix = text.slice(0, chars);
+  if (encoding === 'utf-8' && !prefix.includes('�')) {
+    const bom = body.length >= 3 && body[0] === 0xef && body[1] === 0xbb && body[2] === 0xbf ? 3 : 0;
+    return bom + Buffer.byteLength(prefix, 'utf8');
+  }
+  if (text.length === body.length) return Math.min(chars, body.length);
+  const decoder = new TextDecoder(encoding);
+  let low = 0;
+  let high = body.length;
+  while (low < high) {
+    const middle = (low + high) >>> 1;
+    if (decoder.decode(body.subarray(0, middle)).length >= chars) high = middle;
+    else low = middle + 1;
+  }
+  return low;
+}

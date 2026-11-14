@@ -1,6 +1,6 @@
 ---
 name: all
-description: Full site audit with every Seekwide module that is installed (currently SEO including Core Web Vitals, links, security signs of a hacked site, and images and video). Crawls up to 200 pages politely, runs all scripted checks, scores each module and writes one report with evidence.
+description: Full site audit with every Seekwide module that is installed (currently SEO including Core Web Vitals, links, security signs of a hacked site, images and video, social sharing previews, and the site's side of its apps). Crawls up to 200 pages politely, runs all scripted checks, scores each module and writes one report with evidence.
 when_to_use: Use when the user asks for a full or complete audit of a site, wants everything checked, or is preparing a report for a client. Use the basic skill for a quick look.
 argument-hint: "[url] [--repo] [--pages N] [--compare] [--no-cwv]"
 allowed-tools: mcp__plugin_seekwide_seekwide__project_detect, mcp__plugin_seekwide_seekwide__crawl_start, mcp__plugin_seekwide_seekwide__crawl_status, mcp__plugin_seekwide_seekwide__audit_run, mcp__plugin_seekwide_seekwide__findings_query, mcp__plugin_seekwide_seekwide__page_get, mcp__plugin_seekwide_seekwide__report_render, mcp__plugin_seekwide_seekwide__runs_list, mcp__plugin_seekwide_seekwide__profile_get
@@ -18,7 +18,7 @@ Arguments: `$ARGUMENTS`
 - `--compare`: also show what changed since the previous audit of this project.
 - `--no-cwv`: do not measure Core Web Vitals, so that nothing is sent to Google.
 
-This version ships four modules, `seo` (which includes Core Web Vitals), `links`, `security` (signs of a hacked site and the security headers of the start page) and `media` (images and video). Say so if the user expects more: AI search visibility, local SEO and the other planned modules are not in this version, and the report marks those layers as having no data.
+This version ships six modules, `seo` (which includes Core Web Vitals), `links`, `security` (signs of a hacked site and the security headers of the start page), `media` (images and video), `smo` (what social platforms and messaging apps need for a link preview) and `aso` (the site's side of its apps: the Smart App Banner and the association files for universal links and App Links; store pages are not read). Say so if the user expects more: AI search visibility, local SEO and the other planned modules are not in this version, and the report marks those layers as having no data.
 
 ## How the work is split
 
@@ -83,6 +83,10 @@ The `security` module reads the same pages and sends no request of its own. Its 
 ## Image and video findings
 
 The `media` module reads the images, videos, embedded players and JSON-LD of the crawled pages and checks up to 50 image files with a `HEAD` request each. It does not look at the pictures, so it cannot say whether alt text describes them well. An empty `alt=""` is correct for decoration and is never reported. Findings marked `likely` (a server that picks the image format by browser without saying so, images kept out of Google Images on purpose) are worth checking by hand; images without sizes, very large files and videos without captions are informational. In repo mode only images on the local server are checked. `${CLAUDE_PLUGIN_ROOT}/skills/media/SKILL.md` explains each check.
+
+## Social sharing and app findings
+
+The `smo` module reads the Open Graph and Twitter card tags of the crawled pages and reads the first 64 KiB of up to 20 sharing images for their size; the `aso` module reads the Smart App Banner tag and requests the site's two app association files once each. Neither sends a request to a social platform or to Google Play: links and images there are listed in the notes as not checked, by rule. Without `apps` in the profile, a missing association file is not reported; say so if the site has an app, and point to `/seekwide:aso`, which asks for it. `${CLAUDE_PLUGIN_ROOT}/skills/smo/SKILL.md` and `${CLAUDE_PLUGIN_ROOT}/skills/aso/SKILL.md` explain each check.
 
 ## When the crawl is blocked
 

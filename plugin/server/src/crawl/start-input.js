@@ -6,6 +6,7 @@ import net from 'node:net';
 import { LIMITS } from '../config.js';
 import { classifyAddress } from '../net/ip.js';
 import { InputError } from '../util/errors.js';
+import { neverContacted, offLimitsReason } from '../util/off-limits.js';
 import { PLAIN_HOST_MESSAGE, hasPlainHost } from '../util/plain-host.js';
 import { normalizeUrl, originOf } from '../util/url.js';
 import { deployedOriginOf } from './deployed.js';
@@ -49,6 +50,8 @@ export function validateStart(options) {
   if (startUrl === null) {
     throw new InputError(`"${String(url)}" is not an http or https URL. Pass a full URL such as https://example.com/.`);
   }
+  const offLimits = offLimitsReason(startUrl);
+  if (offLimits !== null) throw new InputError(`${new URL(startUrl).hostname} cannot be audited: ${neverContacted(offLimits)}.`);
   if (!Number.isInteger(maxPages) || maxPages < 1 || maxPages > LIMITS.maxPagesHardCap) {
     throw new InputError(`maxPages must be a whole number from 1 to ${LIMITS.maxPagesHardCap}.`);
   }

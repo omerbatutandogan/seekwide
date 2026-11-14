@@ -116,6 +116,7 @@ export function makePage(overrides = {}) {
     videos: [],
     video_embeds: [],
     video_markup: false,
+    social: { outside_head: [], streamed: false, head_end: { bytes: 1024, by: 'head' }, app_banners: [], rel_me: [] },
     ...overrides,
   };
 }

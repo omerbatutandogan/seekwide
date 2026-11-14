@@ -169,6 +169,54 @@ function repoProblem(repo) {
   return null;
 }
 
+const APP_FILE_OUTCOMES = new Set(['answered', 'not_found', 'unverifiable', 'disallowed']);
+/** A host as `hostName` writes it: lower case letters, digits, hyphens and dots (an international name in its xn-- form). */
+const PLAIN_HOST = /^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$/;
+
+/**
+ * True for a host name in the form a run stores in `not_requested.hosts`, so
+ * that what an audit writes there is always what a later read accepts.
+ * @param {unknown} host
+ * @returns {host is string}
+ */
+export const isStoredHost = (host) => typeof host === 'string' && PLAIN_HOST.test(host);
+const MAX_NOT_REQUESTED_HOSTS = 20;
+
+/**
+ * What the smo and aso modules stored (rule set 0.1.9): the sharing images,
+ * the app association files and what was not requested by rule.
+ * @param {Record<string, unknown>} run
+ * @returns {string|null}
+ */
+function sharingProblem(run) {
+  const social = run.social_images;
+  if (social !== undefined && social !== null) {
+    if (!isObject(social)) return 'social_images';
+    const { images, selected, sized, outcomes, local } = /** @type {Record<string, unknown>} */ (social);
+    if (![images, selected, sized].every(isCount) || typeof local !== 'boolean') return 'social_images';
+    if (!isObject(outcomes) || !Object.values(/** @type {object} */ (outcomes)).every(isCount)) return 'social_images.outcomes';
+  }
+  const files = run.app_files;
+  if (files !== undefined && files !== null) {
+    if (!isObject(files)) return 'app_files';
+    for (const name of ['aasa', 'assetlinks']) {
+      const file = /** @type {Record<string, unknown>} */ (files)[name];
+      if (!isObject(file)) return `app_files.${name}`;
+      const { url, outcome, status } = /** @type {Record<string, unknown>} */ (file);
+      if (!isStoredUrl(url)) return `app_files.${name}.url`;
+      if (typeof outcome !== 'string' || !APP_FILE_OUTCOMES.has(outcome) || !isCount(status)) return `app_files.${name}`;
+    }
+  }
+  const skipped = run.not_requested;
+  if (skipped !== undefined && skipped !== null) {
+    if (!isObject(skipped)) return 'not_requested';
+    const { links, images, social_images: socialImages, hosts } = /** @type {Record<string, unknown>} */ (skipped);
+    if (![links, images, socialImages].every(isCount)) return 'not_requested';
+    if (!Array.isArray(hosts) || hosts.length > MAX_NOT_REQUESTED_HOSTS || !hosts.every(isStoredHost)) return 'not_requested.hosts';
+  }
+  return null;
+}
+
 /**
  * The first field of a stored run that does not have the form the plugin
  * writes, as a dotted name ("findings[3].source.line"), or null when every
@@ -178,7 +226,8 @@ function repoProblem(repo) {
  * every check id and module name has the plugin's form, every URL the run
  * names is an http(s) URL without spaces or control characters, line numbers
  * are positive integers, file names are relative paths inside the project
- * without control characters, and dates and versions have their fixed forms.
+ * without control characters, the hosts listed as not requested are plain
+ * host names, and dates and versions have their fixed forms.
  * @param {Record<string, unknown>} run  A value that passed `isRunShape`.
  * @returns {string|null}
  */
@@ -202,6 +251,8 @@ export function storedRunProblem(run) {
   if (crawl !== null) return crawl;
   const repo = repoProblem(run.repo);
   if (repo !== null) return repo;
+  const sharing = sharingProblem(run);
+  if (sharing !== null) return sharing;
   const findings = /** @type {unknown[]} */ (run.findings);
   for (let i = 0; i < findings.length; i += 1) {
     const finding = findings[i];

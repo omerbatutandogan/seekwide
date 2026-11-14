@@ -4,6 +4,7 @@
 /** @import { CheckContext, CrawlResult, ImageRecord, PageRecord } from '../../types.js' */
 
 import { LIMITS } from '../../config.js';
+import { offLimitsReason } from '../../util/off-limits.js';
 import { crawlIdentity } from '../../util/site-identity.js';
 import { originOf } from '../../util/url.js';
 import { compareText, hasMedia, isRendered } from './helpers.js';
@@ -12,7 +13,8 @@ import { compareText, hasMedia, isRendered } from './helpers.js';
  * The http(s) URLs of a page's rendered images, once each, in document order.
  * @param {PageRecord} page
  * @param {string|null} origin  When set, only URLs on this origin.
- * @param {((host: string) => boolean)|null} [skip]  When set, no URL on a host it is true for.
+ * @param {((host: string) => boolean)|null} [skip]  When set, no URL on a host it is true for, and none on Google Play or a
+ *   social platform.
  * @returns {string[]}
  */
 function imageUrls(page, origin, skip = null) {
@@ -21,7 +23,7 @@ function imageUrls(page, origin, skip = null) {
     const url = image.url;
     if (url === null || !isRendered(image) || !/^https?:/.test(url)) continue;
     if (origin !== null && originOf(url) !== origin) continue;
-    if (skip !== null && skip(new URL(url).host)) continue;
+    if (skip !== null && (skip(new URL(url).host) || offLimitsReason(url) !== null)) continue;
     urls.add(url);
   }
   return [...urls];
@@ -39,8 +41,10 @@ function pagesOf(crawl) {
  * The image URLs to check, without randomness: the html pages in crawl order
  * are gone through in rounds, each round taking each page's next URL that was
  * not chosen yet, so the first image of every page comes before the second of
- * any. A crawl of a site on this machine gets only images on its own origin,
- * and with `skipSite` no image on a host of the site's organisation, or under
+ * any. No image on Google Play or a social platform is chosen
+ * (`offLimitsReason`, `notRequestedImages`). A crawl of a site on this machine
+ * gets only images on its own origin, and with `skipSite` no image on a host
+ * of the site's organisation, or under
  * its name with another ending, linked or not (`SiteIdentity.sharesName`: its
  * apex, www, subdomains, other ports, acme.de for acme.com) is chosen.
  * @param {CrawlResult} crawl
@@ -52,7 +56,7 @@ export function selectImageFiles(crawl, max = LIMITS.maxImageChecks, skipSite = 
   const pages = pagesOf(crawl);
   const origin = crawl.options.local === true ? crawl.site_origin : null;
   const all = new Set(pages.flatMap((page) => imageUrls(page, null)));
-  const skip = skipSite ? crawlIdentity(crawl).sharesName : null;
+  const skip = skipSite ? crawlIdentity(crawl).sharesName : () => false;
   const lists = pages.map((page) => imageUrls(page, origin, skip));
   const positions = lists.map(() => 0);
   /** @type {Set<string>} */
@@ -69,6 +73,16 @@ export function selectImageFiles(crawl, max = LIMITS.maxImageChecks, skipSite = 
     }
   }
   return { urls: [...chosen], images: all.size };
+}
+
+/**
+ * The image URLs of rendered images on the html pages that are on Google Play
+ * or a social platform, which are never requested, each once.
+ * @param {CrawlResult} crawl
+ * @returns {string[]}
+ */
+export function notRequestedImages(crawl) {
+  return [...new Set(pagesOf(crawl).flatMap((page) => imageUrls(page, null)).filter((url) => offLimitsReason(url) !== null))];
 }
 
 /**

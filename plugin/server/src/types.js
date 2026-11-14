@@ -24,6 +24,9 @@ export {};
 /** @typedef {import('./types/page.js').HreflangRef} HreflangRef */
 /** @typedef {import('./types/page.js').Heading} Heading */
 /** @typedef {import('./types/page.js').JsonLdBlock} JsonLdBlock */
+/** @typedef {import('./types/page.js').ProfileEntity} ProfileEntity */
+/** @typedef {import('./types/page.js').SocialRecord} SocialRecord */
+/** @typedef {import('./types/page.js').AppBannerRecord} AppBannerRecord */
 /** @typedef {import('./types/page.js').Indexability} Indexability */
 /** @typedef {import('./types/page.js').PageRecord} PageRecord */
 
@@ -37,6 +40,14 @@ export {};
 // Image files: types/media.js
 /** @typedef {import('./types/media.js').ImageFileResult} ImageFileResult */
 /** @typedef {import('./types/media.js').ImageFilesSummary} ImageFilesSummary */
+
+// Sharing previews and app links: types/sharing.js
+/** @typedef {import('./types/sharing.js').SocialImagesSummary} SocialImagesSummary */
+/** @typedef {import('./types/sharing.js').AppFileResult} AppFileResult */
+/** @typedef {import('./types/sharing.js').AppFiles} AppFiles */
+/** @typedef {import('./types/sharing.js').AppFilesSummary} AppFilesSummary */
+/** @typedef {import('./types/sharing.js').AppsProfile} AppsProfile */
+/** @typedef {import('./types/sharing.js').NotRequestedSummary} NotRequestedSummary */
 
 // Crawl: types/crawl.js
 /** @typedef {import('./types/crawl.js').RobotsSummary} RobotsSummary */

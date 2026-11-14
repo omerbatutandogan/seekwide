@@ -66,6 +66,14 @@ test('the generator keeps both sections, writes ASCII labels and keeps wildcards
   assert.equal(parsed.version, '2026-01-01_00-00-00_UTC');
   for (const rule of ['uk', 'co.uk', 'ck', '0.bg', 'xn--55qx5d.cn', 'vercel.app']) assert.ok(parsed.rules.has(rule), rule);
   assert.ok(parsed.wildcards.has('sch.uk') && parsed.wildcards.has('ck') && parsed.exceptions.has('www.ck'));
+  assert.deepEqual([...parsed.private], ['vercel.app', ...TENANT_DOMAINS], 'only the private section and the hand list are marked');
   assert.throws(() => compact('uk\n'), /VERSION/);
   assert.throws(() => compact('// VERSION: x\n// COMMIT: y\nuk\n'), /section/);
+});
+
+test('hasIcannSuffix tells a country or generic ending from a hosting service\'s domain, the hand list included', async () => {
+  const { hasIcannSuffix } = await import('../../plugin/server/src/util/public-suffix.js');
+  for (const name of ['pinterest.co.uk', 'youtube.de', 'example.com', 'shop.acme.com.mx']) assert.ok(hasIcannSuffix(name), name);
+  for (const name of ['pinterest.github.io', 'acme.vercel.app', 'acme.blogspot.com', 'acme.wordpress.com', 'acme.ghost.io']) assert.ok(!hasIcannSuffix(name), name);
+  assert.ok(suffixRules().private.has('github.io') && !suffixRules().private.has('co.uk'));
 });

@@ -1,4 +1,4 @@
-/** @import { CheckContext, CheckDef, CheckResult, CheckStat, CrawlResult, Finding, AuditResult, ImageFileResult, InlinkRef, OutboundResult, PageRecord, VitalsData } from '../types.js' */
+/** @import { AppFiles, AppsProfile, CheckContext, CheckDef, CheckResult, CheckStat, CrawlResult, Finding, AuditResult, ImageFileResult, InlinkRef, OutboundResult, PageRecord, VitalsData } from '../types.js' */
 
 import { LIMITS, SEVERITIES } from '../config.js';
 import { shortId } from '../util/hash.js';
@@ -15,6 +15,8 @@ const SKIP_REASONS = {
   field_data: 'Needs field data from the Chrome UX Report. It was not collected.',
   live_site: 'Needs the deployed site: this crawl was of a server on this machine, whose response headers say nothing about the live site.',
   image_files: 'Needs the image files to be checked. They were not.',
+  social_images: 'Needs the sharing images to be checked. They were not.',
+  app_files: 'Needs the app association files of the site to be read. They were not.',
 };
 
 /**
@@ -35,9 +37,11 @@ function unreadSitemapReason(crawl) {
  * Build the read-only view that checks run against.
  * @param {CrawlResult} crawl
  * @param {{outbound?: Map<string, OutboundResult>|null, vitals?: VitalsData|null, imageFiles?: Map<string, ImageFileResult>|null,
- *          imageFilesReason?: string}} [extras]
- *   What was collected besides the crawl: external link results, Core Web Vitals and image files; `imageFilesReason`
- *   says why the image files were not checked, when the collector knows.
+ *          imageFilesReason?: string, socialImages?: Map<string, ImageFileResult>|null, socialImagesReason?: string,
+ *          appFiles?: AppFiles|null, appFilesReason?: string, apps?: AppsProfile|null}} [extras]
+ *   What was collected besides the crawl: external link results, Core Web Vitals, image files, sharing images and the app
+ *   association files; a `…Reason` says why one was not collected, when the collector knows. `apps` is what the site
+ *   profile declares about the site's apps.
  * @returns {CheckContext}
  */
 export function buildContext(crawl, extras = {}) {
@@ -80,6 +84,12 @@ export function buildContext(crawl, extras = {}) {
   const sitemapReason = unreadSitemapReason(crawl);
   if (sitemapReason !== null) skipReasons.sitemap = sitemapReason;
   if (imageFiles === null && extras.imageFilesReason) skipReasons.image_files = extras.imageFilesReason;
+  const socialImages = extras.socialImages ?? null;
+  if (socialImages !== null) capabilities.add('social_images');
+  else if (extras.socialImagesReason) skipReasons.social_images = extras.socialImagesReason;
+  const appFiles = extras.appFiles ?? null;
+  if (appFiles !== null) capabilities.add('app_files');
+  else if (extras.appFilesReason) skipReasons.app_files = extras.appFilesReason;
   if (vitals !== null) {
     if (vitals.lab.available) capabilities.add('lab_data');
     else if (vitals.lab.reason) skipReasons.lab_data = vitals.lab.reason;
@@ -121,6 +131,9 @@ export function buildContext(crawl, extras = {}) {
     outbound,
     vitals,
     imageFiles,
+    socialImages,
+    appFiles,
+    apps: extras.apps ?? {},
     resolve,
   };
 }

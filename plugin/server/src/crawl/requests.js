@@ -3,7 +3,7 @@
 // nothing from another address (ARCHITECTURE.md 4.5, steps 6 and 11).
 
 import { LIMITS } from '../config.js';
-import { SHARED_HOST_GATES, hostOf } from '../net/polite.js';
+import { SHARED_HOST_GATES, guardFetch, hostOf, offLimitsRefusal } from '../net/polite.js';
 import { SHARED_ROBOTS, readRobots } from '../net/robots-cache.js';
 import { originOf } from '../util/url.js';
 import { isBotChallenge, RETRY_AFTER_MAX_MS, retryAfterMs } from './challenge.js';
@@ -29,7 +29,9 @@ import { isBotChallenge, RETRY_AFTER_MAX_MS, retryAfterMs } from './challenge.js
  * @param {{fetch: typeof safeFetch, now: () => Date, sleep: (ms: number) => Promise<void>, ratePerSec: number, loopbackOrigin: string|null,
  *          hosts?: HostGates, robotsCache?: RobotsCache}} options
  */
-export function createRequests({ fetch, now, sleep, ratePerSec, loopbackOrigin, hosts = SHARED_HOST_GATES, robotsCache = SHARED_ROBOTS }) {
+export function createRequests({ fetch: given, now, sleep, ratePerSec, loopbackOrigin, hosts = SHARED_HOST_GATES, robotsCache = SHARED_ROBOTS }) {
+  // The same guarded fetch as the other requesters', so that their robots.txt cache is shared.
+  const fetch = guardFetch(given);
   const owner = Symbol('crawl');
   const baseDelayMs = 1000 / ratePerSec;
   let delayMs = baseDelayMs;
@@ -54,6 +56,13 @@ export function createRequests({ fetch, now, sleep, ratePerSec, loopbackOrigin, 
       };
       lastErrors.set(url, refused.error);
       return refused;
+    }
+    // Google Play and social platforms are never contacted: a robots.txt, a sitemap, a probe or a redirect step that
+    // leads there is refused here, before any wait (rule set 0.1.9).
+    const offLimits = offLimitsRefusal(url);
+    if (offLimits !== null) {
+      lastErrors.set(url, offLimits.error);
+      return offLimits;
     }
     if (requests > 0) await sleep(waitMs);
     requests += 1;

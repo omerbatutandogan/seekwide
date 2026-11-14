@@ -4,6 +4,7 @@
 /** @import { CheckStat, Finding, ModuleScore } from './checks.js' */
 /** @import { VitalsData } from './vitals.js' */
 /** @import { ImageFilesSummary } from './media.js' */
+/** @import { AppFilesSummary, AppsProfile, NotRequestedSummary, SocialImagesSummary } from './sharing.js' */
 
 export {};
 
@@ -73,6 +74,12 @@ export {};
  *   run. Null when the audit was not asked to verify fixes; absent in runs stored before it existed.
  * @property {ImageFilesSummary|null} [image_files]  The media module's check of image files: how many images the pages show
  *   and how many were checked. Null when it was not run; absent in runs stored before it existed.
+ * @property {SocialImagesSummary|null} [social_images]  The smo module's check of sharing images. Null when it was not run;
+ *   absent in runs stored before rule set 0.1.9.
+ * @property {AppFilesSummary|null} [app_files]  The aso module's read of the app association files: each file's outcome
+ *   and status. Null when they were not read; absent in runs stored before rule set 0.1.9.
+ * @property {NotRequestedSummary|null} [not_requested]  Links and images on Google Play or social platforms, which no
+ *   check requested. Null when there were none; absent in runs stored before rule set 0.1.9.
  */
 
 /**
@@ -97,5 +104,6 @@ export {};
  * @property {string[]} [competitors]
  * @property {string[]} [target_queries]
  * @property {{brand_name?: string, logo_path?: string}} [report]
+ * @property {AppsProfile} [apps]        The site's apps, for the aso module.
  * @property {string} updated_at         ISO 8601.
  */

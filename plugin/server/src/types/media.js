@@ -22,6 +22,8 @@ export {};
  *   each redirect step that was followed; null when a robots.txt involved could not be read or was not reached.
  * @property {string|null} google_agent  The crawler that robots.txt keeps out ('Googlebot' or 'Googlebot-Image'), when `google` is 'disallowed'.
  * @property {string|null} google_host  The host whose robots.txt keeps it out, when `google` is 'disallowed'.
+ * @property {import('../util/image-size.js').ImageSize|null} [size]  The format and pixel size the first bytes of the file
+ *   declare: only when the check was asked to read them (`readBytes`, the smo module's sharing images) and could.
  */
 
 /**
