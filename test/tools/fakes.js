@@ -105,7 +105,7 @@ function codedError(message, code) {
  * Fake dependencies with call logs. `jobs` and `results` seed the crawl manager.
  * @param {{jobs?: CrawlJob[], results?: CrawlResult[], runs?: Run[], profile?: object|null, env?: NodeJS.ProcessEnv,
  *          projectDir?: string, outbound?: (url: string) => 'ok'|'broken'|'unverifiable',
- *          vitals?: VitalsData|Error, imageFile?: (url: string) => ImageFileResult, llmsTxt?: (origin: string) => import('../../plugin/server/src/types.js').LlmsTxtResult}} [seed]  `vitals`: what the measurement returns,
+ *          vitals?: VitalsData|Error, ads?: {ads: null, reason: string}|Error, imageFile?: (url: string) => ImageFileResult, llmsTxt?: (origin: string) => import('../../plugin/server/src/types.js').LlmsTxtResult}} [seed]  `vitals`: what the measurement returns,
  *   or the error it throws. `imageFile`: what the check of an image file finds; by default a small WebP that Google may fetch.
  */
 export function makeDeps(seed = {}) {
@@ -268,7 +268,15 @@ export function makeDeps(seed = {}) {
       if (!(signal instanceof AbortSignal)) throw new TypeError('measureVitals needs a signal');
       record('measureVitals', [crawl.id, rest]);
       if (seed.vitals instanceof Error) throw seed.vitals;
-      return seed.vitals ?? makeVitals();
+      const vitals = seed.vitals ?? makeVitals();
+      // As the real measurement does: a lab test that asked for Lighthouse's audits says so, so no second request follows.
+      return /** @type {{labAudits?: boolean}} */ (rest).labAudits ? { ...vitals, lab: { ...vitals.lab, audits_requested: true } } : vitals;
+    },
+    /** @param {CrawlResult} crawl @param {{signal?: AbortSignal}} options */
+    async measureAds(crawl, options) {
+      record('measureAds', [crawl.id, Object.keys(options)]);
+      if (seed.ads instanceof Error) throw seed.ads;
+      return seed.ads ?? { ads: null, reason: 'No ad data in this fake.' };
     },
     now: () => NOW,
     defaultProjectDir: () => seed.projectDir ?? PROJECT,

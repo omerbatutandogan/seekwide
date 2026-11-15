@@ -1,7 +1,7 @@
 // HTML document → content fields of a PageRecord. Pure. This file walks the
 // document and collects the visible text; html-elements.js reads each element.
 
-/** @import { AiPageRecord, CanonicalRef, Heading, HreflangRef, ImageRecord, JsonLdBlock, LinkRecord, PageSecurity, SocialRecord, VideoEmbedRecord, VideoRecord } from '../types.js' */
+/** @import { AiPageRecord, CanonicalRef, FormsRecord, Heading, HreflangRef, ImageRecord, JsonLdBlock, LinkRecord, PageSecurity, SocialRecord, VideoEmbedRecord, VideoRecord } from '../types.js' */
 /** @import { DomNode } from './dom.js' */
 /** @import { Frame, HtmlState } from './html-elements.js' */
 
@@ -15,6 +15,7 @@ import { HTML_NS, SVG_NS, findBaseUrl, isAriaHidden, parsedPart } from './dom.js
 import { reachedCaps, visitElement } from './html-elements.js';
 import { enterLandmark } from './media.js';
 import { streamedBoundaries } from './react-stream.js';
+import { emptyForms, formsLimits, formsRecord, formsState, visitForeignElement, visitForms } from './forms.js';
 import { documentSecurity, emptySecurity } from './security.js';
 import { emptySocial, socialRecord, socialState } from './social.js';
 import { siteIdentity } from '../util/site-identity.js';
@@ -54,6 +55,7 @@ const SPACE = Symbol('space');
  * @property {boolean} video_markup
  * @property {SocialRecord} social
  * @property {AiPageRecord} [ai]  The ai module's reading of the page (extract/ai.js).
+ * @property {FormsRecord} [forms]  The cro module's reading of the page's forms (extract/forms.js).
  * @property {string[]} [limits_reached]  Set when a cap stopped the reading of the page (`PageRecord.limits_reached`).
  */
 
@@ -90,7 +92,7 @@ export function extractHtml(html, context) {
     html_lang: null, titles: [], meta_descriptions: [], meta_robots: [], canonicals: [], hreflang: [],
     headings: [], viewport: null, og: {}, twitter: {}, links: [], images: [], jsonld: [], mixed_content: [],
     word_count: 0, text_hash: '', text_excerpt: '', security: emptySecurity(), videos: [], video_embeds: [], video_markup: false,
-    social: emptySocial(), ai: emptyAi(),
+    social: emptySocial(), ai: emptyAi(), forms: emptyForms(),
   };
   /** @type {HtmlState} */
   const state = {
@@ -103,6 +105,7 @@ export function extractHtml(html, context) {
   /** Text of replaced fallback content, for the security signals only. @type {string[]} */
   const replacedText = [];
   const streamed = streamedBoundaries(document);
+  const forms = formsState(baseUrl);
 
   /** @type {(Frame|typeof SPACE)[]} */
   const stack = [{ node: document, head: false, body: false, hidden: false, replaced: false, ariaHidden: false, chrome: false, sectioned: false, nosnippet: false }];
@@ -123,7 +126,10 @@ export function extractHtml(html, context) {
     let frame = item;
     if (node.tagName) {
       const html = node.namespaceURI === HTML_NS;
-      if (html) visitElement(node, item, state);
+      if (html) {
+        visitElement(node, item, state);
+        visitForms(node, item, forms, text.length);
+      } else visitForeignElement(node, forms);
       frame = {
         node,
         head: item.head || (html && node.tagName === 'head'),
@@ -166,13 +172,16 @@ export function extractHtml(html, context) {
   out.text_hash = visible === '' ? '' : sha1Hex(visible.toLowerCase());
   out.text_excerpt = visible.slice(0, LIMITS.textExcerptChars);
   out.ai = aiRecord(state.ai, WORD);
+  out.forms = formsRecord(forms, text, WORD);
+  // A form's http action is upgraded too where the page upgrades insecure requests, as for mixed content.
+  if (state.upgradeInsecure) out.forms.upgrade_insecure = true;
   const served = replacedText.length === 0 ? visible : collapseWhitespace(`${text.join('')} ${replacedText.join('')}`);
   const identity = siteIdentity({ siteHost: context.siteHost, includeSubdomains: context.includeSubdomains, deployedOrigin: context.deployedOrigin ?? null });
   const read = documentSecurity(document, { baseUrl, identity, links: out.links, revealed: streamed.revealed }, {
     titles: out.titles, metaDescriptions: out.meta_descriptions, headings: out.headings, visibleText: served,
   });
   out.security = read.security;
-  const reached = [...(markup.length < html.length ? ['tags'] : []), ...reachedCaps(state), ...read.limits.map((name) => `security.${name}`)];
+  const reached = [...(markup.length < html.length ? ['tags'] : []), ...reachedCaps(state), ...formsLimits(forms), ...read.limits.map((name) => `security.${name}`)];
   if (reached.length > 0) out.limits_reached = reached;
   return out;
 }

@@ -101,3 +101,56 @@ export async function queryCrux(target, options) {
     record: { lcp_ms: lcp, inp_ms: inp, cls, period: first !== null && last !== null ? { first, last } : null },
   };
 }
+
+/** The Chrome UX Report's experimental ad metrics (API page, updated 2026-11-11), each a 75th percentile only. */
+export const AD_METRICS = Object.freeze({
+  density: 'experimental_ad_density',
+  count: 'experimental_ad_count',
+  cpu_ms: 'experimental_ad_cpu',
+  kilobytes: 'experimental_ad_kilobytes',
+});
+
+/**
+ * @typedef {Object} AdMetrics
+ * @property {number|null} density     Share of the viewport ads cover, unitless, two decimals.
+ * @property {number|null} count       Ads shown at once, two decimals.
+ * @property {number|null} cpu_ms      CPU time of the ads, whole milliseconds.
+ * @property {number|null} kilobytes   Network weight of the ads, whole KB.
+ * @property {{first: string, last: string}|null} period
+ */
+
+/**
+ * Ask the Chrome UX Report for the phone record of one origin's experimental
+ * ad metrics (sxo module): one request of its own, never part of the Core Web
+ * Vitals query, so a metric Google drops cannot touch those numbers.
+ *
+ * Guarantees: one POST through `safeFetch` naming only the origin besides the
+ * key; no redirect is followed and nothing is retried; "no data" (Google's own
+ * not found, or a record without any of the four metrics) is `ads: null`; every
+ * other problem is a failure, never thrown.
+ * @param {string} origin
+ * @param {Pick<ApiRequestOptions, 'fetch'|'fetchOptions'|'timeoutMs'> & {apiKey: string, endpoint?: string}} options
+ * @returns {Promise<{ok: true, ads: AdMetrics|null} | {ok: false, failure: ApiFailure}>}
+ */
+export async function queryCruxAds(origin, options) {
+  const { apiKey, endpoint = CRUX_ENDPOINT, fetch, fetchOptions, timeoutMs = LIMITS.requestTimeoutMs } = options;
+  const response = await requestJson(endpoint, {
+    method: 'POST', body: { origin, formFactor: 'PHONE', metrics: Object.values(AD_METRICS) }, apiKey, fetch, fetchOptions, timeoutMs,
+  });
+  if (!response.ok) return response.failure.kind === 'not_found' ? { ok: true, ads: null } : response;
+  const record = asObject(response.data.record);
+  const formFactor = asObject(record.key).formFactor;
+  if (typeof formFactor === 'string' && formFactor !== 'PHONE') return { ok: false, failure: { kind: 'bad_response', status: 200, reason: null } };
+  const metrics = asObject(record.metrics);
+  /** @param {string} name @param {number} decimals */
+  const p75 = (name, decimals) => {
+    const value = nonNegative(asObject(asObject(metrics[name]).percentiles).p75);
+    return value === null ? null : Math.round(value * 10 ** decimals) / 10 ** decimals;
+  };
+  const ads = { density: p75(AD_METRICS.density, 2), count: p75(AD_METRICS.count, 2), cpu_ms: p75(AD_METRICS.cpu_ms, 0), kilobytes: p75(AD_METRICS.kilobytes, 0) };
+  if (Object.values(ads).every((value) => value === null)) return { ok: true, ads: null };
+  const period = asObject(record.collectionPeriod);
+  const first = readDate(period.firstDate);
+  const last = readDate(period.lastDate);
+  return { ok: true, ads: { ...ads, period: first !== null && last !== null ? { first, last } : null } };
+}

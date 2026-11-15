@@ -7,6 +7,7 @@ import { SEVERITIES } from '../config.js';
 import { InputError } from '../util/errors.js';
 import { clip, collapseWhitespace } from '../util/strings.js';
 import { aiLayer, viewAi } from './ai.js';
+import { viewObservations } from './observations.js';
 import { aiAccessNotJudged } from '../util/ai-summary.js';
 import { methodSections, reportTitle } from './copy.js';
 import { changeList, groupByCheck, viewFinding, withLimits } from './findings.js';
@@ -245,6 +246,7 @@ export function buildReport(run, options = {}) {
     fixes: viewFixes(run),
     layers: withAiLayer(viewLayers(vitals, opts.search.length > 0 ? searchLayer(opts.search) : null), aiView),
     ai: aiView,
+    observations: viewObservations(run),
     search: viewSearch(opts.search, findings),
     scores,
     vitals,

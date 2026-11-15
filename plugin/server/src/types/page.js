@@ -3,6 +3,7 @@
 /** @import { RedirectHop } from './net.js' */
 /** @import { PageSecurity } from './security.js' */
 /** @import { AiPageRecord } from './ai.js' */
+/** @import { FormsRecord } from './forms.js' */
 
 export {};
 
@@ -215,6 +216,8 @@ export {};
  *   modules). Absent in records made before rule set 0.1.9.
  * @property {AiPageRecord} [ai]  What the ai module reads on the page: Bing's directives, data-nosnippet, scripts and an empty
  *   application mount element. Absent in records made before rule set 0.2.0.
+ * @property {FormsRecord} [forms]  What the cro module reads on the page: its forms, visible controls and their names, the
+ *   consent API stub and the first action element. Absent in records made before rule set 0.2.1.
  * @property {string[]} [limits_reached]  The caps that stopped the reading of this page, when any did: `tags` (the
  *   document was parsed up to its 200,000th tag), a list at its cap by field name (`links`, `images`, `headings`…),
  *   `list_chars`, and the security scan's (`security.hosts`, `security.hidden_hosts`, `security.visible_hosts`,

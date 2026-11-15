@@ -10,7 +10,7 @@ const pkg = JSON.parse(readFileSync(path.join(PLUGIN_ROOT, 'package.json'), 'utf
 export const VERSION = /** @type {string} */ (pkg.version);
 
 /** Version of the rule set. Bump it whenever a check changes what it reports. */
-export const RULES_VERSION = '0.2.0';
+export const RULES_VERSION = '0.2.1';
 
 /** Version of the JSON written under `.seekwide/`. */
 export const SCHEMA_VERSION = 1;
@@ -76,7 +76,7 @@ export const LIMITS = Object.freeze({
   llmsTxtMaxBytes: 256 * 1024,
 });
 
-export const MODULES = Object.freeze(['seo', 'links', 'security', 'media', 'smo', 'aso', 'ai']);
+export const MODULES = Object.freeze(['seo', 'links', 'security', 'media', 'smo', 'aso', 'ai', 'cro', 'sxo']);
 
 /**
  * Scores a module's checks can count toward instead of the module's own, with
@@ -105,11 +105,13 @@ export const SEVERITIES = Object.freeze(['critical', 'high', 'medium', 'low', 'i
  * (media module) `image_files`, the check of sharing images (smo module) `social_images`, the read of the app association
  * files (aso module) `app_files`, the read of /llms.txt (ai module) `llms_txt`, and the Core Web Vitals measurement
  * `lab_data` and `field_data`. The crawl provides `ai_robots` when it recorded what robots.txt tells AI crawlers, and `ai_pages`
- * when its page records carry the ai module's page signals (rule set 0.2.0 and later). `live_site` is provided for
+ * when its page records carry the ai module's page signals (rule set 0.2.0 and later), and `form_pages` when they carry the
+ * cro module's reading of forms (rule set 0.2.1 and later). The Core Web Vitals measurement provides `lab_audits` when its
+ * lab tests carry Lighthouse's accessibility and best-practices audits (cro module). `live_site` is provided for
  * a crawl of a site that is not on this machine: the response headers of a local development server say nothing about the
  * deployed site.
  */
-export const CAPABILITIES = Object.freeze(['full_crawl', 'sitemap', 'robots', 'outbound', 'lab_data', 'field_data', 'live_site', 'image_files', 'social_images', 'app_files', 'llms_txt', 'ai_robots', 'ai_pages']);
+export const CAPABILITIES = Object.freeze(['full_crawl', 'sitemap', 'robots', 'outbound', 'lab_data', 'field_data', 'live_site', 'image_files', 'social_images', 'app_files', 'llms_txt', 'ai_robots', 'ai_pages', 'form_pages', 'lab_audits']);
 
 /** An API key is sent in a request header, so it must be printable ASCII without spaces. */
 const API_KEY_PATTERN = /^[\x21-\x7E]{1,256}$/;

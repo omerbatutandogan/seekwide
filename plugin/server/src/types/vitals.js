@@ -10,6 +10,16 @@ export {};
  * @property {number|null} tbt_ms      Total Blocking Time, whole milliseconds.
  * @property {string|null} lighthouse_version
  * @property {string|null} final_url   URL the test ended on, when Google was redirected away from the tested URL; null otherwise.
+ * @property {{target_size: LabAudit|null, console_errors: LabAudit|null}} [audits]  Lighthouse's `target-size` (accessibility)
+ *   and `errors-in-console` (best practices) audits, present when the test asked for those categories (cro module); an audit
+ *   that is missing, not applicable or not scored is null.
+ */
+
+/**
+ * One Lighthouse audit of a lab test.
+ * @typedef {Object} LabAudit
+ * @property {number} score            0 to 1, two decimals; 1 passes.
+ * @property {number} items            Rows of the audit's table (the elements or messages it names).
  */
 
 /**
@@ -41,8 +51,10 @@ export {};
 /**
  * Core Web Vitals collected for one audit. Stored in the run as `core_web_vitals`.
  * @typedef {Object} VitalsData
- * @property {{available: boolean, reason: string|null, device: 'mobile'}} lab
- *   `available`: PageSpeed Insights returned values for one or more pages. `reason` says why not.
+ * @property {{available: boolean, reason: string|null, device: 'mobile', audits_requested?: boolean, audits_reason?: string}} lab
+ *   `available`: PageSpeed Insights returned values for one or more pages. `reason` says why not. `audits_requested`: the tests
+ *   asked for the accessibility and best-practices categories too; absent in measurements made before rule set 0.2.1.
+ *   `audits_reason`: why no tested page got those audits, when they were asked for and none did.
  * @property {{available: boolean, reason: string|null, form_factor: 'phone'}} field
  *   `available`: the Chrome UX Report API answered, with a record or with "no data". `reason` says why not.
  * @property {{origin: string, field: FieldRecord|null, field_note: string|null}} origin  The whole site.

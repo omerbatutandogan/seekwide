@@ -12,7 +12,7 @@ import { LIMITS } from '../config.js';
 import { normalizeUrl } from '../util/url.js';
 import { asObject, nonNegative, requestJson } from './google-api.js';
 
-/** @import { LabMetrics } from '../types.js' */
+/** @import { LabAudit, LabMetrics } from '../types.js' */
 /** @import { ApiFailure, ApiRequestOptions } from './google-api.js' */
 
 export const PSI_ENDPOINT = 'https://pagespeedonline.googleapis.com/pagespeedonline/v5/runPagespeed';
@@ -23,6 +23,12 @@ const AUDITS = Object.freeze({
   cls: 'cumulative-layout-shift',
   tbt: 'total-blocking-time',
 });
+
+/** Lighthouse audits the cro module reads, from the accessibility and best-practices categories (default-config.js). */
+const LAB_AUDITS = Object.freeze({ target_size: 'target-size', console_errors: 'errors-in-console' });
+/** Categories asked for besides PERFORMANCE when the lab audits are wanted. */
+export const LAB_AUDIT_CATEGORIES = Object.freeze(['ACCESSIBILITY', 'BEST_PRACTICES']);
+const MAX_ITEMS = 10_000;
 
 const VERSION = /^[0-9A-Za-z.+-]{1,40}$/;
 const CODE = /^[A-Z][A-Z0-9_]{1,63}$/;
@@ -49,12 +55,30 @@ function auditValue(audits, id) {
 }
 
 /**
+ * One Lighthouse audit as the cro checks judge it: its score (0 to 1) and how
+ * many items its table lists; null when the audit is missing, not applicable,
+ * failed to run, or is not scored.
+ * @param {Record<string, unknown>} audits
+ * @param {string} id
+ * @returns {LabAudit|null}
+ */
+function labAudit(audits, id) {
+  const audit = asObject(audits[id]);
+  const score = audit.score;
+  if (!['binary', 'numeric'].includes(String(audit.scoreDisplayMode)) || typeof score !== 'number' || !Number.isFinite(score) || score < 0 || score > 1) return null;
+  const items = asObject(audit.details).items;
+  return { score: Math.round(score * 100) / 100, items: Array.isArray(items) ? Math.min(items.length, MAX_ITEMS) : 0 };
+}
+
+/**
  * Read the lab metrics out of a PageSpeed Insights answer.
  * @param {Record<string, unknown>} data
  * @param {string} pageUrl
+ * @param {boolean} withAudits  The accessibility and best-practices categories were asked for.
+ * @param {boolean} [auditsOnly]  Only those were asked for: no metric is expected.
  * @returns {{ok: true, lab: LabMetrics} | {ok: false, failure: ApiFailure}}
  */
-function readLab(data, pageUrl) {
+function readLab(data, pageUrl, withAudits, auditsOnly = false) {
   const lighthouse = asObject(data.lighthouseResult);
 
   // Lighthouse reports a page it could not load here, with HTTP 200.
@@ -72,7 +96,7 @@ function readLab(data, pageUrl) {
   const lcp = auditValue(audits, AUDITS.lcp);
   const cls = auditValue(audits, AUDITS.cls);
   const tbt = auditValue(audits, AUDITS.tbt);
-  if (lcp === null && cls === null && tbt === null) return fail('bad_response', 'NO_METRICS');
+  if (!auditsOnly && lcp === null && cls === null && tbt === null) return fail('bad_response', 'NO_METRICS');
 
   const version = lighthouse.lighthouseVersion;
   const ended = lighthouse.finalDisplayedUrl ?? lighthouse.finalUrl;
@@ -85,6 +109,7 @@ function readLab(data, pageUrl) {
       tbt_ms: tbt === null ? null : Math.round(tbt),
       lighthouse_version: typeof version === 'string' && VERSION.test(version) ? version : null,
       final_url: finalUrl !== null && finalUrl !== normalizeUrl(pageUrl) ? finalUrl : null,
+      ...(withAudits ? { audits: { target_size: labAudit(audits, LAB_AUDITS.target_size), console_errors: labAudit(audits, LAB_AUDITS.console_errors) } } : {}),
     },
   };
 }
@@ -102,15 +127,23 @@ function readLab(data, pageUrl) {
  * and the layout shift score has three decimals.
  *
  * @param {string} pageUrl  An absolute http(s) URL.
- * @param {Pick<ApiRequestOptions, 'apiKey'|'fetch'|'fetchOptions'|'timeoutMs'> & {endpoint?: string}} [options]
+ * With `labAudits`, the same request also asks for the ACCESSIBILITY and
+ * BEST_PRACTICES categories, and the lab metrics carry Lighthouse's
+ * `target-size` and `errors-in-console` audits (`audits`). With `auditsOnly`
+ * too, the request asks for those two categories and not PERFORMANCE, and the
+ * result carries the audits with every metric null: what a cro audit adds to
+ * a measurement made earlier without them.
+ *
+ * @param {Pick<ApiRequestOptions, 'apiKey'|'fetch'|'fetchOptions'|'timeoutMs'> & {endpoint?: string, labAudits?: boolean, auditsOnly?: boolean}} [options]
  *   Without `apiKey` the request is sent without one. `endpoint` is for tests.
  * @returns {Promise<{ok: true, lab: LabMetrics} | {ok: false, failure: ApiFailure}>}
  */
 export async function runPagespeed(pageUrl, options = {}) {
-  const { apiKey = null, endpoint = PSI_ENDPOINT, fetch, fetchOptions, timeoutMs = LIMITS.psiTimeoutMs } = options;
-  const query = new URLSearchParams({ url: pageUrl, category: 'PERFORMANCE', strategy: 'MOBILE' });
+  const { apiKey = null, endpoint = PSI_ENDPOINT, fetch, fetchOptions, timeoutMs = LIMITS.psiTimeoutMs, labAudits = false, auditsOnly = false } = options;
+  const query = auditsOnly && labAudits ? new URLSearchParams({ url: pageUrl, strategy: 'MOBILE' }) : new URLSearchParams({ url: pageUrl, category: 'PERFORMANCE', strategy: 'MOBILE' });
+  if (labAudits) for (const category of LAB_AUDIT_CATEGORIES) query.append('category', category);
   const response = await requestJson(`${endpoint}?${query}`, {
     apiKey, fetch, fetchOptions, timeoutMs, maxBytes: LIMITS.psiMaxBodyBytes,
   });
-  return response.ok ? readLab(response.data, pageUrl) : response;
+  return response.ok ? readLab(response.data, pageUrl, labAudits, auditsOnly && labAudits) : response;
 }

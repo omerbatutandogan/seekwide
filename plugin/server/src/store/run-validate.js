@@ -11,6 +11,7 @@
 import { MODULES, SCORE_GROUPS, SEVERITIES } from '../config.js';
 import { MAX_URL_LENGTH, originOf } from '../util/url.js';
 import { isValidRunId } from './project.js';
+import { observationsProblem } from './observation-validate.js';
 
 /** @import { Run } from '../types.js' */
 
@@ -302,6 +303,8 @@ export function storedRunProblem(run) {
   if (sharing !== null) return sharing;
   const ai = aiProblem(run.ai);
   if (ai !== null) return ai;
+  const observed = observationsProblem(run.observations);
+  if (observed !== null) return observed;
   const findings = /** @type {unknown[]} */ (run.findings);
   for (let i = 0; i < findings.length; i += 1) {
     const finding = findings[i];

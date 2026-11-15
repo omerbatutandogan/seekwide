@@ -6,6 +6,7 @@
 /** @import { ImageFilesSummary } from './media.js' */
 /** @import { AppFilesSummary, AppsProfile, NotRequestedSummary, SocialImagesSummary } from './sharing.js' */
 /** @import { AiPolicy, AiSummary } from './ai.js' */
+/** @import { Observation } from './forms.js' */
 
 export {};
 
@@ -83,6 +84,9 @@ export {};
  *   check requested. Null when there were none; absent in runs stored before rule set 0.1.9.
  * @property {AiSummary|null} [ai]   The ai module's record: the data date, the stated policy, what robots.txt tells each AI
  *   crawler and what /llms.txt answered. Null when the module did not run; absent in runs stored before rule set 0.2.0.
+ * @property {Observation[]|null} [observations]  Measurements without a pass/fail threshold (cro and sxo modules), shown in their
+ *   own report section; they never change a score and are not findings. Null when no module that observes ran; absent in
+ *   runs stored before rule set 0.2.1.
  */
 
 /**

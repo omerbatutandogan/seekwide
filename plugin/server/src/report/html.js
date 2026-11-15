@@ -8,6 +8,7 @@ import { affectedText, confidenceText } from './findings.js';
 import { CSS } from './html-css.js';
 import { buildReport } from './model.js';
 import { trafficText } from './search.js';
+import { OBSERVED_NOTE } from './observations.js';
 
 /** @typedef {ReturnType<typeof buildReport>} Report */
 
@@ -117,6 +118,17 @@ ${rows.length > 0 ? html`<table><thead><tr><th>Crawler</th><th>Vendor</th><th>Pu
 ${a.statements.filter((_, i) => i !== 1).map((statement) => html`<p class="meta">${statement}</p>`)}
 <p class="meta">Crawler data verified ${a.dataDate}.</p>
 <div class="warn"><strong>Check by hand</strong> (an audit from outside cannot see these)<ul>${a.manual.map((item) => html`<li>${item}</li>`)}</ul></div>
+</section>`;
+}
+
+/** @param {Report} r */
+function observed(r) {
+  if (r.observations === null) return '';
+  return html`<section id="observed"><h2>Observed (not scored)</h2>
+<p class="note">${OBSERVED_NOTE}</p>
+${r.observations.map((o) => html`<h3>${o.title}</h3>
+<ul>${o.lines.map((line) => html`<li>${line}</li>`)}${o.urls.length > 0 ? html`<li>Pages: ${o.urls.map((url, i) => html`${i > 0 ? ' ' : ''}${urlHtml(url)}`)}</li>` : ''}</ul>
+${o.note !== null ? html`<p class="meta">${o.note}</p>` : ''}${o.source !== null ? html`<p class="meta">Source: ${urlHtml(o.source)}</p>` : ''}`)}
 </section>`;
 }
 
@@ -257,7 +269,7 @@ export function renderHtml(run, options) {
 </head>
 <body>
 <main>
-${titleBlock(r)}${summary(r)}${scope(r)}${fixes(r)}${layers(r)}${scores(r)}${vitals(r)}${search(r)}${aiSection(r)}${topFixes(r)}${allFindings(r)}${suggestions(r)}${notRun(r)}${changes(r)}${method(r)}
+${titleBlock(r)}${summary(r)}${scope(r)}${fixes(r)}${layers(r)}${scores(r)}${vitals(r)}${search(r)}${aiSection(r)}${observed(r)}${topFixes(r)}${allFindings(r)}${suggestions(r)}${notRun(r)}${changes(r)}${method(r)}
 <footer>Seekwide ${r.pluginVersion} &middot; rules ${r.rulesVersion} &middot; run <code>${r.runId}</code> &middot; ${r.date.iso}</footer>
 </main>
 </body>

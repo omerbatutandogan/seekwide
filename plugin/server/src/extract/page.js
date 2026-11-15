@@ -15,6 +15,7 @@ import { indexabilityOf } from './indexability.js';
 import { securityHeaders } from './security-headers.js';
 import { emptySecurity } from './security.js';
 import { emptySocial } from './social.js';
+import { emptyForms } from './forms.js';
 
 /**
  * @typedef {Object} RecordBase
@@ -29,7 +30,7 @@ function emptyContent() {
     html_lang: null, titles: [], meta_descriptions: [], meta_robots: [], canonicals: [], hreflang: [],
     headings: [], viewport: null, og: {}, twitter: {}, links: [], images: [], jsonld: [], mixed_content: [],
     word_count: 0, text_hash: '', text_excerpt: '', security: emptySecurity(), videos: [], video_embeds: [], video_markup: false,
-    social: emptySocial(), ai: emptyAi(),
+    social: emptySocial(), ai: emptyAi(), forms: emptyForms(),
   };
 }
 

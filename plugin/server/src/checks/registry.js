@@ -2,11 +2,13 @@
 
 import { checks as aiChecks } from './ai/index.js';
 import { checks as asoChecks } from './aso/index.js';
+import { checks as croChecks } from './cro/index.js';
 import { checks as linkChecks } from './links/index.js';
 import { checks as mediaChecks } from './media/index.js';
 import { checks as securityChecks } from './security/index.js';
 import { checks as seoChecks } from './seo/index.js';
 import { checks as smoChecks } from './smo/index.js';
+import { checks as sxoChecks } from './sxo/index.js';
 import { prepareChecks } from './validate.js';
 
 /**
@@ -14,5 +16,5 @@ import { prepareChecks } from './validate.js';
  * @returns {CheckDef[]}
  */
 export function allChecks() {
-  return prepareChecks([...seoChecks, ...linkChecks, ...securityChecks, ...mediaChecks, ...smoChecks, ...asoChecks, ...aiChecks]);
+  return prepareChecks([...seoChecks, ...linkChecks, ...securityChecks, ...mediaChecks, ...smoChecks, ...asoChecks, ...aiChecks, ...croChecks, ...sxoChecks]);
 }

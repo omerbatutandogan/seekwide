@@ -217,6 +217,7 @@ test('scores and coverage are reported for every module', () => {
   assert.deepEqual(skipped.map((stat) => stat.id), [
     'ai.access.self_refused', 'ai.llms_txt.malformed',
     'aso.aasa.invalid', 'aso.aasa.missing', 'aso.assetlinks.invalid', 'aso.assetlinks.missing',
+    'cro.lab.console_errors', 'cro.lab.target_size',
     'links.outbound.broken',
     'media.image.broken', 'media.image.large_file', 'media.image.legacy_format', 'media.image.robots_blocked',
     'security.headers.csp_missing', 'security.headers.framing_missing', 'security.headers.hsts_missing',

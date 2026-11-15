@@ -14,12 +14,13 @@ import { MEDIA_ARGUMENTS, collectImageFiles, imageFilesNotes } from './audit-med
 import { AI_ARGUMENTS, aiNotes, aiSummary, collectAi } from './audit-ai.js';
 import { aiAccessNotJudged } from '../util/ai-summary.js';
 import { SHARING_ARGUMENTS, appFilesNotes, collectAppFiles, collectSocialImages, notRequestedNotes, notRequestedSummary, socialImagesNotes } from './audit-sharing.js';
-import { VITALS_ARGUMENTS, collectVitals, vitalsOutput } from './audit-vitals.js';
+import { VITALS_ARGUMENTS, collectAds, collectVitals, labAuditsNotes, vitalsOutput } from './audit-vitals.js';
 import { JOB_ID_SCHEMA, PROJECT_DIR_SCHEMA, UNTRUSTED_NOTE, countBy, resolveProjectDir, withStoreErrors } from './common.js';
 import { finishedCrawl } from './crawl.js';
 import { VERIFY_FIXES_SCHEMA, fixBase, fixOutput, fixVerification } from './fix.js';
 import { SOURCE_DIR_SCHEMA, auditSources } from './project.js';
 import { crawlIdentity } from '../util/site-identity.js';
+import { buildObservations, observationNotes } from '../observations/index.js';
 
 const TOP_GROUPS = 10;
 
@@ -68,7 +69,7 @@ export function auditTools(deps) {
       name: 'audit_run',
       title: 'Run the audit',
       description:
-        'Run the SEO, link, security, media, social sharing (smo), app (aso) and AI access and readiness (ai) checks on a finished crawl, save the run under <project>/.seekwide/runs/ and return ' +
+        'Run the SEO, link, security, media, social sharing (smo), app (aso), AI access and readiness (ai), forms and contact (cro) and search experience (sxo) checks on a finished crawl, save the run under <project>/.seekwide/runs/ and return ' +
         'scores, totals, the top problems and notes on coverage. Accepts crawls that are done or blocked. ' +
         'The security module only reads the crawled pages and sends no request of its own. ' +
         `The media module checks up to ${LIMITS.maxImageChecks} image files the pages show (robots.txt first, then a HEAD request each), which can take a minute. ` +
@@ -76,8 +77,11 @@ export function auditTools(deps) {
         '/.well-known/apple-app-site-association and /.well-known/assetlinks.json, and the apps the site profile declares. ' +
         'The ai module reads what robots.txt tells known AI crawlers (from the crawl; it never pretends to be one), the snippet and Bing directives of the pages, ' +
         'and requests the site\'s /llms.txt once; it is given as a count, never a score, and uses the AI policy the site profile states. ' +
+        'The cro module reads the forms of the crawled pages and never submits one or requests its action URL; with it, the PageSpeed Insights lab test also asks for Lighthouse\'s accessibility and best-practices audits. ' +
+        'The sxo module reads titles, headings, the viewport and redirects; with a Google API key it asks the Chrome UX Report once for the origin\'s experimental ad metrics. ' +
+        'Both add observations: measurements without a threshold that never change a score. ' +
         'No check ever sends a request to Google Play or a social platform. ' +
-        'External links are checked only when the links module runs. With the seo module, Core Web Vitals are measured ' +
+        'External links are checked only when the links module runs. With the seo or cro module, Core Web Vitals are measured ' +
         'for a few pages through Google (PageSpeed Insights and the Chrome UX Report), which can take a minute; ' +
         'when Google refuses or does not answer, those checks are skipped and the audit still completes. ' +
         'With source_dir (repo mode, for a crawl of the project\'s own local server), each finding also names the source file it comes from. ' +
@@ -126,9 +130,14 @@ export function auditTools(deps) {
         const linksRequested = modules.includes('links');
         const checkOutbound = linksRequested && (args.check_outbound_links ?? true);
         const external = checkOutbound ? externalLinkUrls(crawl) : [];
-        // Core Web Vitals belong to the seo module. They are collected while the links are checked.
+        // Core Web Vitals belong to the seo module; the cro module reads Lighthouse's accessibility and best-practices audits
+        // from the same lab tests. They are collected while the links are checked.
         const seoRequested = modules.includes('seo');
-        const checkVitals = seoRequested && (args.check_core_web_vitals ?? true);
+        const croRequested = modules.includes('cro');
+        const askGoogle = args.check_core_web_vitals ?? true;
+        const checkVitals = (seoRequested || croRequested) && askGoogle;
+        // The sxo module's ad metrics: one Chrome UX Report query of their own, apart from the Core Web Vitals.
+        const sxoRequested = modules.includes('sxo');
         // Image files belong to the media module. They are checked after the external links, never at the same time:
         // an image and a link can be on one host, and that host must see one request at a time.
         const mediaRequested = modules.includes('media');
@@ -146,14 +155,16 @@ export function auditTools(deps) {
         const appsDone = socialDone.catch(() => null).then(() => collectAppFiles(deps, crawl, projectDir, { requested: asoRequested, check: args.check_app_files ?? true, signal }));
         const aiDone = appsDone.catch(() => null).then(() => collectAi(deps, crawl, projectDir, { requested: aiRequested, check: args.check_llms_txt ?? true, signal }));
         /** @type {[Map<string, OutboundResult>|null, VitalsData|null, Awaited<ReturnType<typeof collectImageFiles>>,
-         *   Awaited<ReturnType<typeof collectSocialImages>>, Awaited<ReturnType<typeof collectAppFiles>>, Awaited<ReturnType<typeof collectAi>>]} */
-        const [outbound, vitals, images, social, apps, ai] = await Promise.all([
+         *   Awaited<ReturnType<typeof collectSocialImages>>, Awaited<ReturnType<typeof collectAppFiles>>, Awaited<ReturnType<typeof collectAi>>,
+         *   Awaited<ReturnType<typeof collectAds>>]} */
+        const [outbound, vitals, images, social, apps, ai, ads] = await Promise.all([
           links,
-          checkVitals ? collectVitals(deps, crawl, args.core_web_vitals_pages ?? LIMITS.vitalsPagesDefault, pendingVitals, signal) : null,
+          checkVitals ? collectVitals(deps, crawl, args.core_web_vitals_pages ?? LIMITS.vitalsPagesDefault, pendingVitals, signal, croRequested) : null,
           imagesDone,
           socialDone,
           appsDone,
           aiDone,
+          collectAds(deps, crawl, { requested: sxoRequested, check: askGoogle, signal }),
         ]);
         signal?.throwIfAborted();
         const notRequested = notRequestedSummary({
@@ -215,6 +226,7 @@ export function auditTools(deps) {
           app_files: apps.summary,
           not_requested: notRequested,
           ai: aiSummary(crawl, ai, aiRequested),
+          observations: buildObservations(ctx, modules, { sxo: ads }),
         };
         // A count of what could be judged says what could not: robots.txt refused, failed or not recorded for AI crawlers.
         const notJudged = aiAccessNotJudged(run.ai);
@@ -239,6 +251,7 @@ export function auditTools(deps) {
           },
           top: topGroups(findings, TOP_GROUPS),
           core_web_vitals: vitalsOutput(vitals),
+          observations: run.observations ?? null,
           repo: run.repo,
           fix_verification: fixOutput(run.fixes ?? null),
           skipped_checks: skippedChecks(result.checks),
@@ -246,13 +259,15 @@ export function auditTools(deps) {
             ...runNotes(
               crawl,
               { requested: linksRequested, checked: checkOutbound, found: external.length },
-              { requested: seoRequested, checked: checkVitals, vitals },
+              { requested: seoRequested || croRequested, checked: checkVitals, vitals },
               mapped === null ? [] : mapped.notes,
             ),
             ...imageFilesNotes(images),
             ...socialImagesNotes(social),
             ...appFilesNotes(apps),
             ...aiNotes(run.ai ?? null, ai),
+            ...observationNotes(ctx, modules),
+            ...labAuditsNotes(vitals, croRequested),
             ...notRequestedNotes(notRequested),
           ],
           _note: UNTRUSTED_NOTE,

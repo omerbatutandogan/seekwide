@@ -7,6 +7,9 @@ import { aiRobotsReason } from '../crawl/ai-robots.js';
 import { isRefusedSitemap } from './page-helpers.js';
 import { scoreModules } from './scoring.js';
 
+/** Why a measurement that has lab data has no lab audits. */
+export const LAB_AUDITS_NOT_ASKED = 'Needs Lighthouse\'s accessibility and best-practices audits, which the lab tests of this measurement did not ask for. Audit with the cro module to have them asked for.';
+
 const SKIP_REASONS = {
   full_crawl: 'Needs a complete crawl. This crawl stopped at a limit (of pages, of size or of time) or was blocked.',
   sitemap: 'Needs an XML sitemap. None was found.',
@@ -20,6 +23,8 @@ const SKIP_REASONS = {
   app_files: 'Needs the app association files of the site to be read. They were not.',
   llms_txt: 'Needs the site\'s /llms.txt to be requested. It was not.',
   ai_robots: 'Needs what robots.txt tells AI crawlers. This crawl did not record it.',
+  lab_audits: 'Needs Lighthouse\'s accessibility and best-practices audits from PageSpeed Insights. They were not collected.',
+  form_pages: 'Needs the reading of forms the cro checks use. This crawl was made before rule set 0.2.1 and did not record it. Crawl the site again.',
   ai_pages: 'Needs the page signals the AI checks read (Bing\'s directives, data-nosnippet, scripts). This crawl was made before rule set 0.2.0 and did not record them. Crawl the site again.',
 };
 
@@ -100,6 +105,7 @@ export function buildContext(crawl, extras = {}) {
   if (aiReason === null) capabilities.add('ai_robots');
   else skipReasons.ai_robots = aiReason;
   if (pages.length === 0 || pages.some((page) => page.ai !== undefined)) capabilities.add('ai_pages');
+  if (pages.length === 0 || pages.some((page) => page.forms !== undefined)) capabilities.add('form_pages');
   const llmsTxt = extras.llmsTxt ?? null;
   if (llmsTxt !== null) capabilities.add('llms_txt');
   else if (extras.llmsTxtReason) skipReasons.llms_txt = extras.llmsTxtReason;
@@ -108,6 +114,11 @@ export function buildContext(crawl, extras = {}) {
     else if (vitals.lab.reason) skipReasons.lab_data = vitals.lab.reason;
     if (vitals.field.available) capabilities.add('field_data');
     else if (vitals.field.reason) skipReasons.field_data = vitals.field.reason;
+    // The cro module's lab audits come with the lab test when it asked for them.
+    if (vitals.pages.some((page) => page.lab?.audits !== undefined)) capabilities.add('lab_audits');
+    else if (!vitals.lab.available && vitals.lab.reason) skipReasons.lab_audits = vitals.lab.reason;
+    else if (vitals.lab.audits_requested !== true) skipReasons.lab_audits = LAB_AUDITS_NOT_ASKED;
+    else if (vitals.lab.audits_reason) skipReasons.lab_audits = vitals.lab.audits_reason;
   }
 
   /** @param {string} url */

@@ -62,7 +62,7 @@ export {};
 /**
  * @typedef {Object} CheckDef
  * @property {string} id               `<module>.<area>.<problem>`, lower-case, for example "seo.title.missing".
- * @property {'seo'|'links'|'security'|'media'|'smo'|'aso'|'ai'} module
+ * @property {'seo'|'links'|'security'|'media'|'smo'|'aso'|'ai'|'cro'|'sxo'} module
  * @property {'code'} engine           Every scripted check is 'code'. Model judgments are never checks.
  * @property {string} title            Short name of the problem, sentence case, no trailing period.
  * @property {string} description      What the check looks at and why it matters, one or two sentences.

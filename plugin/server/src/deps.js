@@ -13,6 +13,7 @@ import { renderHtml } from './report/html.js';
 import { renderMarkdown } from './report/markdown.js';
 import { attachSources, loadProjectSources } from './repo/sources.js';
 import { compareRuns, ensureProject, listRuns, loadRun, loadSearchImport, newRunId, projectPaths, readProfile, saveRun, saveSearchImport, writeProfile } from './store/index.js';
+import { measureAds } from './vitals/ads.js';
 import { measureVitals } from './vitals/measure.js';
 
 /** @import { ToolDeps } from './tools/index.js' */
@@ -21,7 +22,7 @@ import { measureVitals } from './vitals/measure.js';
  * Build the dependencies the tools run with.
  *
  * Guarantees: the Google API key is read from `env` here and nowhere else, and
- * only to be bound into `measureVitals`; `env` in the result holds the two
+ * only to be bound into `measureVitals` and `measureAds`; `env` in the result holds the two
  * report settings and nothing else, so no tool can read the key, or any other
  * variable, from the server's environment. Nothing is read from disk or sent
  * anywhere until a tool is called.
@@ -53,6 +54,10 @@ export function createToolDeps(env = process.env, measure = measureVitals) {
     measureVitals: (crawl, options) => {
       const { key, unusable } = googleApiKeySetting(env);
       return measure(crawl, { ...options, apiKey: key, ...(unusable ? { apiKeyUnusable: true } : {}) });
+    },
+    measureAds: (crawl, options) => {
+      const { key, unusable } = googleApiKeySetting(env);
+      return measureAds(crawl, { ...options, apiKey: key, ...(unusable ? { apiKeyUnusable: true } : {}) });
     },
     loadProjectSources,
     attachSources,

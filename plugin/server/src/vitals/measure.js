@@ -7,6 +7,7 @@ import { LIMITS } from '../config.js';
 import { isPublicHost } from '../util/site-identity.js';
 import { queryCrux } from './crux.js';
 import { describeFailure, isServiceFailure } from './google-api.js';
+import { addLabAudits } from './lab-audits.js';
 import { runPagespeed } from './psi.js';
 import { selectVitalsPages } from './select.js';
 
@@ -25,6 +26,10 @@ import { selectVitalsPages } from './select.js';
  *   or after `signal` fired (the audit that asked was cancelled).
  * @property {AbortSignal} [signal]
  * @property {number} [concurrency]   PageSpeed Insights tests running at once when a key is set.
+ * @property {boolean} [labAudits]    Ask PageSpeed Insights for the accessibility and best-practices categories too, in the
+ *   same request (cro module).
+ * @property {VitalsData} [base]       A measurement made earlier without them: only the audits are asked for and added to it
+ *   (`addLabAudits`); its values are kept and the Chrome UX Report is not asked.
  */
 
 /**
@@ -40,7 +45,7 @@ const NOT_PUBLIC = "The audited site is on this machine or on a private network,
 const NOT_KNOWN_PUBLIC = 'This crawl does not record whether the site is on this machine, so nothing was sent to Google. Crawl the site again to measure Core Web Vitals.';
 const NO_PAGES = 'No indexable HTML page was crawled, so there was no page to measure.';
 const NO_KEY = 'No Google API key is set, and the Chrome UX Report API requires one. Add a key in the plugin settings to collect field data.';
-const KEY_UNUSABLE = 'The Google API key in the plugin settings cannot be used: it holds a space, a line break or a character outside plain ASCII, or is longer than 256 characters, so no request can carry it. Nothing was sent to Google. Check the key in the plugin settings.';
+export const KEY_UNUSABLE = 'The Google API key in the plugin settings cannot be used: it holds a space, a line break or a character outside plain ASCII, or is longer than 256 characters, so no request can carry it. Nothing was sent to Google. Check the key in the plugin settings.';
 const NO_FIELD_DATA = 'The Chrome UX Report has no phone data for this site or for the tested pages. It only publishes data for sites and pages with enough visits from Chrome users.';
 const NO_ORIGIN_DATA = 'The Chrome UX Report has no phone data for this site.';
 const NO_PAGE_DATA = 'The Chrome UX Report has no phone data for this page.';
@@ -60,7 +65,7 @@ const MAX_NAMED = 3;
  * @param {CrawlResult} crawl
  * @returns {string|null}
  */
-function whyNotSent(crawl) {
+export function whyNotSent(crawl) {
   const local = crawl.options?.local;
   if (local === true) return NOT_PUBLIC;
   if (local !== false) return NOT_KNOWN_PUBLIC;
@@ -87,10 +92,10 @@ export function unavailableVitals(origin, reason) {
  * Lab data: one PageSpeed Insights test per page. Without a key the tests run
  * one at a time. A refusal that concerns the service or the key stops the rest.
  * @param {VitalsPage[]} pages
- * @param {{apiKey: string|null, psi: typeof runPagespeed, concurrency: number, run: RunState}} deps
+ * @param {{apiKey: string|null, psi: typeof runPagespeed, concurrency: number, run: RunState, labAudits: boolean}} deps
  * @returns {Promise<ApiFailure|null>} The refusal that stopped the tests, if any.
  */
-async function collectLab(pages, { apiKey, psi, concurrency, run }) {
+async function collectLab(pages, { apiKey, psi, concurrency, run, labAudits }) {
   /** @type {ApiFailure|null} */
   let refusal = null;
   const queue = [...pages];
@@ -107,7 +112,7 @@ async function collectLab(pages, { apiKey, psi, concurrency, run }) {
       }
       let result;
       try {
-        result = await psi(page.url, { apiKey });
+        result = await psi(page.url, { apiKey, ...(labAudits ? { labAudits } : {}) });
       } catch (error) {
         run.fail(error);
         return;
@@ -201,7 +206,14 @@ export async function measureVitals(crawl, options = {}) {
   if (!Number.isInteger(concurrency) || concurrency < 1) throw new TypeError('measureVitals concurrency must be a positive integer');
   if (!Number.isFinite(deadlineMs) || deadlineMs < 0) throw new TypeError('measureVitals deadlineMs must be a non-negative number');
   if (options.apiKeyUnusable !== undefined && typeof options.apiKeyUnusable !== 'boolean') throw new TypeError('measureVitals apiKeyUnusable must be true or false');
+  if (options.labAudits !== undefined && typeof options.labAudits !== 'boolean') throw new TypeError('measureVitals labAudits must be true or false');
 
+  if (options.base !== undefined) {
+    return addLabAudits(crawl, options.base, {
+      apiKey, refused: whyNotSent(crawl), keyUnusable: options.apiKeyUnusable === true ? KEY_UNUSABLE : null, now, deadlineMs, concurrency,
+      ...(options.runPagespeed ? { psi: options.runPagespeed } : {}), ...(options.signal ? { signal: options.signal } : {}),
+    });
+  }
   const refusedSite = whyNotSent(crawl);
   if (refusedSite !== null) return unavailableVitals(crawl.site_origin, refusedSite);
   // Each page is checked again, so a crawl file that names local pages under a public origin sends none of them.
@@ -212,7 +224,7 @@ export async function measureVitals(crawl, options = {}) {
 
   /** @type {VitalsData} */
   const data = {
-    lab: { available: false, reason: null, device: 'mobile' },
+    lab: { available: false, reason: null, device: 'mobile', ...(options.labAudits === true ? { audits_requested: true } : {}) },
     field: { available: false, reason: NO_KEY, form_factor: 'phone' },
     origin: { origin: crawl.site_origin, field: null, field_note: null },
     pages: selected.map(({ url, why }) => ({ url, why, lab: null, lab_note: null, field: null, field_note: null })),
@@ -231,7 +243,7 @@ export async function measureVitals(crawl, options = {}) {
     },
   };
   const [refusal] = await Promise.all([
-    collectLab(data.pages, { apiKey, psi: options.runPagespeed ?? runPagespeed, concurrency, run }),
+    collectLab(data.pages, { apiKey, psi: options.runPagespeed ?? runPagespeed, concurrency, run, labAudits: options.labAudits === true }),
     apiKey === null ? undefined : collectField(data, { apiKey, crux: options.queryCrux ?? queryCrux, run }),
   ]);
   if (crash.thrown) throw crash.error;

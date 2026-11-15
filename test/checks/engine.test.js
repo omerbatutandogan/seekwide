@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { buildContext, runChecks } from '../../plugin/server/src/checks/engine.js';
+import { LAB_AUDITS_NOT_ASKED, buildContext, runChecks } from '../../plugin/server/src/checks/engine.js';
 import { scoreModules } from '../../plugin/server/src/checks/scoring.js';
 import { prepareChecks, validateCheckDef } from '../../plugin/server/src/checks/validate.js';
 import { SITE, makeCrawl, makeLink, makePage, makeRedirect, makeVitals } from '../helpers/factories.js';
@@ -51,7 +51,7 @@ test('buildContext indexes pages, inlinks and capabilities', () => {
   assert.equal(ctx.inlinks.get(`${SITE}/a`)?.length, 2);
   assert.equal(ctx.inlinks.has('https://other.test/x'), false);
   assert.equal(ctx.sitemapUrls.has(`${SITE}/a`), true);
-  assert.deepEqual([...ctx.capabilities].sort(), ['ai_pages', 'full_crawl', 'live_site', 'robots', 'sitemap']);
+  assert.deepEqual([...ctx.capabilities].sort(), ['ai_pages', 'form_pages', 'full_crawl', 'live_site', 'robots', 'sitemap']);
   assert.deepEqual(ctx.site, { origin: SITE, host: 'example.test', https: true, start_url: `${SITE}/` });
   assert.equal(ctx.outbound, null);
   assert.equal(ctx.vitals, null);
@@ -70,19 +70,19 @@ test('buildContext provides live_site unless the crawl was of a site on this mac
 test('buildContext adds lab_data and field_data only for the sources that answered, and keeps the reason of the others', () => {
   const both = buildContext(makeCrawl(), { vitals: makeVitals() });
   assert.ok(both.capabilities.has('lab_data') && both.capabilities.has('field_data'));
-  assert.deepEqual(both.skipReasons, { ai_robots: NO_PAGE });
+  assert.deepEqual(both.skipReasons, { ai_robots: NO_PAGE, lab_audits: LAB_AUDITS_NOT_ASKED }, 'lab data without the audits says why they are missing');
   assert.deepEqual(both.vitals, makeVitals());
 
   const labOnly = buildContext(makeCrawl(), { vitals: makeVitals({ field: { available: false, reason: 'No key.', form_factor: 'phone' } }) });
   assert.equal(labOnly.capabilities.has('lab_data'), true);
   assert.equal(labOnly.capabilities.has('field_data'), false);
-  assert.deepEqual(labOnly.skipReasons, { field_data: 'No key.', ai_robots: NO_PAGE });
+  assert.deepEqual(labOnly.skipReasons, { field_data: 'No key.', ai_robots: NO_PAGE, lab_audits: LAB_AUDITS_NOT_ASKED });
 
   const neither = buildContext(makeCrawl(), {
     vitals: makeVitals({ lab: { available: false, reason: 'Refused.', device: 'mobile' }, field: { available: false, reason: null, form_factor: 'phone' } }),
   });
   assert.equal(neither.capabilities.has('lab_data') || neither.capabilities.has('field_data'), false);
-  assert.deepEqual(neither.skipReasons, { lab_data: 'Refused.', ai_robots: NO_PAGE }, 'a source without a reason gets the default one');
+  assert.deepEqual(neither.skipReasons, { lab_data: 'Refused.', ai_robots: NO_PAGE, lab_audits: 'Refused.' }, 'a source without a reason gets the default one');
 });
 
 test('a check that needs missing data is skipped with the collector\'s reason, or the default one', () => {

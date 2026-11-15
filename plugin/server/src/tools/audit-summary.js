@@ -50,14 +50,18 @@ const LIMIT_WORDS = {
 /**
  * One sentence on the pages where a cap stopped the reading of the page
  * (`PageRecord.limits_reached`), or null when there are none. Signals past a
- * cap were not read, so a check can miss something there.
+ * cap were not read, so a check can miss something there. The caps of the
+ * forms reading are left out: only the cro module reads forms, and its own
+ * note names them (`observationNotes`).
  * @param {CrawlResult} crawl
  * @returns {string|null}
  */
 export function limitsNote(crawl) {
-  const capped = crawl.pages.filter((page) => Array.isArray(page.limits_reached) && page.limits_reached.length > 0);
+  /** @param {import('../types.js').PageRecord} page */
+  const caps = (page) => (Array.isArray(page.limits_reached) ? page.limits_reached.filter((name) => name !== 'forms' && !name.startsWith('forms.')) : []);
+  const capped = crawl.pages.filter((page) => caps(page).length > 0);
   if (capped.length === 0) return null;
-  const counts = countBy(capped.flatMap((page) => /** @type {string[]} */ (page.limits_reached)), (name) => name);
+  const counts = countBy(capped.flatMap(caps), (name) => name);
   const reasons = Object.entries(counts)
     .sort(([a], [b]) => (a < b ? -1 : 1))
     .map(([name, count]) => `${LIMIT_WORDS[/** @type {keyof typeof LIMIT_WORDS} */ (name)] ?? `the list of ${name} reached its cap`} on ${count === 1 ? '1 page' : `${count} pages`}`);

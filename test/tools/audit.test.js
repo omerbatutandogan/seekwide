@@ -92,7 +92,7 @@ describe('audit_run', () => {
     assert.equal(run.rules_version, RULES_VERSION);
     assert.equal(run.plugin_version, VERSION);
     assert.equal(run.schema_version, 1);
-    assert.deepEqual(run.modules_requested, ['seo', 'links', 'security', 'media', 'smo', 'aso', 'ai']);
+    assert.deepEqual(run.modules_requested, ['seo', 'links', 'security', 'media', 'smo', 'aso', 'ai', 'cro', 'sxo']);
     assert.deepEqual(run.crawl, {
       id: 'c-1', pages_crawled: 2, html_pages: 2, indexable_pages: 2, unreadable_pages: 0, truncated: false, blocked: null,
       robots_status: 'ok', sitemap_urls: 0, max_pages: 25, user_agent: 'seekwide/test',
@@ -139,8 +139,8 @@ describe('audit_run', () => {
     ];
     const result = await audit(fake).handler({ job_id: 'c-1' });
 
-    assert.deepEqual(fake.calls.measureVitals, [['c-1', { maxPages: LIMITS.vitalsPagesDefault }]]);
-    assert.deepEqual(fake.runs[0].core_web_vitals, { ...vitals, measured_at: NOW.toISOString(), reused: false }, 'the run keeps passing values too, for the report');
+    assert.deepEqual(fake.calls.measureVitals, [['c-1', { maxPages: LIMITS.vitalsPagesDefault, labAudits: true }]]);
+    assert.deepEqual(fake.runs[0].core_web_vitals, { ...vitals, lab: { ...vitals.lab, audits_requested: true }, measured_at: NOW.toISOString(), reused: false }, 'the run keeps passing values too, for the report (the cro module asked for the lab audits)');
     assert.deepEqual(result.core_web_vitals, {
       measured_at: NOW.toISOString(),
       reused: false,
@@ -160,7 +160,7 @@ describe('audit_run', () => {
   it('passes the page budget through and stays within the schema limits', async () => {
     const { fake } = setup();
     await audit(fake).handler({ job_id: 'c-1', core_web_vitals_pages: 7 });
-    assert.deepEqual(fake.calls.measureVitals, [['c-1', { maxPages: 7 }]]);
+    assert.deepEqual(fake.calls.measureVitals, [['c-1', { maxPages: 7, labAudits: true }]]);
     const schema = /** @type {any} */ (audit(fake).inputSchema).properties;
     assert.deepEqual([schema.core_web_vitals_pages.minimum, schema.core_web_vitals_pages.maximum, schema.core_web_vitals_pages.default], [1, LIMITS.vitalsPagesMax, LIMITS.vitalsPagesDefault]);
     assert.equal(schema.check_core_web_vitals.default, true);

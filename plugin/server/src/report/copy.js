@@ -3,7 +3,7 @@
 
 export const TITLE = 'SEO and link audit';
 
-const TITLE_WORDS = /** @type {Record<string, string>} */ ({ seo: 'SEO', links: 'link', security: 'security', media: 'media', smo: 'social sharing', aso: 'app', ai: 'AI readiness' });
+const TITLE_WORDS = /** @type {Record<string, string>} */ ({ seo: 'SEO', links: 'link', security: 'security', media: 'media', smo: 'social sharing', aso: 'app', ai: 'AI readiness', cro: 'form', sxo: 'search experience' });
 
 /**
  * The report's title. A run of only the seo and links modules keeps the title
@@ -12,7 +12,7 @@ const TITLE_WORDS = /** @type {Record<string, string>} */ ({ seo: 'SEO', links: 
  * @returns {string}
  */
 export function reportTitle(modules) {
-  const names = Array.isArray(modules) ? ['seo', 'links', 'security', 'media', 'smo', 'aso', 'ai'].filter((name) => modules.includes(name)) : [];
+  const names = Array.isArray(modules) ? ['seo', 'links', 'security', 'media', 'smo', 'aso', 'ai', 'cro', 'sxo'].filter((name) => modules.includes(name)) : [];
   if (names.every((name) => name === 'seo' || name === 'links')) return TITLE;
   const words = names.map((name) => TITLE_WORDS[name]);
   const joined = words.length === 1 ? words[0] : `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`;
@@ -24,7 +24,7 @@ export const SEVERITY_LABELS = Object.freeze({ critical: 'Critical', high: 'High
 export const CONFIDENCE_LABELS = Object.freeze({ confirmed: 'Confirmed', likely: 'Likely' });
 
 export const MODULE_LABELS = Object.freeze({
-  seo: 'SEO', links: 'Links', security: 'Security', security_headers: 'Security headers', media: 'Media', smo: 'Social sharing', aso: 'App links', ai: 'AI readiness',
+  seo: 'SEO', links: 'Links', security: 'Security', security_headers: 'Security headers', media: 'Media', smo: 'Social sharing', aso: 'App links', ai: 'AI readiness', cro: 'Forms and contact', sxo: 'Search experience',
 });
 
 export const BLOCK_REASONS = Object.freeze({

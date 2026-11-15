@@ -6,6 +6,7 @@
 /** @import { fetchAppFiles } from '../net/app-files.js' */
 /** @import { fetchLlmsTxt } from '../net/llms-txt.js' */
 /** @import { ToolDef } from '../mcp/stdio.js' */
+/** @import { AdMetrics } from '../vitals/crux.js' */
 /** @import { ProjectPaths } from '../store/project.js' */
 /** @import { ProjectSources } from '../repo/sources.js' */
 /** @import { ScoreChange } from '../store/compare.js' */
@@ -55,7 +56,9 @@ import { searchDataTools } from './search-data.js';
  * @property {(run: Run, options: object) => string} renderMarkdown
  * @property {(run: Run, options: object) => string} renderHtml
  * @property {(urls: string[], options?: {maxLinks?: number, concurrency?: number, signal?: AbortSignal}) => Promise<Map<string, OutboundResult>>} checkExternalLinks
- * @property {(crawl: CrawlResult, options: {maxPages: number, signal?: AbortSignal}) => Promise<VitalsData>} measureVitals
+ * @property {(crawl: CrawlResult, options: {maxPages: number, signal?: AbortSignal, labAudits?: boolean, base?: VitalsData}) => Promise<VitalsData>} measureVitals
+ * @property {(crawl: CrawlResult, options: {signal?: AbortSignal}) => Promise<{ads: AdMetrics|null, reason: string|null}>} measureAds
+ *   The Chrome UX Report's experimental ad metrics of the crawl's origin (sxo module), with the key bound in like `measureVitals`.
  *   Core Web Vitals of a crawl. The Google API key is bound into this function where the server is
  *   wired, so no tool ever holds it.
  * @property {(urls: string[], options?: Parameters<typeof checkImageFiles>[1]) => Promise<Map<string, ImageFileResult>>} checkImageFiles

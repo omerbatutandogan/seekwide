@@ -6,6 +6,7 @@ import { plural } from './facts.js';
 import { affectedText, confidenceText } from './findings.js';
 import { buildReport } from './model.js';
 import { trafficText } from './search.js';
+import { OBSERVED_NOTE } from './observations.js';
 
 /** @typedef {ReturnType<typeof buildReport>} Report */
 
@@ -167,6 +168,20 @@ function aiSection(r) {
 }
 
 /** @param {Report} r */
+function observed(r) {
+  if (r.observations === null) return [];
+  const lines = ['## Observed (not scored)', '', `*${mdText(OBSERVED_NOTE)}*`, ''];
+  for (const o of r.observations) {
+    lines.push(`### ${mdText(o.title)}`, '', ...o.lines.map((line) => `- ${mdText(line)}`));
+    if (o.urls.length > 0) lines.push(`- Pages: ${o.urls.map((url) => mdUrl(url, true)).join(' ')}`);
+    lines.push('');
+    if (o.note !== null) lines.push(`*${mdText(o.note)}*`, '');
+    if (o.source !== null) lines.push(`Source: ${mdUrl(o.source, true)}`, '');
+  }
+  return lines;
+}
+
+/** @param {Report} r */
 function topFixes(r) {
   const lines = ['## Top fixes', ''];
   if (r.topFixes.length === 0) return [...lines, 'No findings. Every check that ran passed.', ''];
@@ -265,7 +280,7 @@ function method(r) {
 export function renderMarkdown(run, options) {
   const r = buildReport(run, options);
   const lines = [
-    ...header(r), ...summary(r), ...scope(r), ...fixes(r), ...layers(r), ...scores(r), ...vitals(r), ...search(r), ...aiSection(r), ...topFixes(r),
+    ...header(r), ...summary(r), ...scope(r), ...fixes(r), ...layers(r), ...scores(r), ...vitals(r), ...search(r), ...aiSection(r), ...observed(r), ...topFixes(r),
     ...allFindings(r), ...suggestions(r), ...notRun(r), ...changes(r), ...method(r),
   ];
   return `${lines.join('\n').trimEnd()}\n`;

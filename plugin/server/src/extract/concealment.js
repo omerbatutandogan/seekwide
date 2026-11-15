@@ -133,7 +133,7 @@ export function lengthPx(value) {
  * @param {Map<string, string>} style
  * @returns {boolean} True when the inline style moves the box at least `OFFSCREEN_PX` to the left or up, off the page.
  */
-function offscreen(style) {
+export function offscreen(style) {
   const far = (/** @type {string|undefined} */ value, sign = -1) => {
     const px = lengthPx(value?.trim());
     return px !== null && sign * px >= OFFSCREEN_PX;

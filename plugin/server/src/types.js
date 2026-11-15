@@ -38,6 +38,14 @@ export {};
 /** @typedef {import('./types/ai.js').LlmsTxtResult} LlmsTxtResult */
 /** @typedef {import('./types/ai.js').AiSummary} AiSummary */
 
+// The cro module and the observations of a run: types/forms.js
+/** @typedef {import('./types/forms.js').FormRecord} FormRecord */
+/** @typedef {import('./types/forms.js').NameSource} NameSource */
+/** @typedef {import('./types/forms.js').ControlRecord} ControlRecord */
+/** @typedef {import('./types/forms.js').FirstAction} FirstAction */
+/** @typedef {import('./types/forms.js').FormsRecord} FormsRecord */
+/** @typedef {import('./types/forms.js').Observation} Observation */
+
 // Security signals: types/security.js
 /** @typedef {import('./types/security.js').HiddenLinkRecord} HiddenLinkRecord */
 /** @typedef {import('./types/security.js').EmbedRecord} EmbedRecord */
@@ -69,6 +77,7 @@ export {};
 
 // Core Web Vitals: types/vitals.js
 /** @typedef {import('./types/vitals.js').LabMetrics} LabMetrics */
+/** @typedef {import('./types/vitals.js').LabAudit} LabAudit */
 /** @typedef {import('./types/vitals.js').FieldMetric} FieldMetric */
 /** @typedef {import('./types/vitals.js').FieldRecord} FieldRecord */
 /** @typedef {import('./types/vitals.js').VitalsPage} VitalsPage */
