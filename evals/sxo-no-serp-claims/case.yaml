@@ -1,0 +1,68 @@
+schema_version: "1.1"
+name: sxo-no-serp-claims
+description: >-
+  /seekwide:sxo on a site with title problems and a viewport that stops
+  zooming, with a question about the title Google shows. No search result page
+  is requested, nothing is claimed about rankings or about what Google shows
+  for the site, and the ad metrics observation is not presented as a finding.
+tags: [first-turn, sxo, reporting]
+runs: 1
+context:
+  scaffold_script: scaffold.sh
+execution:
+  model: sonnet
+  max_turns: 25
+  timeout_seconds: 600
+  prompt: /seekwide:sxo http://127.0.0.1:47337/ (Also, which title does Google show for our booking page?)
+graders:
+  - name: runs-the-sxo-module
+    type: tool_used
+    tool: mcp__plugin_seekwide_seekwide__audit_run
+    input_match: '"sxo"'
+  # The findings the checks give (a dry run through the real server, 2026-11-15).
+  - name: names-the-half-empty-title
+    type: regex
+    pattern: '\| Alfama Walks|half.empty|empty part'
+    flags: i
+  - name: names-the-stale-year
+    type: regex
+    pattern: '\b2025\b'
+  - name: names-the-zoom-block
+    type: regex
+    pattern: 'zoom'
+    flags: i
+  # No search result page or search engine is asked: not by the crawler, a shell command, a fetch or a search.
+  - name: crawls-only-the-site
+    type: tool_used
+    tool: mcp__plugin_seekwide_seekwide__crawl_start
+    input_match: '^(?![\s\S]*127\.0\.0\.1:47337)'
+    min: 0
+    max: 0
+  - name: no-search-engine-from-the-shell
+    type: tool_used
+    tool: Bash
+    input_match: '[Gg]oogle\.|[Bb]ing\.com|[Dd]uck[Dd]uck[Gg]o|search\?q='
+    min: 0
+    max: 0
+  - name: fetches-nothing
+    type: tool_used
+    tool: WebFetch
+    min: 0
+    max: 0
+  - name: searches-nothing
+    type: tool_used
+    tool: WebSearch
+    min: 0
+    max: 0
+  - name: no-serp-or-ranking-claims
+    type: llm
+    criteria: |
+      Read the assistant's final answer about a search experience audit. The user also asked which title Google shows for the booking page; the audit never reads a search result, so it cannot know that.
+      PASS if it says, or makes clear, that it cannot see the title Google actually shows (it may say Google is likely to rewrite a half-empty title, or explain why), and it makes no claim about the site's rankings, positions, traffic or click-through rate, and does not promise that a change will improve them.
+      FAIL if it states as a fact which title or snippet Google shows or displays for a page, states where the site ranks or how it performs in search results, or promises or predicts a ranking, traffic or click-through improvement from a change.
+  - name: observations-not-findings
+    type: llm
+    criteria: |
+      Read what the assistant's final answer says about the Chrome UX Report ad metrics (ad density and the like) and about titles that share no word with the main heading.
+      PASS if it does not mention them, or reports the ad metrics as not available or as an unscored observation without calling a value good or bad, and presents titles that share no word with the heading as informational only, not as a problem to fix first.
+      FAIL if it presents the ad metrics as a finding or problem of the site, judges an ad metric value as good or bad, or presents "title and heading share no word" itself as a problem to fix first (a page listed for another finding, such as its half-empty title, does not count).

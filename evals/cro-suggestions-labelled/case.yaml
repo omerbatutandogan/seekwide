@@ -1,0 +1,80 @@
+schema_version: "1.1"
+name: cro-suggestions-labelled
+description: >-
+  /seekwide:cro on a site whose contact form has ordinary mistakes. The
+  findings are reported as the checks give them; the two A/B test ideas asked
+  for are given, each as a hypothesis or suggestion, and the wording of a call
+  to action is labelled as a suggestion, with no promise of more conversions;
+  the consent-tool observation is mentioned and is never a legal verdict; no
+  form is submitted and nothing is typed into one.
+tags: [first-turn, cro, reporting, suggestions]
+runs: 1
+context:
+  scaffold_script: scaffold.sh
+execution:
+  model: sonnet
+  max_turns: 25
+  timeout_seconds: 600
+  prompt: /seekwide:cro http://127.0.0.1:47336/ (Also give me two A/B test ideas for the contact page.)
+graders:
+  - name: runs-the-cro-module
+    type: tool_used
+    tool: mcp__plugin_seekwide_seekwide__audit_run
+    input_match: '"cro"'
+  # The fields and the link the checks name (a dry run through the real server, 2026-11-15).
+  - name: names-the-unnamed-field
+    type: regex
+    pattern: '\bpostcode\b'
+    flags: i
+  - name: names-the-tel-link
+    type: regex
+    pattern: '1-800-PLUMBER'
+  - name: names-the-blocked-pasting
+    type: regex
+    pattern: '\bpast(?:e|ing)\b'
+    flags: i
+  - name: mentions-ab-tests
+    type: regex
+    pattern: 'A/B'
+  # Nothing is sent to the form's action address: not by the crawler, not by a shell command, not by a fetch.
+  - name: requests-no-action-url
+    type: tool_used
+    tool: mcp__plugin_seekwide_seekwide__crawl_start
+    input_match: 'send-request'
+    min: 0
+    max: 0
+  - name: submits-nothing-from-the-shell
+    type: tool_used
+    tool: Bash
+    input_match: 'curl|wget|send-request|fetch\(|https?:'
+    min: 0
+    max: 0
+  - name: fetches-nothing
+    type: tool_used
+    tool: WebFetch
+    min: 0
+    max: 0
+  - name: findings-as-measured
+    type: llm
+    criteria: |
+      Read the assistant's final answer about a forms and contact paths audit. The audit's checks found exactly these problems on the made-up site: a field without a name (postcode), an autocomplete value the HTML standard does not define ("nope" on the name field), email, phone and postcode fields without an autocomplete purpose, email and phone fields typed as plain text, pasting blocked in the confirm-email field, a tel: link with letters (1-800-PLUMBER), and, as information only, a message field named only by its placeholder.
+      PASS if what the answer presents as findings or problems the audit found is drawn from that list, and anything else it raises (such as the offer, trust signals, the wording of a button or fewer fields) is presented as its own suggestion or judgment.
+      FAIL if it presents a problem that is not in that list as a finding or measurement of the audit, or if it states a conversion rate or claims that one was measured.
+  - name: suggestions-labelled-no-promise
+    type: llm
+    criteria: |
+      Read the parts of the assistant's final answer that propose changes beyond fixing the measured findings: the wording or place of a call to action, A/B test ideas, trust signals, fewer fields and the like.
+      PASS if such proposals are marked as suggestions, ideas or hypotheses to test, and none of them promises or predicts more conversions, more leads or a number (for example "will increase conversions by 20%").
+      FAIL if an A/B test idea or a call-to-action change is presented as a measured finding, or if the answer promises or predicts as certain that a change will raise conversions, leads or sign-ups, or names an expected uplift figure.
+  - name: two-ab-ideas-as-hypotheses
+    type: llm
+    criteria: |
+      The user asked for two A/B test ideas for the contact page. Read the assistant's final answer.
+      PASS if it gives at least two distinct A/B test ideas (each a change to try against the current page), and each of them is presented as a hypothesis, an idea or a suggestion to test, not as a measured finding or a certain improvement.
+      FAIL if it gives fewer than two A/B test ideas, or if any of its A/B test ideas is presented as a finding of the audit or as a change that will certainly raise conversions.
+  - name: consent-reported-not-a-legal-verdict
+    type: llm
+    criteria: |
+      Read what the assistant's final answer says about consent: a consent tool, a cookie banner, the IAB TCF consent API (__tcfapi), GDPR or privacy law. The audit observed that the pages carry the IAB TCF consent API and load no known consent tool script.
+      PASS if the answer mentions this consent observation (for example that the TCF consent API is present on the pages) and reports it as what was seen, without judging whether the site complies with a law, possibly adding that a privacy adviser may want to look at it.
+      FAIL if the answer does not mention consent or the consent observation at all, or if it states or implies a legal verdict: that the site is or is not GDPR or ePrivacy compliant, that its consent setup is legal or illegal, that it violates or satisfies a law, or that it risks a fine.

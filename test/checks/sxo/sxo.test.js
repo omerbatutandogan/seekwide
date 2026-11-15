@@ -68,6 +68,24 @@ test('sxo.title.no_heading_overlap is info and compares the title without its re
   assert.deepEqual([stat?.applicable, findings.length, findings[0]?.url, findings[0]?.weight], [2, 1, `${SITE}/about`, 0]);
 });
 
+test('sxo.title.no_heading_overlap passes a start page whose heading is the site name, and only the start page', () => {
+  const home = titled('/', 'Alfama Walks: small-group walking tours of Lisbon', 'Alfama Walks');
+  const tours = titled('/tours', 'Tours | Alfama Walks', 'Our tours');
+  const start = run([home, tours, titled('/pricing', 'Pricing | Acme', 'Acme rocks'), titled('/faq', 'Questions answered | Acme', 'FAQ')], 'sxo.title.no_heading_overlap');
+  assert.deepEqual(start.findings.map((finding) => finding.url).sort(), [`${SITE}/faq`, `${SITE}/pricing`]);
+  assert.equal(start.stat?.applicable, 4);
+  const inner = run([titled('/', 'Tours | Alfama Walks', 'Our tours'), titled('/intro', 'Alfama Walks: small-group walking tours of Lisbon', 'Alfama Walks')], 'sxo.title.no_heading_overlap');
+  assert.deepEqual(inner.findings.map((finding) => finding.url), [`${SITE}/intro`], 'the same title and heading on an inner page fail');
+  const redirected = run([makeRedirect(`${SITE}/`, `${SITE}/en/`), titled('/en/', 'Alfama Walks: small-group walking tours of Lisbon', 'Alfama Walks'), tours], 'sxo.title.no_heading_overlap');
+  assert.deepEqual(redirected.findings, [], 'the start page is the one the start URL redirects to');
+  const logo = run([
+    titled('/', 'Acme Plumbing: boilers and heating', 'Acme Plumbing'),
+    titled('/refunds', 'Refund policy | Acme Plumbing', 'Acme Plumbing'), titled('/jobs', 'Jobs and careers | Acme Plumbing', 'Acme Plumbing'),
+    titled('/prices', 'Boiler repair prices | Harbor Lane Plumbing', 'Plumbing'), titled('/about', 'About | Harbor Lane Plumbing', 'Harbor Lane'),
+  ], 'sxo.title.no_heading_overlap');
+  assert.deepEqual(logo.findings.map((finding) => finding.url).sort(), [`${SITE}/about`, `${SITE}/jobs`, `${SITE}/prices`, `${SITE}/refunds`], 'a logo in the h1 of inner pages is reported');
+});
+
 test('the viewport rule follows axe: user-scalable no or 0 and a maximum-scale below 2 block zooming', () => {
   for (const value of ['width=device-width, user-scalable=no', 'width=device-width,user-scalable=0', 'maximum-scale=1.0', 'initial-scale=1; maximum-scale=1.5', 'user-scalable=0.5']) assert.notEqual(zoomBlocker(value), null, value);
   for (const value of ['width=device-width, initial-scale=1', 'maximum-scale=2', 'maximum-scale=5, user-scalable=yes', 'maximum-scale=-1', 'user-scalable=1', 'maximum-scale=device-width', 'user-scalable']) assert.equal(zoomBlocker(value), null, value);

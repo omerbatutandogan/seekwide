@@ -16,8 +16,11 @@ if (!name || !/^[a-z0-9-]+$/.test(name)) {
   process.exit(2);
 }
 const evalsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-// The plugin under test is the plugin/ folder, next to evals/.
-const pluginRoot = path.join(path.dirname(evalsDir), 'plugin');
+// The plugin under test is the plugin/ folder of the repository. evals/run.sh
+// runs a copy of evals/ inside plugin/ and names the repository in .repo-dir.
+const repoFile = path.join(evalsDir, '.repo-dir');
+const repoRoot = existsSync(repoFile) ? readFileSync(repoFile, 'utf8').trim() : path.dirname(evalsDir);
+const pluginRoot = path.join(repoRoot, 'plugin');
 const PLACEHOLDER = '__PLUGIN_ROOT__';
 
 /** @type {Record<string, any>[]} */

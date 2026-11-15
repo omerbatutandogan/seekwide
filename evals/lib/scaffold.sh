@@ -9,11 +9,19 @@
 
 set -euo pipefail
 
-# Physical paths (-P): a run reaches the cases through the plugin/evals link
-# (evals/README.md), and its parent is plugin/, not the repository.
 case_dir="$(cd -P "$(dirname "${BASH_SOURCE[1]}")" && pwd -P)"
 evals_dir="$(cd -P "$case_dir/.." && pwd -P)"
-repo_dir="$(cd -P "$evals_dir/.." && pwd -P)"
+# evals/run.sh runs the cases from a copy in plugin/evals, whose parent is
+# plugin/, not the repository, and writes the repository's path to .repo-dir
+# in that copy. A case run from evals/ itself finds the repository as its parent.
+if [ -f "$evals_dir/.repo-dir" ]; then
+  repo_dir="$(cat "$evals_dir/.repo-dir")"
+else
+  repo_dir="$(cd -P "$evals_dir/.." && pwd -P)"
+fi
+# What outlives a run (the pid files of the servers, the path evals/setup.sh
+# wrote) stays in the repository's evals/, not in the copy run.sh removes.
+state_dir="$repo_dir/evals"
 # The plugin under test is the plugin/ folder of the repository; evals/ and fixtures/ are next to it.
 plugin_dir="$repo_dir/plugin"
 lib_dir="$evals_dir/lib"
@@ -39,12 +47,18 @@ wait_for_file() {
 # it is still running. Only a process whose command line is one of this
 # suite's servers is stopped; anything else on the port makes port_free fail.
 stop_ours() {
-  local file="$evals_dir/.servers/$1.pid" pid
+  local file="$state_dir/.servers/$1.pid" pid
   [ -f "$file" ] || return 0
   pid="$(cat "$file")"
-  local command
+  local command ours=false lib
   command="$(ps -p "$pid" -o command= 2>/dev/null || true)"
-  if [ -n "$command" ] && { printf '%s' "$command" | grep -Fq "$lib_dir/serve-static.mjs" || printf '%s' "$command" | grep -Fq "$lib_dir/timed.mjs"; }; then
+  # The server may have been started from evals/lib or from the copy run.sh makes.
+  for lib in "$repo_dir/evals/lib" "$repo_dir/plugin/evals/lib"; do
+    if [ -n "$command" ] && { printf '%s' "$command" | grep -Fq "$lib/serve-static.mjs" || printf '%s' "$command" | grep -Fq "$lib/timed.mjs"; }; then
+      ours=true
+    fi
+  done
+  if [ "$ours" = true ]; then
     kill "$pid" 2>/dev/null || true
     for _ in $(seq 1 50); do kill -0 "$pid" 2>/dev/null || break; sleep 0.1; done
   fi
@@ -53,8 +67,8 @@ stop_ours() {
 
 # Remember the server just started on <port>, so that the next run can stop it.
 remember() {
-  mkdir -p "$evals_dir/.servers"
-  printf '%s\n' "$2" > "$evals_dir/.servers/$1.pid"
+  mkdir -p "$state_dir/.servers"
+  printf '%s\n' "$2" > "$state_dir/.servers/$1.pid"
 }
 
 # Fails when something already listens on 127.0.0.1:<port> or localhost:<port>.
@@ -123,7 +137,7 @@ next_ts_project() {
 # clean when Claude starts.
 start_next_dev() {
   local deps
-  deps="$(cat "$evals_dir/.deps-dir" 2>/dev/null)" || fail "run evals/setup.sh first: it installs Next.js for the fix cases"
+  deps="$(cat "$state_dir/.deps-dir" 2>/dev/null)" || fail "run evals/setup.sh first: it installs Next.js for the fix cases"
   [ -d "$deps/next-ts/node_modules" ] || fail "$deps/next-ts/node_modules is missing: run evals/setup.sh again"
   stop_ours 47320
   port_free 47320

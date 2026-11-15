@@ -27,3 +27,5 @@ evals/*/*.jsonl
 /plugin/evals
 evals/.deps-dir
 evals/.servers/
+# The lock of a running evals/run.sh
+evals/.run.lock/

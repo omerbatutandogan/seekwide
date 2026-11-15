@@ -149,7 +149,7 @@ const noHeadingOverlap = {
   id: 'sxo.title.no_heading_overlap',
   title: 'Title and main heading share no word',
   description:
-    'Checks indexable pages with a title and an <h1> for a title that, once the parts repeated in the titles of other pages (the site name) are removed, shares no word of four or more letters with the heading. Google builds title links from the title, the main visible title and <h1> elements among other sources, and may rewrite a title that does not describe the page. A rule of thumb: a heading and a title can describe one page in different words.',
+    'Checks indexable pages with a title and an <h1> for a title that, once the parts repeated in the titles of other pages (the site name) are removed, shares no word of four or more letters with the heading. On the start page of the crawl a heading whose every such word is in the whole title passes too, since a start page whose heading is the site name is ordinary; on any other page such a heading (a logo in the <h1> of every page) does not say what the page is about and is reported. Google builds title links from the title, the main visible title and <h1> elements among other sources, and may rewrite a title that does not describe the page. A rule of thumb: a heading and a title can describe one page in different words.',
   severity: 'info',
   weight: 0,
   impact: 1,
@@ -171,6 +171,7 @@ const noHeadingOverlap = {
         uses.set(part, pages);
       }
     }
+    const startUrl = ctx.resolve(ctx.site.start_url)?.url ?? ctx.site.start_url;
     /** @type {CheckResult[]} */
     const results = [];
     for (const page of ctx.indexablePages) {
@@ -182,7 +183,10 @@ const noHeadingOverlap = {
       const own = parts.filter((part) => (uses.get(fold(part))?.size ?? 0) < 2);
       const words = new Set(fold((own.length > 0 ? own : parts).join(' ')).match(LONG_WORD) ?? []);
       if (words.size === 0) continue;
-      const shared = (fold(heading).match(LONG_WORD) ?? []).some((word) => words.has(word));
+      const headingWords = fold(heading).match(LONG_WORD) ?? [];
+      const titleWords = new Set(fold(parts.join(' ')).match(LONG_WORD) ?? []);
+      const siteName = page.url === startUrl && headingWords.length > 0 && headingWords.every((word) => titleWords.has(word));
+      const shared = siteName || headingWords.some((word) => words.has(word));
       results.push(shared ? { status: 'pass', url: page.url } : {
         status: 'fail', url: page.url, selector: 'head > title',
         evidence: { observed: { title: clip(title, 200), h1: clip(heading, 200) }, expected: 'A word of four or more letters in both' },

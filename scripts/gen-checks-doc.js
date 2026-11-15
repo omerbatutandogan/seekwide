@@ -16,7 +16,7 @@ import { RULES_VERSION } from '../plugin/server/src/config.js';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TARGET = path.join(ROOT, 'docs', 'checks.md');
 
-const MODULE_TITLES = { seo: 'SEO', links: 'Links', security: 'Security', media: 'Media', smo: 'Social sharing (smo)', aso: 'App links (aso)', ai: 'AI access and readiness (ai)' };
+const MODULE_TITLES = { seo: 'SEO', links: 'Links', security: 'Security', media: 'Media', smo: 'Social sharing (smo)', aso: 'App links (aso)', ai: 'AI access and readiness (ai)', cro: 'Forms and contact paths (cro)', sxo: 'Search experience (sxo)' };
 const NEEDS_TEXT = {
   full_crawl: 'a complete crawl',
   sitemap: 'an XML sitemap',
@@ -28,6 +28,11 @@ const NEEDS_TEXT = {
   image_files: 'the check of image files (requests to the image hosts)',
   social_images: 'the check of sharing images (requests to the image hosts)',
   app_files: 'the app association files (requests to the audited site)',
+  llms_txt: 'the site\'s /llms.txt (one request to the audited site)',
+  ai_robots: 'what robots.txt tells AI crawlers',
+  ai_pages: 'the page signals the AI checks read (a crawl made with rule set 0.2.0 or later)',
+  form_pages: 'the reading of forms (a crawl made with rule set 0.2.1 or later)',
+  lab_audits: 'Lighthouse\'s accessibility and best-practices audits from PageSpeed Insights',
 };
 
 /**
@@ -38,6 +43,8 @@ const cell = (value) => value.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').repla
 
 function render() {
   const checks = allChecks();
+  const untitled = [...new Set(checks.map((check) => check.module))].filter((name) => !(name in MODULE_TITLES));
+  if (untitled.length > 0) throw new Error(`No section title for the module(s) ${untitled.join(', ')} in MODULE_TITLES`);
   const lines = [
     '# Checks',
     '',
