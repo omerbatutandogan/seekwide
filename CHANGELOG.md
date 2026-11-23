@@ -2,7 +2,9 @@
 
 Notable changes to Seekwide. Versions follow [semantic versioning](https://semver.org/); the rule set has its own version (`RULES_VERSION`) that changes whenever a check starts reporting something different.
 
-## 0.2.0 (unreleased)
+## 0.2.0 (2026-11-24)
+
+Five new modules (`smo`, `aso`, `ai`, `cro`, `sxo`), so an audit without a module list now runs nine; Search Console and Bing data imported from an export file; observations; only the `plugin/` folder is installed. Rule set 0.2.1. What was not verified before this release is listed under "Not verified before release" below.
 
 ### Added
 
