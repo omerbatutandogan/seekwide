@@ -2,6 +2,13 @@
 
 Notable changes to Seekwide. Versions follow [semantic versioning](https://semver.org/); the rule set has its own version (`RULES_VERSION`) that changes whenever a check starts reporting something different.
 
+## Unreleased
+
+### Fixed
+
+- **A Search Console export from a Turkish interface is read.** A real CSV download names its metric columns "Tıklamalar", "Gösterimler", "TO" and "Pozisyon", not the names of the Turkish help page that the import knew, so `search_data_import` refused every Turkish download with "The file has no table of pages". Those names are now read too, next to the help page's; what the real file showed is in `docs/IMPORTS.md`, and a test copies its shape (file names, headers, decimal points, dates in `Grafik.csv`) with made-up values.
+- **Checked with real Bing files.** A real Pages table download (byte order mark, every cell quoted, `Avg. Position` with all its digits) was read as it is, with no change, and a test now copies its shape. Bing's overview download, which has dates and no pages, is refused as before, and `docs/IMPORTS.md` says to export the Pages table.
+
 ## 0.2.0 (2026-11-24)
 
 Five new modules (`smo`, `aso`, `ai`, `cro`, `sxo`), so an audit without a module list now runs nine; Search Console and Bing data imported from an export file; observations; only the `plugin/` folder is installed. Rule set 0.2.1. What was not verified before this release is listed under "Not verified before release" below.
