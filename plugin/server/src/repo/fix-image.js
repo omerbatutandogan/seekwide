@@ -1,6 +1,7 @@
 // The fix of one page's image markup (ARCHITECTURE.md 4.13): width and height
-// for images that do not reserve their box, and eager loading for the image
-// the page marks as its main one. Which images they are is read from the
+// for images that do not reserve their box, eager loading for the image the
+// page marks as its main one, and alt text that the model writes from the
+// image file itself. Which images they are is read from the
 // stored crawl with the checks' own rules, never from the stored run's text.
 
 /** @import { Finding, ImageRecord, PageRecord } from '../types.js' */
@@ -8,7 +9,8 @@
 /** @import { FIXABLE_CHECKS } from './fixes.js' */
 /** @import { PlanContext } from './fix-common.js' */
 
-import { isRendered } from '../checks/media/helpers.js';
+import { hasWrittenAlt, lacksAlt, placeholderReason } from '../checks/media/alt.js';
+import { isExposed, isRendered } from '../checks/media/helpers.js';
 import { contentImage, markedMain, reservesSpace } from '../checks/media/layout.js';
 import { clip } from '../util/strings.js';
 import { CURRENT_CLIP, resolvePageFile } from './fix-common.js';
@@ -29,6 +31,8 @@ export const IMAGE_UNITS = Object.freeze({
     units: (page) => page.images.filter((image) => isRendered(image) && markedMain(image)),
     fails: (image) => image.loading?.trim().toLowerCase() === 'lazy',
   },
+  'media.image.alt_missing': { units: (page) => page.images.filter(isExposed), fails: lacksAlt },
+  'media.image.alt_placeholder': { units: (page) => page.images.filter(hasWrittenAlt), fails: (image) => placeholderReason(image) !== null },
 });
 
 /**
@@ -92,14 +96,18 @@ export function planImage(ctx, finding, fix) {
   // The served page's lines are the file's when the finding's first line maps to itself, which repo mode
   // gives only for a file that is the page it serves.
   const sameLines = html && source.line !== null && source.line === finding.line;
-  /** @type {{src: string, line: number|null, file: string|null, size: ImageSize|null}[]} */
+  const sized = fix.action === 'add_size';
+  const placeholder = finding.check_id === 'media.image.alt_placeholder';
+  /** @type {{src: string, line: number|null, file: string|null, size?: ImageSize|null, alt?: string}[]} */
   const images = failing.slice(0, MAX_IMAGES).map((image) => {
     const local = imageFileOf(image.url, crawl.site_origin, ctx);
     return {
       src: clip(image.src.trim(), CURRENT_CLIP),
       line: sameLines && Number.isSafeInteger(image.line) && /** @type {number} */ (image.line) > 0 ? image.line : null,
       file: local === null ? null : inProject(local),
-      size: local === null ? null : ctx.imageSizes.get(local) ?? null,
+      ...(sized ? { size: local === null ? null : ctx.imageSizes.get(local) ?? null } : {}),
+      // Text from the page: data, shown so that the placeholder can be found and replaced.
+      ...(placeholder ? { alt: clip((image.alt ?? '').trim(), CURRENT_CLIP) } : {}),
     };
   });
   const line = Number.isSafeInteger(source.line) && /** @type {number} */ (source.line) > 0 ? source.line : null;
@@ -111,7 +119,7 @@ export function planImage(ctx, finding, fix) {
     file: inProject(file),
     line,
     route: typeof source.route === 'string' ? clip(source.route, CURRENT_CLIP) : null,
-    how: imageHow({ action: fix.action, html, count: failing.length, listed: images.length, unsized: images.filter((image) => image.size === null).length }),
+    how: imageHow({ action: fix.action, html, count: failing.length, listed: images.length, unsized: images.filter((image) => image.size === null).length, remote: images.filter((image) => image.file === null).length }),
     needs_site_url: false,
     current: { images_failing: failing.length },
     images,

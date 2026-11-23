@@ -109,7 +109,7 @@ The pictures below come from one run of the plugin on [`fixtures/sample-site`](f
 - **Checks the search experience**: titles Google documents as reasons to write its own title link (half-empty, an older year than the heading, another writing system than the page), a viewport that stops zooming, and pages that redirect to one page carrying their address (the pattern of a consent, age or language wall); with a key, the Chrome UX Report's experimental ad metrics as an observation. It never requests a search result.
 - **Never contacts Google Play or a social platform.** No check sends a request to Google Play, Facebook, Instagram, X, LinkedIn, Pinterest, TikTok, YouTube, Telegram, Discord and the like, not even for their robots.txt; links and images there are listed in the report as not checked, by rule.
 - **Names the source file** when you audit a project in its own folder (repo mode). For a Next.js App Router project or a plain HTML site, the audit runs against the project's local server and each finding says which file it comes from: `app/about/page.tsx` for the route `/about`, or `services.html:17` for a broken link on line 17. See [Auditing a project in its folder](#auditing-a-project-in-its-folder).
-- **Fixes what it found, and checks the fix.** For a project audited in its folder, `/seekwide:fix` proposes changes for metadata findings (a missing or duplicate title or meta description, a missing canonical, missing Open Graph tags, a missing sitemap) internal links (through a redirect, or to a broken page) and image markup (width and height from the image file's own size, a main image that is lazy-loaded) in the file each one comes from. Every change is shown as a diff and written only after you say yes; nothing is committed. A second audit then says, finding by finding, whether it is closed, still open, replaced by another finding, or could not be verified. See [Fixing findings](#fixing-findings).
+- **Fixes what it found, and checks the fix.** For a project audited in its folder, `/seekwide:fix` proposes changes for metadata findings (a missing or duplicate title or meta description, a missing canonical, missing Open Graph tags, a missing sitemap) internal links (through a redirect, or to a broken page) and image markup (width and height from the image file's own size, a main image that is lazy-loaded, alt text that Claude writes after looking at the project's own image file) in the file each one comes from. Every change is shown as a diff and written only after you say yes; nothing is committed. A second audit then says, finding by finding, whether it is closed, still open, replaced by another finding, or could not be verified. See [Fixing findings](#fixing-findings).
 - **Uses the search data you export.** A Search Console or Bing Webmaster Tools export saved in the project folder adds clicks, impressions and positions to the report and lists findings on the pages with the most impressions first, with no account connection (see [Search Console and Bing data](#search-console-and-bing-data)). Scores do not depend on it.
 - **Writes a report** as Markdown and as one self-contained HTML file, with an optional agency name and logo. The HTML prints cleanly to PDF.
 - **Keeps facts and advice apart.** Claude writes the summary and can suggest better titles, and the report labels those parts as suggestions. They never change a score.
@@ -122,7 +122,7 @@ The pictures below come from one run of the plugin on [`fixtures/sample-site`](f
 - It does not measure Core Web Vitals of every page. A lab test takes many seconds and Google limits how many can be run, so a few pages stand for the rest.
 - It does not change your code by itself. The plugin's own server never writes into a project. With `/seekwide:fix`, Claude edits files with its normal tools, after showing you each diff and getting your yes, and it never commits. Only metadata, internal-link and image-markup fixes exist; image files and content are not touched.
 - It does not look for cloaking or sneaky redirects, and it does not test a site's defences. Finding cloaking needs a request that pretends to be Google, which this crawler never sends, so a clean security result is not proof of a clean site.
-- It does not look at images themselves: it cannot tell whether alt text describes a picture, and it does not write alt text or convert images. It has no local SEO module yet.
+- Its checks do not look at images themselves, so an audit cannot tell whether alt text describes a picture. Only `/seekwide:fix` has Claude look at an image, a file in the project, to suggest alt text; it never downloads one, and it does not convert images. It has no local SEO module yet.
 - It does not pretend to be an AI crawler and does not contact AI vendors. Whether GPTBot, ClaudeBot or PerplexityBot may read a site is read from its robots.txt with that crawler's own token; what a CDN or firewall does to the real crawler is not tested, and the report says so.
 - It does not read social platforms or app stores. It never requests a Facebook, X, LinkedIn or other social page, a Google Play page or an App Store page, and never pretends to be a platform's crawler, so what a platform finally shows in a preview (after its own cache and rules) is not measured.
 
@@ -194,6 +194,7 @@ What it can fix, and where the change goes:
 | Internal link to a broken page | The same; you choose the new target from the site's pages, or remove the link | The same |
 | Image without width and height | `width` and `height` on the `<Image>` or `<img>`, from the pixel size in the image file's header | `width` and `height` on the `<img>` on the line the audit names |
 | Main image lazy-loaded | `loading="lazy"` removed from it, or from the shared component that adds it | The same, in the file |
+| Missing or placeholder alt text | `alt` on the `<Image>` or `<img>`, written by Claude after looking at the image file in `public/`; an imported or remote image is asked about, never downloaded | `alt` on the `<img>` on the line the audit names, written the same way |
 
 How it goes:
 
@@ -293,7 +294,7 @@ What to know:
 - **It is the image host's robots.txt that counts.** Google reads the robots.txt of the host that serves an image, so an image on a CDN is governed by the CDN's file, not the site's.
 - **Some findings need a second look.** A style sheet can reserve an image's size, which the crawler does not read. A server can choose the image format by the browser it sees rather than by what the request accepts, and this crawler never claims to be a browser; files whose server says so are left out. Captions can be part of the picture or loaded by a player script. Those findings are `likely` or informational.
 - **Measured on real sites.** Before release the module was run on 19 real sites (the 20 sites the other modules were measured on, without the one that blocked the crawler) and a sample of its findings was judged by hand; the rules that were often wrong or not worth acting on were narrowed, made informational or removed (a check for pages with a video and no `VideoObject` was removed, because which page is a watch page cannot be told from its markup).
-- **Not measured:** what an image shows (so whether alt text fits it), images and videos that scripts add, images in CSS backgrounds, and images much larger than the box they are shown in, which needs layout. Fixes for images come later.
+- **Not measured:** what an image shows (so whether alt text fits it), images and videos that scripts add, images in CSS backgrounds, and images much larger than the box they are shown in, which needs layout. `/seekwide:fix` fixes missing sizes, a lazy main image and missing or placeholder alt text in a project audited in its folder.
 
 ## Social sharing and app links
 
@@ -441,10 +442,9 @@ A project profile (`/seekwide:setup`) overrides them for one client.
 
 Planned, in this order, and not built yet:
 
-1. Alt text written from the image itself, and fixes for images and internal links.
-2. First-party AI evidence: Search Console's generative AI report and Bing's AI Performance export, server log import (which AI crawlers really reached the site), entity checks, agent readiness. Then E-E-A-T, international, local, programmatic pages.
-3. Backlinks, measured AI visibility (sampled through your own API keys, as a rate with an interval), app store listings (from your own App Store Connect and Play data), Search Console click-through by position for the search experience, and social search. (Search Console and Bing data can already be [imported from an export](#search-console-and-bing-data).)
-4. WordPress core and plugin vulnerabilities, using Wordfence Intelligence with your own key.
+1. First-party AI evidence: Search Console's generative AI report and Bing's AI Performance export, server log import (which AI crawlers really reached the site), entity checks, agent readiness. Then E-E-A-T, international, local, programmatic pages.
+2. Backlinks, measured AI visibility (sampled through your own API keys, as a rate with an interval), app store listings (from your own App Store Connect and Play data), Search Console click-through by position for the search experience, and social search. (Search Console and Bing data can already be [imported from an export](#search-console-and-bing-data).)
+3. WordPress core and plugin vulnerabilities, using Wordfence Intelligence with your own key.
 
 Seekwide will never pretend to be a search engine's crawler to look for cloaking.
 

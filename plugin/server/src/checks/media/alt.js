@@ -56,6 +56,22 @@ export function placeholderReason(image) {
   return null;
 }
 
+/**
+ * An image with no text alternative at all: no alt attribute, no other name, no figure caption.
+ * @param {ImageRecord} image  An exposed image.
+ */
+export function lacksAlt(image) {
+  return image.alt === null && image.named !== true && image.figure_caption !== true;
+}
+
+/**
+ * An exposed image with alt text that is not empty: a unit of the placeholder check.
+ * @param {ImageRecord} image
+ */
+export function hasWrittenAlt(image) {
+  return isExposed(image) && image.alt !== null && image.alt.trim() !== '';
+}
+
 /** @type {CheckDef} */
 const altMissing = {
   ...MEDIA,
@@ -77,7 +93,7 @@ const altMissing = {
     return pageResults(
       mediaPages(ctx),
       (page) => page.images.filter(isExposed),
-      (image) => image.alt === null && image.named !== true && image.figure_caption !== true,
+      lacksAlt,
       (failing, units) => ({
         line: failing[0].line,
         evidence: {
@@ -111,7 +127,7 @@ const altPlaceholder = {
   run(ctx) {
     return pageResults(
       mediaPages(ctx),
-      (page) => page.images.filter((image) => isExposed(image) && image.alt !== null && image.alt.trim() !== ''),
+      (page) => page.images.filter(hasWrittenAlt),
       (image) => placeholderReason(image) !== null,
       (failing, units) => ({
         line: failing[0].line,
