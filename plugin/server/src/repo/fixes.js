@@ -5,8 +5,9 @@
 //
 // Scope (ARCHITECTURE.md 4.13): a missing or duplicate title and meta description, a
 // missing canonical, missing Open Graph tags, a missing sitemap (with the
-// robots.txt line that names it). Anything else is counted, not planned.
-// The plans of page and sitemap fixes are in fix-page.js and fix-sitemap.js.
+// robots.txt line that names it), an internal link that goes through a
+// redirect or leads to a broken page. Anything else is counted, not planned.
+// The plans are in fix-page.js, fix-link.js and fix-sitemap.js.
 
 /** @import { CrawlResult, Finding, PageRecord, Run } from '../types.js' */
 /** @import { ProjectSources } from './sources.js' */
@@ -14,13 +15,14 @@
 
 import { SEVERITIES } from '../config.js';
 import { plainPath } from './fix-common.js';
-import { planPage } from './fix-page.js';
+import { planLink } from './fix-link.js';
+import { layoutsAbove, planPage } from './fix-page.js';
 import { planSitemap } from './fix-sitemap.js';
 
 /**
  * The checks a fix exists for. `unit` says which pages the check looks at,
  * which the re-audit needs to know before it calls a finding closed.
- * @type {Readonly<Record<string, {type: 'title'|'meta_description'|'canonical'|'open_graph'|'sitemap', action: 'add'|'make_unique'|'remove_extra'|'create', unit: 'indexable'|'html'|'site'}>>}
+ * @type {Readonly<Record<string, {type: 'title'|'meta_description'|'canonical'|'open_graph'|'sitemap'|'internal_link', action: 'add'|'make_unique'|'remove_extra'|'create'|'retarget'|'replace_or_remove', unit: 'indexable'|'html'|'site'|'link'}>>}
  */
 export const FIXABLE_CHECKS = Object.freeze({
   'seo.title.missing': { type: 'title', action: 'add', unit: 'indexable' },
@@ -32,6 +34,8 @@ export const FIXABLE_CHECKS = Object.freeze({
   'seo.canonical.missing': { type: 'canonical', action: 'add', unit: 'indexable' },
   'seo.social.og_incomplete': { type: 'open_graph', action: 'add', unit: 'indexable' },
   'seo.sitemap.missing': { type: 'sitemap', action: 'create', unit: 'site' },
+  'links.internal.redirect': { type: 'internal_link', action: 'retarget', unit: 'link' },
+  'links.internal.broken': { type: 'internal_link', action: 'replace_or_remove', unit: 'link' },
 });
 
 /** Metadata findings that are deliberately not repaired, with the reason given to the user. */
@@ -47,9 +51,10 @@ const REFUSED_CHECKS = Object.freeze({
  * @property {string} title
  * @property {string} severity
  * @property {string|null} url
- * @property {string} type            What is fixed: 'title', 'meta_description', 'canonical', 'open_graph' or 'sitemap'.
- * @property {string} action          'add', 'make_unique', 'remove_extra', 'repair' or 'create'.
- * @property {'next-app'|'html'} kind  How the file is edited: a Next.js metadata export, or an HTML `<head>`.
+ * @property {string} type            What is fixed: 'title', 'meta_description', 'canonical', 'open_graph', 'sitemap' or 'internal_link'.
+ * @property {string} action          'add', 'make_unique', 'remove_extra', 'repair', 'create', 'retarget' or 'replace_or_remove'.
+ * @property {'next-app'|'html'} kind  How the file is edited: a Next.js file (a metadata export, or a link in the page, a layout or a
+ *   component they use), or an HTML file.
  * @property {string|null} file       The file to edit, relative to the project folder; null for a fix that only creates files.
  * @property {number|null} line
  * @property {string|null} route
@@ -65,6 +70,12 @@ const REFUSED_CHECKS = Object.freeze({
  * @property {{file: string, purpose: string}[]} [edit]    Other files to change.
  * @property {string[]} [sitemap_paths]   Paths of the pages the sitemap should list.
  * @property {string[]} [dynamic_routes]  Next.js routes whose addresses are not known from file names.
+ * @property {string|null} [new_href]  An internal link: the href to write; null when the user chooses it (a broken page) or the
+ *   deployed address is needed and not known.
+ * @property {boolean} [temporary]    A redirected link: every hop of the redirect is temporary (302, 303, 307).
+ * @property {boolean} [external]     A redirected link: the redirect ends on another site.
+ * @property {string[]} [candidates]  A link to a broken page: paths of indexable pages of the crawl it could point to instead.
+ * @property {string[]} [also_on]     An internal link: other pages of the run with the same link to the same address.
  */
 
 /**
@@ -111,7 +122,14 @@ export function planFixes({ run, sources, crawl, siteUrl, titles = {} }) {
   for (const page of crawl?.pages ?? []) if (!pages.has(page.url)) pages.set(page.url, page);
   /** @type {Map<string, Finding>} */
   const byCheckAndUrl = new Map();
-  for (const finding of run.findings) if (finding.url !== null) byCheckAndUrl.set(`${finding.check_id}\n${finding.url}`, finding);
+  /** @type {Map<string, Finding[]>} */
+  const byCheck = new Map();
+  for (const finding of run.findings) {
+    if (finding.url !== null) byCheckAndUrl.set(`${finding.check_id}\n${finding.url}`, finding);
+    const list = byCheck.get(finding.check_id);
+    if (list) list.push(finding);
+    else byCheck.set(finding.check_id, [finding]);
+  }
   const appDir = sources.detection.app_dir;
   const isNext = sources.detection.framework === 'next-app' && appDir !== null;
 
@@ -137,6 +155,8 @@ export function planFixes({ run, sources, crawl, siteUrl, titles = {} }) {
   /** @type {PlanContext} */
   const ctx = {
     sources, files, crawl, siteUrl, appDir, isNext, pages, byCheckAndUrl, inProject, listed, refuse, base,
+    findingsOf: (checkId) => byCheck.get(checkId) ?? [],
+    layoutsOf: (file) => (appDir === null ? [] : layoutsAbove(file, appDir, files)),
     add: (fix) => {
       plan.fixes.push(fix);
     },
@@ -147,6 +167,7 @@ export function planFixes({ run, sources, crawl, siteUrl, titles = {} }) {
       if (Object.hasOwn(REFUSED_CHECKS, finding.check_id)) refuse(finding, REFUSED_CHECKS[/** @type {keyof typeof REFUSED_CHECKS} */ (finding.check_id)]);
       else outOfScope.set(finding.check_id, (outOfScope.get(finding.check_id) ?? 0) + 1);
     } else if (fix.type === 'sitemap') planSitemap(ctx, finding);
+    else if (fix.type === 'internal_link') planLink(ctx, finding, fix);
     else planPage(ctx, finding, fix);
   }
   plan.outOfScope = Object.fromEntries(outOfScope);

@@ -8,6 +8,7 @@
 /** @import { CrawlResult, Finding, FixVerification, FixResult, PageRecord, Run } from '../types.js' */
 /** @import { RunComparison } from '../store/compare.js' */
 
+import { hrefSelector } from '../checks/links/helpers.js';
 import { firstNonEmpty, isUnverifiable } from '../checks/page-helpers.js';
 import { SEVERITIES } from '../config.js';
 import { plainPath } from './fix-common.js';
@@ -70,6 +71,23 @@ function partnerDoubt(finding, pages) {
 }
 
 /**
+ * A link finding is about one link target of a page, and goes away when the
+ * page stops linking there, which is the fix. It also goes away when the page
+ * still has the link but its target was not crawled this time, so the check
+ * had nothing to look at. Why that may be what happened, or null.
+ * @param {Finding} finding
+ * @param {PageRecord} page   The page in the new crawl.
+ * @param {Map<string, PageRecord>} pages  The new crawl.
+ * @returns {string|null}
+ */
+function linkDoubt(finding, page, pages) {
+  if (FIXABLE_CHECKS[finding.check_id]?.unit !== 'link' || typeof finding.selector !== 'string') return null;
+  const still = page.links.find((link) => link.internal && link.url !== null && hrefSelector(link.href) === finding.selector);
+  if (!still || pages.has(/** @type {string} */ (still.url))) return null;
+  return 'The page still has the same link, but the re-audit did not crawl the address it points to, so the check had nothing to look at. Crawl again with a larger page budget.';
+}
+
+/**
  * Why a fixed "no sitemap" finding cannot be called closed although it is gone, or null when it can.
  * @param {CrawlResult} crawl
  * @returns {string|null}
@@ -82,6 +100,17 @@ function sitemapDoubt(crawl) {
     return `robots.txt now names a sitemap on another host (${external.url}), which a crawl of the local server does not read. Crawl again with site_url set to the deployed address, so that the sitemap is read from the local server.`;
   }
   return 'A sitemap is named, but none could be read in the re-audit.';
+}
+
+/**
+ * Why a fixed page or link finding cannot be called closed although it is gone, or null when it can.
+ * @param {Finding} finding
+ * @param {Map<string, PageRecord>} pages  The new crawl.
+ * @returns {string|null}
+ */
+function pageOrLinkDoubt(finding, pages) {
+  const page = finding.url === null ? undefined : pages.get(finding.url);
+  return pageDoubt(finding, page) ?? (page ? linkDoubt(finding, page, pages) : null) ?? partnerDoubt(finding, pages);
 }
 
 /**
@@ -138,7 +167,7 @@ export function verifyFixes({ base, run, crawl, findingIds, comparison, titles =
       // finding that is gone is never called closed: nothing here can tell whether the check looked again.
       const doubt = !fixable
         ? 'The finding is no longer reported, but this check is outside what a fix verification can confirm: the plugin cannot tell whether the check looked at the same thing again. Compare the two runs and look at the page.'
-        : site ? sitemapDoubt(crawl) : pageDoubt(finding, finding.url === null ? undefined : pages.get(finding.url)) ?? partnerDoubt(finding, pages);
+        : site ? sitemapDoubt(crawl) : pageOrLinkDoubt(finding, pages);
       const area = areaOf(finding.check_id);
       const successors = comparison.added.filter((added) =>
         site

@@ -148,10 +148,10 @@ describe('planFixes on the Next.js fixture', () => {
       finding('seo.h1.missing', '/pricing', 'app/(marketing)/pricing/page.jsx'),
       finding('seo.canonical.relative', '/', 'app/page.jsx'),
       finding('seo.canonical.relative', '/blog/first-post', 'app/blog/[slug]/page.jsx'),
-      finding('links.internal.broken', '/blog', 'app/blog/page.jsx'),
+      finding('links.internal.nofollow', '/blog', 'app/blog/page.jsx'),
     ]);
     assert.deepEqual([fixes, notFixable], [[], []]);
-    assert.deepEqual(outOfScope, { 'seo.h1.missing': 1, 'seo.canonical.relative': 2, 'links.internal.broken': 1 });
+    assert.deepEqual(outOfScope, { 'seo.h1.missing': 1, 'seo.canonical.relative': 2, 'links.internal.nofollow': 1 });
   });
 
   it('a missing sitemap is refused when the project already has a sitemap file or robots.txt names one', () => {
@@ -281,6 +281,7 @@ describe('planFixes on a real crawl of the plain HTML fixture', () => {
   it('names the file and line of each fix', () => {
     const rows = plan.fixes.map((fix) => `${fix.check_id} ${fix.action} ${fix.file}:${fix.line}`).sort();
     assert.deepEqual(rows, [
+      'links.internal.broken replace_or_remove services.html:17',
       'seo.canonical.missing repair contact.html:3',
       'seo.meta_description.missing add about.html:3',
       'seo.sitemap.missing create null:null',
@@ -321,6 +322,7 @@ describe('the pages each fixable check looks at', () => {
   const { checks, findings } = runChecks(allChecks(), buildContext(crawl, {}), { detectedAt: '2026-11-11T00:00:00.000Z' });
 
   for (const [id, { unit }] of Object.entries(FIXABLE_CHECKS)) {
+    if (unit === 'link') continue;
     it(`${id} looks at ${unit === 'site' ? 'the site' : `${unit} pages`}`, () => {
       const stat = checks.find((check) => check.id === id);
       assert.equal(stat?.status, 'run', id);

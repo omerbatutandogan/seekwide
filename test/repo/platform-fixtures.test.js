@@ -123,6 +123,7 @@ describe('Next.js 16, TypeScript, src/app (fixtures/next-ts)', () => {
   it('plans the fixes in the page files and in generateMetadata of the dynamic route, and a TypeScript sitemap', () => {
     const rows = run.plan.fixes.map((fix) => `${fix.check_id} ${fix.file} dynamic=${fix.dynamic}`).sort();
     assert.deepEqual(rows, [
+      'links.internal.broken src/app/blog/page.tsx dynamic=undefined',
       'seo.canonical.missing src/app/about/page.tsx dynamic=false',
       'seo.canonical.missing src/app/products/[id]/page.tsx dynamic=true',
       'seo.canonical.missing src/app/products/[id]/page.tsx dynamic=true',

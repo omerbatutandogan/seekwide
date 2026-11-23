@@ -117,7 +117,9 @@ describe('fix and re-audit on the plain HTML fixture', () => {
     const before = await snapshot();
     plan = await call('fix_plan', { site_url: `${SITE}/` });
     assert.deepEqual(await snapshot(), before);
-    assert.deepEqual([plan.run_id, plan.site_url, plan.audited, plan.fixable_total, plan.not_fixable_total], [base.run_id, SITE, server.origin, 11, 0]);
+    assert.deepEqual([plan.run_id, plan.site_url, plan.audited, plan.fixable_total, plan.not_fixable_total], [base.run_id, SITE, server.origin, 12, 0]);
+    const link = plan.fixes.find((/** @type {any} */ f) => f.check_id === 'links.internal.broken');
+    assert.deepEqual([link.file, link.line, link.kind, link.current.href, link.new_href], ['services.html', 17, 'html', '/pricing.html', null]);
     const title = plan.fixes.find((/** @type {any} */ f) => f.check_id === 'seo.title.missing');
     assert.deepEqual([title.file, title.line, title.kind, title.current.titles], ['about.html', 3, 'html', []]);
     const duplicate = plan.fixes.find((/** @type {any} */ f) => f.check_id === 'seo.title.duplicate' && f.file === 'contact.html');
@@ -135,16 +137,19 @@ describe('fix and re-audit on the plain HTML fixture', () => {
     await edit('index.html', '<link rel="canonical" href="/">', '<link rel="canonical" href="/">\n<meta property="og:title" content="Plain Fixture">');
     await writeFile(path.join(projectDir, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${plan.fixes.find((/** @type {any} */ f) => f.type === 'sitemap').sitemap_paths.map((/** @type {string} */ p) => `<url><loc>${SITE}${p}</loc></url>`).join('\n')}\n</urlset>\n`);
     await appendFile(path.join(projectDir, 'robots.txt'), `Sitemap: ${SITE}/sitemap.xml\n`);
+    // The broken link now points to a page the plan offered under candidates.
+    assert.ok(plan.fixes.find((/** @type {any} */ f) => f.check_id === 'links.internal.broken').candidates.includes('/contact.html'));
+    await edit('services.html', '<a href="/pricing.html">', '<a href="/contact.html">');
     await reload();
 
     const fixed = [
       idOf('seo.title.missing'), idOf('seo.meta_description.missing'), idOf('seo.title.duplicate', 'contact.html'), idOf('seo.title.duplicate', 'services.html'),
-      idOf('seo.canonical.missing'), idOf('seo.sitemap.missing'), idOf('seo.social.og_incomplete', 'index.html'),
+      idOf('seo.canonical.missing'), idOf('seo.sitemap.missing'), idOf('seo.social.og_incomplete', 'index.html'), idOf('links.internal.broken'),
     ];
     const jobId = await crawl({ site_url: SITE });
     const after = await call('audit_run', { job_id: jobId, check_core_web_vitals: false, source_dir: projectDir, verify_fixes: { base_run_id: base.run_id, finding_ids: fixed } });
 
-    assert.deepEqual(after.fix_verification.counts, { closed: 6, open: 1, replaced: 0, unverified: 0 });
+    assert.deepEqual(after.fix_verification.counts, { closed: 7, open: 1, replaced: 0, unverified: 0 });
     assert.deepEqual(after.fix_verification.results.map((/** @type {any} */ r) => [r.check_id, r.file, r.outcome]), [
       ['seo.title.missing', 'about.html', 'closed'],
       ['seo.meta_description.missing', 'about.html', 'closed'],
@@ -154,6 +159,7 @@ describe('fix and re-audit on the plain HTML fixture', () => {
       ['seo.sitemap.missing', null, 'closed'],
       // og:title was added, og:image was not: the finding stays.
       ['seo.social.og_incomplete', 'index.html', 'open'],
+      ['links.internal.broken', 'services.html', 'closed'],
     ]);
     assert.equal(after.repo.deployed_origin, SITE);
     assert.ok(after.notes.some((/** @type {string} */ note) => note.includes(`deployed at ${SITE}`)));
@@ -165,7 +171,7 @@ describe('fix and re-audit on the plain HTML fixture', () => {
     assert.notEqual(after.run_id, base.run_id);
     const report = await call('report_render', { compare_to: base.run_id });
     const md = await readFile(report.files.markdown, 'utf8');
-    assert.match(md, /## Fixes verified in this run\n\n7 fixed findings were checked again: 6 closed, 1 still open\./);
+    assert.match(md, /## Fixes verified in this run\n\n8 fixed findings were checked again: 7 closed, 1 still open\./);
     assert.match(md, /\| \*\*Closed\*\* \| No XML sitemap found \(`seo\.sitemap\.missing`\) \| Whole site \|/);
     assert.match(md, /## Changes since the previous run/);
     assert.match(await readFile(report.files.html, 'utf8'), /<section id="fixes">/);

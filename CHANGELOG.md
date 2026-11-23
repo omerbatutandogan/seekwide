@@ -4,6 +4,11 @@ Notable changes to Seekwide. Versions follow [semantic versioning](https://semve
 
 ## Unreleased
 
+### Added
+
+- **`/seekwide:fix` fixes internal links.** `links.internal.redirect` and `links.internal.broken` now have a fix, planned by `fix_plan` from the stored crawl (`repo/fix-link.js`): a link through a redirect gets `new_href`, the final address written in the form the link has (a path, or the deployed address and the path; never a local server's address), and a link to a broken page gets `candidates`, the site's indexable pages with the closest addresses first, from which the user chooses, or removes the link. A temporary redirect or one that ends on another site is changed only after the user said so. `also_on` names the other pages with the same link, for one change in a shared header or footer. Without the stored crawl the finding is refused rather than planned from the stored run's text. `links.internal.insecure` has no fix: a local server is not served over https, so the check never reports there.
+- **The re-audit verifies link fixes.** A link finding that is gone is `closed` when the page was crawled again, and `unverified` when the page still has the same link but its target was not crawled.
+
 ### Fixed
 
 - **A Search Console export from a Turkish interface is read.** A real CSV download names its metric columns "Tıklamalar", "Gösterimler", "TO" and "Pozisyon", not the names of the Turkish help page that the import knew, so `search_data_import` refused every Turkish download with "The file has no table of pages". Those names are now read too, next to the help page's; what the real file showed is in `docs/IMPORTS.md`, and a test copies its shape (file names, headers, decimal points, dates in `Grafik.csv`) with made-up values.
