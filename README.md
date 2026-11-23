@@ -4,7 +4,7 @@
 
 Claude Code plugin for site audits you can re-run and trust: scripted SEO, Core Web Vitals, links, signs of a hacked site, images and video, social sharing previews, app links, AI access and readiness, forms and contact paths and the search experience, with evidence for every finding, repeatable scores, a client-ready report and fixes verified by a second audit.
 
-> **Status: 0.3.0.** Nine modules work today, `seo`, `links`, `security`, `media`, `smo` (social sharing), `aso` (the site's side of its apps), `ai` (AI access and readiness), `cro` (forms and contact paths) and `sxo` (search experience), plus fixes for metadata, internal links and image markup (including alt text) in a project in its own folder. The [roadmap](#roadmap) lists what is planned and not built yet.
+> **Status: 0.4.0.** Nine modules work today, `seo`, `links`, `security`, `media`, `smo` (social sharing), `aso` (the site's side of its apps), `ai` (AI access and readiness), `cro` (forms and contact paths) and `sxo` (search experience), plus fixes for metadata, internal links and image markup (including alt text) in a project in its own folder, and imports of server access logs and of the AI reports of Search Console and Bing. The [roadmap](#roadmap) lists what is planned and not built yet.
 
 ![The top of a Seekwide report for a fictional café site: the logo and name of the agency that prepared it, a written summary marked as not scored, four measured figures, and the results of all nine modules and the security headers, each with its coverage](docs/images/report-overview.png)
 
@@ -451,7 +451,7 @@ A project profile (`/seekwide:setup`) overrides them for one client.
 
 Planned, in this order, and not built yet:
 
-1. First-party AI evidence: Search Console's generative AI report and Bing's AI Performance export, server log import (which AI crawlers really reached the site), entity checks, agent readiness. Then E-E-A-T, international, local, programmatic pages.
+1. First-party AI evidence: entity checks and agent readiness. Then E-E-A-T, international, local, programmatic pages. (Server logs and the AI reports of Search Console and Bing are imported since 0.4.0.)
 2. Backlinks, measured AI visibility (sampled through your own API keys, as a rate with an interval), app store listings (from your own App Store Connect and Play data), Search Console click-through by position for the search experience, and social search. (Search Console and Bing data can already be [imported from an export](#search-console-and-bing-data).)
 3. WordPress core and plugin vulnerabilities, using Wordfence Intelligence with your own key.
 
