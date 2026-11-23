@@ -198,6 +198,39 @@ export async function listDirs(root, relative, max) {
 }
 
 /**
+ * The first bytes of a regular file inside `root`, at most `maxBytes` of them
+ * whatever the file's size, or null when it is missing, is not a regular
+ * file, or a symbolic link is on the way to it. Opened as `readFileInside`
+ * opens a file. For the header of an image, never for code.
+ * @param {string} root      Absolute real path.
+ * @param {string} relative  Forward-slash path of plain names.
+ * @param {number} maxBytes
+ * @returns {Promise<Buffer|null>}
+ */
+export async function readFileHead(root, relative, maxBytes) {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0) throw new TypeError('readFileHead maxBytes must be a positive integer');
+  if ((await entryKind(root, relative)) !== 'file') return null;
+  let handle;
+  try {
+    handle = await fs.open(path.join(root, ...relative.split('/')), constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+    const stat = await handle.stat();
+    if (!stat.isFile()) return null;
+    const buffer = Buffer.alloc(Math.min(stat.size, maxBytes));
+    let offset = 0;
+    while (offset < buffer.length) {
+      const { bytesRead } = await handle.read(buffer, offset, buffer.length - offset, offset);
+      if (bytesRead === 0) break;
+      offset += bytesRead;
+    }
+    return buffer.subarray(0, offset);
+  } catch {
+    return null;
+  } finally {
+    await handle?.close();
+  }
+}
+
+/**
  * The bytes of a regular file inside `root`, or null when it is missing, is
  * not a regular file, is larger than `maxBytes`, or a symbolic link is on the
  * way to it. The file is opened without following a link, and what was opened

@@ -322,7 +322,8 @@ describe('the pages each fixable check looks at', () => {
   const { checks, findings } = runChecks(allChecks(), buildContext(crawl, {}), { detectedAt: '2026-11-11T00:00:00.000Z' });
 
   for (const [id, { unit }] of Object.entries(FIXABLE_CHECKS)) {
-    if (unit === 'link') continue;
+    // One unit per link target, or per page with an image the check looks at: test/repo/fix-link.test.js and fix-image.test.js.
+    if (unit === 'link' || unit === 'image') continue;
     it(`${id} looks at ${unit === 'site' ? 'the site' : `${unit} pages`}`, () => {
       const stat = checks.find((check) => check.id === id);
       assert.equal(stat?.status, 'run', id);

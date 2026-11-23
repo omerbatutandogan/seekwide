@@ -71,6 +71,7 @@ export function resolvePageFile(ctx, finding) {
  * @property {boolean} isNext          A Next.js App Router project.
  * @property {Map<string, PageRecord>} pages  The crawl's records by URL, the first of each.
  * @property {Map<string, Finding>} byCheckAndUrl  The run's findings by check id and URL.
+ * @property {Map<string, import('../util/image-size.js').ImageSize|null>} imageSizes  Pixel sizes of image files, by their name in the listing.
  * @property {(checkId: string) => Finding[]} findingsOf  The run's findings of one check, in the run's order.
  * @property {(file: string) => string[]} layoutsOf  Next.js: the layout files above a file of the app folder, nearest first, relative to the source folder.
  * @property {(file: string) => string} inProject  A file of the listing, relative to the project folder.

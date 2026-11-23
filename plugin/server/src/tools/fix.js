@@ -12,8 +12,10 @@ import path from 'node:path';
 import { deployedOriginOf } from '../crawl/deployed.js';
 import { ToolError } from '../mcp/stdio.js';
 import { classifyAddress } from '../net/ip.js';
-import { FIXABLE_CHECKS, planFixes } from '../repo/fixes.js';
-import { RepoError } from '../repo/scan.js';
+import { LIMITS } from '../config.js';
+import { FIXABLE_CHECKS, imageFilesToRead, planFixes } from '../repo/fixes.js';
+import { RepoError, readFileHead } from '../repo/scan.js';
+import { imageSize } from '../util/image-size.js';
 import { verifyFixes } from '../repo/verify.js';
 import { InputError } from '../util/errors.js';
 import { PLAIN_HOST_MESSAGE, hasPlainHost } from '../util/plain-host.js';
@@ -172,9 +174,10 @@ export function fixTools(deps) {
       title: 'Plan fixes for a run',
       description:
         'For a saved run made in repo mode, say which findings a fix exists for (a missing or duplicate title or meta description, ' +
-        'a missing canonical, missing Open Graph tags, a missing sitemap, an internal link that goes through a redirect or leads to a broken page), ' +
+        'a missing canonical, missing Open Graph tags, a missing sitemap, an internal link that goes through a redirect or leads to a broken page, ' +
+        'an image without width and height, a main image that is lazy-loaded), ' +
         'which file each fix belongs in, what the page sends today and how to change it. ' +
-        'Findings that cannot be fixed safely are listed with the reason, grouped by check and reason with counts and examples. Reads the saved run and the project\'s file names; it changes nothing.',
+        'Findings that cannot be fixed safely are listed with the reason, grouped by check and reason with counts and examples. Reads the saved run, the project\'s file names and the first bytes of the project\'s image files that an image fix needs; it changes nothing.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -238,7 +241,13 @@ export function fixTools(deps) {
 
         const run = args.check_id === undefined ? loaded : { ...loaded, findings: loaded.findings.filter((finding) => finding.check_id === args.check_id) };
         const titles = Object.fromEntries(deps.checks.map((check) => [check.id, check.title]));
-        const plan = planFixes({ run, sources, crawl, siteUrl, titles });
+        // The pixel size of the project's own image files that an image fix needs, from their first bytes only.
+        const imageSizes = new Map();
+        for (const file of imageFilesToRead({ run, sources, crawl }).slice(0, LIMITS.maxFixImageReads)) {
+          const head = await readFileHead(sources.sourceDir, file, LIMITS.socialImageReadBytes);
+          imageSizes.set(file, head === null ? null : imageSize(head));
+        }
+        const plan = planFixes({ run, sources, crawl, siteUrl, titles, imageSizes });
         const limit = args.limit ?? 50;
         const offset = args.offset ?? 0;
         const fixes = plan.fixes.slice(offset, offset + limit);

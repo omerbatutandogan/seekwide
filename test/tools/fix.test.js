@@ -7,7 +7,7 @@ import { ToolError } from '../../plugin/server/src/mcp/stdio.js';
 import { validate } from '../../plugin/server/src/mcp/schema.js';
 import { groupRefused, publicOrigin } from '../../plugin/server/src/tools/fix.js';
 import { createTools } from '../../plugin/server/src/tools/index.js';
-import { makeCrawl, makePage } from '../helpers/factories.js';
+import { makeCrawl, makeImage, makePage } from '../helpers/factories.js';
 import { makeTree } from '../helpers/repo.js';
 import { makeCheckStat, makeFinding, makeRun } from '../helpers/run-factory.js';
 import { jobFor, makeDeps, sampleCrawl, toolNamed } from './fakes.js';
@@ -76,6 +76,31 @@ describe('fix_plan', () => {
     assert.deepEqual((await plan({ results: [crawl] }).call()).fixes[0].current.titles, ['Now']);
     const other = makeCrawl({ id: 'c-repo', site_origin: 'http://localhost:9999', pages: [makePage({ url: `${LOCAL}/about` })] });
     assert.equal((await plan({ results: [other] }).call()).fixes[0].current, null);
+  });
+
+  it('reads the pixel size of the project\'s own image file from its first bytes for an image fix', async () => {
+    const header = Buffer.alloc(33);
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(header, 0);
+    header.writeUInt32BE(13, 8);
+    header.write('IHDR', 12, 'ascii');
+    header.writeUInt32BE(1600, 16);
+    header.writeUInt32BE(900, 20);
+    const project = await makeTree({ 'package.json': '{"dependencies":{"next":"15.0.0"}}', 'app/layout.tsx': '', 'app/page.tsx': '', 'public/hero.png': Buffer.concat([header, Buffer.alloc(300_000)]) });
+    try {
+      const finding = sourced('media.image.dimensions_missing', '/', 'app/page.tsx');
+      const crawl = makeCrawl({ id: 'c-repo', site_origin: LOCAL, pages: [makePage({ url: `${LOCAL}/`, images: [
+        makeImage({ src: '/hero.png', url: `${LOCAL}/hero.png`, width: null, height: null }),
+        makeImage({ src: '/_next/static/media/logo.1a2b.png', url: `${LOCAL}/_next/static/media/logo.1a2b.png`, width: null, height: null }),
+      ] })] });
+      const fake = makeDeps({ projectDir: project.dir, runs: [repoRun({ findings: [finding] })], results: [crawl] });
+      const result = await /** @type {Promise<any>} */ (toolNamed(createTools(fake.deps), 'fix_plan').handler({}));
+      assert.deepEqual(result.fixes[0].images.map((/** @type {any} */ image) => [image.src, image.file, image.size]), [
+        ['/hero.png', 'public/hero.png', { format: 'png', width: 1600, height: 900 }],
+        ['/_next/static/media/logo.1a2b.png', null, null],
+      ]);
+    } finally {
+      await project.remove();
+    }
   });
 
   it('takes the deployed address from the argument, then from the profile, and reduces it to an origin', async () => {

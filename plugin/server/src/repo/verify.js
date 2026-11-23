@@ -13,6 +13,7 @@ import { firstNonEmpty, isUnverifiable } from '../checks/page-helpers.js';
 import { SEVERITIES } from '../config.js';
 import { plainPath } from './fix-common.js';
 import { clip } from '../util/strings.js';
+import { IMAGE_UNITS } from './fix-image.js';
 import { FIXABLE_CHECKS } from './fixes.js';
 
 /** Characters of a URL from the saved base run put into a sentence. */
@@ -88,6 +89,21 @@ function linkDoubt(finding, page, pages) {
 }
 
 /**
+ * An image finding goes away when the page's images no longer fail, which is
+ * the fix, and also when the page no longer has an image the check looks at
+ * (the main image lost its priority hint instead of its lazy loading). Why
+ * the second may be what happened, or null.
+ * @param {Finding} finding
+ * @param {PageRecord} page  The page in the new crawl.
+ * @returns {string|null}
+ */
+function imageDoubt(finding, page) {
+  if (!Object.hasOwn(IMAGE_UNITS, finding.check_id)) return null;
+  if (Array.isArray(page.videos) && IMAGE_UNITS[finding.check_id].units(page).length > 0) return null;
+  return 'The page no longer has an image this check looks at, so the finding is gone without the check passing an image. Look at what changed on the page.';
+}
+
+/**
  * Why a fixed "no sitemap" finding cannot be called closed although it is gone, or null when it can.
  * @param {CrawlResult} crawl
  * @returns {string|null}
@@ -110,7 +126,7 @@ function sitemapDoubt(crawl) {
  */
 function pageOrLinkDoubt(finding, pages) {
   const page = finding.url === null ? undefined : pages.get(finding.url);
-  return pageDoubt(finding, page) ?? (page ? linkDoubt(finding, page, pages) : null) ?? partnerDoubt(finding, pages);
+  return pageDoubt(finding, page) ?? (page ? linkDoubt(finding, page, pages) ?? imageDoubt(finding, page) : null) ?? partnerDoubt(finding, pages);
 }
 
 /**
