@@ -9,6 +9,7 @@ import { writeFileAtomic } from '../store/fs-util.js';
 import { ensureRunDir } from '../store/project.js';
 import { PROJECT_DIR_SCHEMA, loadBaseRun, resolveProjectDir, runRefSchema, settingValue, withStoreErrors } from './common.js';
 import { IMPORT_SOURCES } from '../imports/parse.js';
+import { AI_SOURCES } from '../imports/ai-data.js';
 import { matchPages } from '../imports/match.js';
 import { loadLogo } from './logo.js';
 import { crawlOfRun } from './search-data.js';
@@ -67,9 +68,9 @@ export function reportTools(deps) {
           compare_to: runRefSchema('Run id, or "previous" for the newest run older than the one rendered, to include a "changes since" section.'),
           search_data: {
             type: 'array',
-            items: { type: 'string', enum: [...IMPORT_SOURCES] },
-            maxItems: IMPORT_SOURCES.length,
-            description: 'Imported search data to show (search_data_import). Defaults to every source imported into the project; [] leaves it out.',
+            items: { type: 'string', enum: [...IMPORT_SOURCES, ...AI_SOURCES] },
+            maxItems: IMPORT_SOURCES.length + AI_SOURCES.length,
+            description: 'Imported search data and AI reports to show (search_data_import). Defaults to every source imported into the project; [] leaves them out.',
           },
         },
         additionalProperties: false,
@@ -92,7 +93,8 @@ export function reportTools(deps) {
         const logo = pickLogo(settingValue(args.logo_path), settingValue(profile?.report?.logo_path), settingValue(deps.env.SEEKWIDE_REPORT_LOGO));
         const logoDataUri = logo ? await loadLogo(logo, projectDir) : undefined;
 
-        const sources = args.search_data === undefined ? [...IMPORT_SOURCES] : [...new Set(/** @type {import('../imports/parse.js').ImportSource[]} */ (args.search_data))];
+        const named = args.search_data === undefined ? null : new Set(/** @type {string[]} */ (args.search_data));
+        const sources = named === null ? [...IMPORT_SOURCES] : IMPORT_SOURCES.filter((source) => named.has(source));
         const search = [];
         for (const source of sources) {
           const data = await withStoreErrors(() => deps.loadSearchImport(projectDir, source));
@@ -103,6 +105,15 @@ export function reportTools(deps) {
           search.push({ data, match: matchPages(data, run, await crawlOfRun(deps, run)) });
         }
 
+        const aiSearch = [];
+        for (const source of named === null ? AI_SOURCES : AI_SOURCES.filter((item) => named.has(item))) {
+          const data = await withStoreErrors(() => deps.loadAiImport(projectDir, source));
+          if (data === null) {
+            if (named === null) continue;
+            throw new ToolError(`No AI report from ${source} was imported into this project. Import the export with search_data_import, or leave it out of search_data.`);
+          }
+          aiSearch.push(data);
+        }
         const logs = await withStoreErrors(() => deps.loadLogImport(projectDir));
 
         const options = {
@@ -113,6 +124,7 @@ export function reportTools(deps) {
           ...(comparison ? { comparison } : {}),
           ...(search.length > 0 ? { search } : {}),
           ...(logs !== null ? { logs } : {}),
+          ...(aiSearch.length > 0 ? { aiSearch } : {}),
         };
 
         const formats = args.formats && args.formats.length > 0 ? [...new Set(/** @type {('markdown'|'html')[]} */ (args.formats))] : [...FORMATS];
@@ -136,7 +148,7 @@ export function reportTools(deps) {
           files[format] = file;
           bytes[format] = Buffer.byteLength(content, 'utf8');
         }
-        return { run_id: run.run_id, files, bytes, search_data: search.map((entry) => entry.data.source), server_logs: logs !== null };
+        return { run_id: run.run_id, files, bytes, search_data: [...search.map((entry) => entry.data.source), ...aiSearch.map((data) => data.source)], server_logs: logs !== null };
       },
     },
   ];

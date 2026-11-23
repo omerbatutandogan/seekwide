@@ -75,3 +75,13 @@ A Search Console CSV download from an English interface (Performance, web search
 The Excel option of the same report (English interface) was read with no change too: seven sheets named `Chart`, `Queries`, `Pages`, `Countries`, `Devices`, `Search appearance` and `Filters`, with the same headers as the CSV files; counts and positions are stored as numbers, the CTR as a fraction (`0.0446`), and the dates as text written `YYYY-MM-DD` (shared strings), not as date-formatted serials.
 
 Still not seen: an Excel download from a Turkish interface, and a Bing download from a Turkish interface.
+
+### The AI reports (2026-11-23 and 2026-11-24)
+
+Neither AI report has a documented column layout. These downloads were read, from English interfaces; none is kept in the repository, and `googleAiZip`, `googleAiXlsx`, `bingAiOverviewCsv` and `bingAiPagesCsv` in `test/helpers/exports.js` copy their shapes with made-up values.
+
+- **Search Console, "Performance on Search Generative AI Features"** (the CSV zip and the Excel file of the same report, the last 3 months): five tables, `Chart` (`Date,Impressions`), `Pages` (`Top pages,Impressions`), `Countries`, `Devices` and `Filters` (`Search type,Web (text-based)`, `Date,Last 3 months`). Impressions only: no clicks, no CTR, no position. Dates `YYYY-MM-DD`. Seekwide reads the dates, the pages and the filters (`google_search_console_ai`), and refuses a file with clicks or positions, which is the Performance report.
+- **Bing, AI Performance overview** (`<site>_AIPerformanceOverviewStats_<date>.csv`): a byte order mark, every cell quoted, `Date,Citations,Cited Pages`, dates written `8/23/2026 12:00:00 AM`. Read as month/day/year at midnight only (`bing_ai_performance`); any other time or order is refused, so a date is never misread.
+- **Bing, AI Performance pages** (`<site>_AIPageStatsReport_<date>.csv`): the same quoting, `Page,Citations`, no dates, so the period comes from the user (`bing_ai_pages`).
+
+What the reports count is the tools' own definition, quoted in the report as supplied, not measured: impressions in Google's AI Overviews and AI Mode, and citations of the site in Microsoft's AI answers.

@@ -4,6 +4,8 @@
 
 /** @import { ImportSource, SearchImport } from '../imports/parse.js' */
 /** @import { LogImport } from '../logs/record.js' */
+/** @import { AiImport } from '../imports/ai-record.js' */
+/** @import { AiSource } from '../imports/ai-data.js' */
 
 import path from 'node:path';
 import { IMPORT_SOURCES } from '../imports/parse.js';
@@ -11,6 +13,8 @@ import { storeError } from './errors.js';
 import { assertRealDir, makeRealDirs, readStoreFile, writeFileAtomic } from './fs-util.js';
 import { importProblem } from './import-validate.js';
 import { logImportProblem } from '../logs/record.js';
+import { aiImportProblem } from '../imports/ai-record.js';
+import { AI_SOURCES } from '../imports/ai-data.js';
 import { ensureProject, projectPaths } from './project.js';
 
 /** The largest import file the plugin writes or reads: 50,000 pages and dates at most. */
@@ -146,4 +150,57 @@ export async function loadLogImport(projectDir) {
   const problem = logImportProblem(value);
   if (problem !== null) throw storeError('IMPORT_CORRUPT', `The log import in ${relative} is damaged or was not written by Seekwide: ${problem}.`);
   return /** @type {LogImport} */ (value);
+}
+
+/** @param {string} projectDir @param {AiSource} source */
+function aiPaths(projectDir, source) {
+  if (!AI_SOURCES.includes(source)) throw new TypeError(`Unknown AI import source ${JSON.stringify(source)}.`);
+  const paths = projectPaths(projectDir);
+  const dir = path.join(paths.root, 'imports');
+  return { dir, file: path.join(dir, `${source}.json`), relative: `.seekwide/imports/${source}.json`, paths };
+}
+
+/**
+ * Store an AI report import, replacing the one from the same source, with the guarantees of `saveSearchImport`.
+ * @param {string} projectDir
+ * @param {AiImport} record
+ * @returns {Promise<{file: string, relative: string}>}
+ */
+export async function saveAiImport(projectDir, record) {
+  const { dir, file, relative, paths } = aiPaths(projectDir, record.source);
+  const problem = aiImportProblem(record, record.source);
+  if (problem !== null) throw storeError('IMPORT_INVALID', `The import could not be saved: ${problem}.`);
+  const text = `${JSON.stringify(record)}\n`;
+  if (Buffer.byteLength(text, 'utf8') > IMPORT_STORE_BYTES) throw storeError('IMPORT_TOO_LARGE', `The import would take more than ${IMPORT_STORE_BYTES / 1048576} MB, the most Seekwide stores.`);
+  await ensureProject(projectDir);
+  await makeRealDirs([paths.root, dir], paths.projectDir);
+  await writeFileAtomic(file, text);
+  return { file, relative };
+}
+
+/**
+ * The stored AI report import from one source, or null, with the guarantees of `loadSearchImport`.
+ * @param {string} projectDir
+ * @param {AiSource} source
+ * @returns {Promise<AiImport|null>}
+ */
+export async function loadAiImport(projectDir, source) {
+  const { dir, file, relative, paths } = aiPaths(projectDir, source);
+  if (!(await assertRealDir(paths.root, paths.projectDir)) || !(await assertRealDir(dir, paths.projectDir))) return null;
+  let text;
+  try {
+    text = await readStoreFile(file, IMPORT_STORE_BYTES, paths.projectDir);
+  } catch (error) {
+    if (/** @type {NodeJS.ErrnoException} */ (error).code === 'ENOENT') return null;
+    throw error;
+  }
+  let value;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    throw corrupt(relative, 'it is not JSON');
+  }
+  const problem = aiImportProblem(value, source);
+  if (problem !== null) throw corrupt(relative, problem);
+  return /** @type {AiImport} */ (value);
 }

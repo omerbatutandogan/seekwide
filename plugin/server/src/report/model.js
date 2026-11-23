@@ -8,6 +8,7 @@ import { InputError } from '../util/errors.js';
 import { clip, collapseWhitespace } from '../util/strings.js';
 import { aiLayer, viewAi } from './ai.js';
 import { viewLogs } from './logs.js';
+import { aiVisibilityLayer, viewAiVisibility } from './ai-visibility.js';
 import { viewObservations } from './observations.js';
 import { aiAccessNotJudged } from '../util/ai-summary.js';
 import { methodSections, reportTitle } from './copy.js';
@@ -58,6 +59,8 @@ function readOptions(run, options) {
   if (!Array.isArray(search) || !search.every((entry) => obj(entry).data !== undefined && obj(entry).match !== undefined)) {
     throw new TypeError('search must be an array of {data, match}.');
   }
+  const aiSearch = o.aiSearch ?? [];
+  if (!Array.isArray(aiSearch) || !aiSearch.every((entry) => typeof obj(entry).source === 'string' && Array.isArray(obj(entry).dates))) throw new TypeError('aiSearch must be an array of AI report imports.');
   const logs = o.logs ?? null;
   if (logs !== null && (obj(logs).source !== 'server_logs' || !Array.isArray(obj(logs).bots))) throw new TypeError('logs must be a log import.');
   const comparison = o.comparison ?? null;
@@ -72,6 +75,7 @@ function readOptions(run, options) {
     comparison: /** @type {RunComparison|null} */ (comparison),
     search: /** @type {SearchEntry[]} */ (search),
     logs: /** @type {import('../logs/record.js').LogImport|null} */ (logs),
+    aiSearch: /** @type {import('../imports/ai-record.js').AiImport[]} */ (aiSearch),
     recommendations: recommendations.map((item, index) => {
       const entry = obj(item);
       const title = text(entry.title);
@@ -227,6 +231,7 @@ export function buildReport(run, options = {}) {
     });
 
   const aiView = viewAi(run);
+  const aiVisibility = viewAiVisibility(opts.aiSearch);
   return {
     title: reportTitle(run.modules_requested),
     host,
@@ -248,7 +253,8 @@ export function buildReport(run, options = {}) {
     ],
     scope: viewScope(run, { host, blocked }),
     fixes: viewFixes(run),
-    layers: withAiLayer(viewLayers(vitals, opts.search.length > 0 ? searchLayer(opts.search) : null), aiView),
+    layers: withAiLayer(viewLayers(vitals, opts.search.length > 0 ? searchLayer(opts.search) : null, aiVisibility === null ? null : aiVisibilityLayer(aiVisibility)), aiView),
+    aiVisibility,
     ai: aiView,
     observations: viewObservations(run),
     search: viewSearch(opts.search, findings),

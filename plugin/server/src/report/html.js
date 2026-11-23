@@ -122,6 +122,18 @@ ${a.statements.filter((_, i) => i !== 1).map((statement) => html`<p class="meta"
 }
 
 /** @param {Report} r */
+function aiVisibilitySection(r) {
+  const v = r.aiVisibility;
+  if (v === null) return '';
+  const sources = v.sources.map((source) => html`<h3>${source.name}: ${source.report}</h3>
+<dl><dt>File</dt><dd><code>${source.file}</code>, imported on ${source.imported}.</dd><dt>Period</dt><dd>${source.period}</dd></dl>
+<div class="figs">${source.figures.map((f) => html`<div class="fig"><b>${f.value}</b><span>${f.label}</span></div>`)}</div>
+${source.pages.length > 0 ? html`<table><thead><tr><th>Page</th><th class="n">${source.metric}</th></tr></thead><tbody>${source.pages.map((page) => html`<tr><td>${urlHtml(page.url)}</td><td class="n">${page.value}</td></tr>`)}</tbody></table>` : ''}
+${source.notes.map((note) => html`<p class="meta">${note}</p>`)}`);
+  return html`<section id="ai-search-performance"><h2>AI search performance (imported)</h2><p class="note">${v.supplied}</p>${sources}</section>`;
+}
+
+/** @param {Report} r */
 function logsSection(r) {
   const l = r.logs;
   if (l === null) return '';
@@ -283,7 +295,7 @@ export function renderHtml(run, options) {
 </head>
 <body>
 <main>
-${titleBlock(r)}${summary(r)}${scope(r)}${fixes(r)}${layers(r)}${scores(r)}${vitals(r)}${search(r)}${aiSection(r)}${logsSection(r)}${observed(r)}${topFixes(r)}${allFindings(r)}${suggestions(r)}${notRun(r)}${changes(r)}${method(r)}
+${titleBlock(r)}${summary(r)}${scope(r)}${fixes(r)}${layers(r)}${scores(r)}${vitals(r)}${search(r)}${aiVisibilitySection(r)}${aiSection(r)}${logsSection(r)}${observed(r)}${topFixes(r)}${allFindings(r)}${suggestions(r)}${notRun(r)}${changes(r)}${method(r)}
 <footer>Seekwide ${r.pluginVersion} &middot; rules ${r.rulesVersion} &middot; run <code>${r.runId}</code> &middot; ${r.date.iso}</footer>
 </main>
 </body>

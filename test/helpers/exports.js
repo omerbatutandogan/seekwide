@@ -122,3 +122,45 @@ export function bingPageTrafficDownload() {
     quoted([`${SITE}/`, '5', '1', '20%', '6']),
   ].join('\r\n') + '\r\n';
 }
+
+/**
+ * Search Console's "Performance on Search Generative AI Features" CSV download,
+ * in the form a real one had on 2026-11-24: Chart (Date, Impressions), Pages
+ * (Top pages, Impressions), Countries, Devices and Filters. The values are made up.
+ */
+export function googleAiZip() {
+  return makeZip([
+    { name: 'Chart.csv', data: csv(['Date', 'Impressions'], [['2026-10-01', 3], ['2026-10-02', 0], ['2026-10-03', 9]]) },
+    { name: 'Pages.csv', data: csv(['Top pages', 'Impressions'], [[`${SITE}/`, 8], [`${SITE}/about`, 4], [`${SITE}/pricing?utm_source=x`, 1]]) },
+    { name: 'Countries.csv', data: csv(['Country', 'Impressions'], [['Turkey', 7], ['United States', 5]]) },
+    { name: 'Devices.csv', data: csv(['Device', 'Impressions'], [['Desktop', 6], ['Mobile', 6]]) },
+    { name: 'Filters.csv', data: csv(['Filter', 'Value'], [['Search type', 'Web (text-based)'], ['Date', 'Last 3 months']]) },
+  ]);
+}
+
+/** The same report as the Excel file, one sheet per table. */
+export function googleAiXlsx() {
+  return makeXlsx([
+    { name: 'Chart', rows: [['Date', 'Impressions'], ['2026-10-01', 3], ['2026-10-02', 0], ['2026-10-03', 9]] },
+    { name: 'Pages', rows: [['Top pages', 'Impressions'], [`${SITE}/`, 8], [`${SITE}/about`, 4]] },
+    { name: 'Filters', rows: [['Filter', 'Value'], ['Search type', 'Web (text-based)']] },
+  ]);
+}
+
+/** @param {string[][]} rows */
+const bingQuoted = (rows) => '﻿' + rows.map((row) => row.map((cell) => `"${cell}"`).join(',')).join('\r\n') + '\r\n';
+
+/** The overview of Bing's AI Performance report, as a real download was written on 2026-11-23. The values are made up. */
+export function bingAiOverviewCsv() {
+  return bingQuoted([
+    ['Date', 'Citations', 'Cited Pages'],
+    ['9/30/2026 12:00:00 AM', '0', '0'],
+    ['10/1/2026 12:00:00 AM', '3', '2'],
+    ['10/2/2026 12:00:00 AM', '1', '1'],
+  ]);
+}
+
+/** The table of pages of Bing's AI Performance report, as a real download was written on 2026-11-23. The values are made up. */
+export function bingAiPagesCsv() {
+  return bingQuoted([['Page', 'Citations'], [`${SITE}/about`, '1'], [`${SITE}/`, '3']]);
+}
