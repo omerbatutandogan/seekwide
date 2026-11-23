@@ -165,11 +165,13 @@ export function describeVitals(view) {
  * there is some, otherwise "no data in this run" with where the data comes from.
  * @param {VitalsView|null} view
  * @param {LayerView|null} [search]  The search visibility layer of imported data (report/search.js).
+ * @param {LayerView|null} [aiVisibility]  The AI visibility layer of imported AI reports (report/ai-visibility.js).
  * @returns {LayerView[]}
  */
-export function viewLayers(view, search = null) {
+export function viewLayers(view, search = null, aiVisibility = null) {
   const fixed = STATIC_LAYERS.map((layer) => {
     if (layer.name === SEARCH_LAYER_EMPTY.name) return search ?? { ...SEARCH_LAYER_EMPTY };
+    if (layer.name === 'AI visibility' && aiVisibility !== null) return aiVisibility;
     return {
       name: layer.name,
       measured: layer.measured,

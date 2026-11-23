@@ -40,7 +40,7 @@ export const KNOWN_HEADERS =
  * @param {string} value
  * @returns {string}
  */
-function fold(value) {
+export function fold(value) {
   return value
     .normalize('NFD')
     .replace(/\p{M}/gu, '')

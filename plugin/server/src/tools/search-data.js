@@ -7,12 +7,16 @@
 /** @import { CrawlResult, Run } from '../types.js' */
 /** @import { SearchImport } from '../imports/parse.js' */
 
+import { AI_SOURCES, aiTables } from '../imports/ai-data.js';
+import { AI_IMPORT_SCHEMA_VERSION } from '../imports/ai-record.js';
 import { ImportError } from '../imports/errors.js';
 import { matchPages, trafficOf } from '../imports/match.js';
-import { IMPORT_SOURCES, importExport } from '../imports/parse.js';
+import { IMPORT_SOURCES, importExport, readTables } from '../imports/parse.js';
 import { clicksOverImpressions } from '../imports/search-data.js';
 import { readImportFile } from '../imports/read-file.js';
 import { parseDate } from '../imports/values.js';
+import { clip, collapseWhitespace } from '../util/strings.js';
+import { createHash } from 'node:crypto';
 import { SEVERITIES } from '../config.js';
 import { ToolError } from '../mcp/stdio.js';
 import { PROJECT_DIR_SCHEMA, resolveProjectDir, runRefSchema, withStoreErrors } from './common.js';
@@ -23,6 +27,90 @@ export const IMPORT_NOTE =
 
 const DATE_SCHEMA = { type: 'string', maxLength: 10, description: 'YYYY-MM-DD.' };
 const LISTED = 10;
+
+/** @import { AiImport } from '../imports/ai-record.js' */
+/** @import { AiSource } from '../imports/ai-data.js' */
+
+/**
+ * Import an export of one of the AI reports: read, store, and say what it holds.
+ * @param {ToolDeps} deps
+ * @param {string} projectDir
+ * @param {AiSource} source
+ * @param {{start: string, end: string}|undefined} period
+ * @param {unknown} input
+ */
+async function importAiReport(deps, projectDir, source, period, input) {
+  /** @type {AiImport} */
+  let record;
+  try {
+    const file = await readImportFile(projectDir, /** @type {string} */ (input));
+    const { format, tables } = await readTables(file.bytes);
+    const data = aiTables(tables, source);
+    if (period && data.dates.length > 0) {
+      throw new ImportError('UNSUPPORTED', 'The file has a table of dates and says which dates it covers. Leave period_start and period_end out.');
+    }
+    record = {
+      schema_version: AI_IMPORT_SCHEMA_VERSION,
+      source,
+      imported_at: deps.now().toISOString(),
+      file: { path: clip(collapseWhitespace(file.relative), 300), format, bytes: file.bytes.length, sha256: createHash('sha256').update(file.bytes).digest('hex') },
+      period: data.dates.length > 0
+        ? { start: data.dates[0].date, end: /** @type {{date: string}} */ (data.dates.at(-1)).date, from: 'file' }
+        : period ? { ...period, from: 'user' } : null,
+      ...data,
+    };
+  } catch (error) {
+    if (!(error instanceof ImportError)) throw error;
+    throw new ToolError(error.message);
+  }
+  /** @type {string[]} */
+  const notes = [];
+  let previous = null;
+  try {
+    previous = await deps.loadAiImport(projectDir, source);
+  } catch (error) {
+    const code = /** @type {{code?: unknown}} */ (error)?.code;
+    if (code !== 'IMPORT_CORRUPT' && code !== 'STORE_FILE_TOO_LARGE') await withStoreErrors(() => Promise.reject(error));
+    notes.push('The earlier import from this source could not be read, so it was replaced without being compared.');
+  }
+  const saved = await withStoreErrors(() => deps.saveAiImport(projectDir, record));
+  if (record.period === null) notes.push('The file does not say which dates it covers. Call again with period_start and period_end, the dates chosen in the report, to record them.');
+  if (source === 'google_search_console_ai') notes.push('Search Console\'s generative AI report counts impressions only: how often a page was shown in AI Overviews or AI Mode. It has no clicks and no position.');
+  if (source !== 'bing_ai_pages' && record.totals !== undefined && 'citations' in record.totals && record.totals.citations === 0) {
+    notes.push('Bing counted no citation of the site in AI answers during the period.');
+  }
+  const runs = await withStoreErrors(() => deps.listRuns(projectDir));
+  if (record.pages.length > 0 && runs.length > 0) {
+    const run = await withStoreErrors(() => deps.loadRun(projectDir, 'last'));
+    const host = (/** @type {string} */ url) => {
+      try {
+        return new URL(url).host.replace(/^www\./, '');
+      } catch {
+        return '';
+      }
+    };
+    if (!record.pages.some((page) => host(page.url) === host(run.start_url))) {
+      notes.push(`None of the pages in the export is on the host of ${run.start_url.slice(0, 200)}: check that the export and the audit are of the same site.`);
+    }
+  }
+  return {
+    source,
+    saved_to: saved.relative,
+    replaced: previous === null ? null : { imported_at: previous.imported_at, period: previous.period },
+    file: { path: record.file.path, format: record.file.format, bytes: record.file.bytes },
+    period: record.period,
+    filters: record.filters,
+    totals: record.totals,
+    dates: record.dates.length,
+    pages: record.pages.length,
+    counts: record.counts,
+    top_pages: record.pages.slice(0, LISTED),
+    match: null,
+    priority_pages: null,
+    notes,
+    _note: IMPORT_NOTE,
+  };
+}
 
 /**
  * The crawl behind a run, when the cache still holds it and it is of the run's site.
@@ -86,16 +174,18 @@ export function searchDataTools(deps) {
       title: 'Import search performance data',
       description:
         "Read a search performance export the user downloaded: Search Console's Performance report (the CSV zip, the Excel file, or its Pages table as CSV) " +
-        "or the Pages table of Bing Webmaster Tools' Search Performance report (CSV). The file must be inside the project folder. It is stored in " +
+        "or the Pages table of Bing Webmaster Tools' Search Performance report (CSV); or one of the AI reports: Search Console's " +
+        '"Performance on Search Generative AI Features" (CSV zip or Excel; source google_search_console_ai), the overview of Bing\'s AI Performance report ' +
+        '(CSV; bing_ai_performance) or its table of pages (CSV; bing_ai_pages). The file must be inside the project folder. It is stored in ' +
         '.seekwide/imports/ (replacing the previous import from the same source) and used by report_render. The result says how its pages match the latest audit. ' +
         'Nothing is sent anywhere.',
       inputSchema: {
         type: 'object',
         properties: {
           path: { type: 'string', maxLength: 4096, description: 'The export file, absolute or relative to project_dir. It must be inside the project folder.' },
-          source: { type: 'string', enum: [...IMPORT_SOURCES], description: 'Where the user exported the file from.' },
+          source: { type: 'string', enum: [...IMPORT_SOURCES, ...AI_SOURCES], description: 'Where the user exported the file from, and which report.' },
           project_dir: PROJECT_DIR_SCHEMA,
-          period_start: { ...DATE_SCHEMA, description: 'YYYY-MM-DD: the first day the export covers, as chosen in the report. Only for a file without a table of dates (Bing).' },
+          period_start: { ...DATE_SCHEMA, description: 'YYYY-MM-DD: the first day the export covers, as chosen in the report. Only for a file without a table of dates (Bing\'s Pages tables).' },
           period_end: { ...DATE_SCHEMA, description: 'YYYY-MM-DD: the last day the export covers. Only together with period_start.' },
           run_id: runRefSchema('The audit to match the pages with: a run id, or "last" (the default). Without saved runs nothing is matched.'),
         },
@@ -105,6 +195,7 @@ export function searchDataTools(deps) {
       async handler(args) {
         const projectDir = resolveProjectDir(args.project_dir, deps.defaultProjectDir);
         const period = statedPeriod(args.period_start, args.period_end);
+        if (AI_SOURCES.includes(/** @type {AiSource} */ (args.source))) return importAiReport(deps, projectDir, /** @type {AiSource} */ (args.source), period, args.path);
         const source = /** @type {SearchImport['source']} */ (args.source);
         let record;
         try {

@@ -78,6 +78,10 @@ import { searchDataTools } from './search-data.js';
  *   Store a log import under .seekwide/imports/, replacing the earlier one.
  * @property {(projectDir: string) => Promise<import('../logs/record.js').LogImport|null>} loadLogImport
  *   The stored log import, checked like a run; null when there is none.
+ * @property {(projectDir: string, record: import('../imports/ai-record.js').AiImport) => Promise<{file: string, relative: string}>} saveAiImport
+ *   Store an AI report import under .seekwide/imports/, replacing the one from the same source.
+ * @property {(projectDir: string, source: import('../imports/ai-data.js').AiSource) => Promise<import('../imports/ai-record.js').AiImport|null>} loadAiImport
+ *   The stored AI report import from one source; null when there is none.
  * @property {() => Date} now
  * @property {() => string} defaultProjectDir
  * @property {{SEEKWIDE_REPORT_BRAND?: string, SEEKWIDE_REPORT_LOGO?: string}} env

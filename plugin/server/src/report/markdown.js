@@ -168,6 +168,20 @@ function aiSection(r) {
 }
 
 /** @param {Report} r */
+function aiVisibilitySection(r) {
+  const v = r.aiVisibility;
+  if (v === null) return [];
+  const lines = ['## AI search performance (imported)', '', `*${mdText(v.supplied)}*`, ''];
+  for (const source of v.sources) {
+    lines.push(`### ${mdText(source.name)}: ${mdText(source.report)}`, '', `- **File:** ${mdCode(source.file)}, imported on ${mdText(source.imported)}`, `- **Period:** ${mdText(source.period)}`,
+      ...source.figures.map((figure) => `- **${mdText(figure.label)}:** ${mdText(figure.value)}`), '');
+    if (source.pages.length > 0) lines.push(...table(['Page', source.metric], source.pages.map((page) => [mdUrl(page.url, true), page.value])), '');
+    if (source.notes.length > 0) lines.push(...source.notes.map((note) => `*${mdText(note)}*`), '');
+  }
+  return lines;
+}
+
+/** @param {Report} r */
 function logsSection(r) {
   const l = r.logs;
   if (l === null) return [];
@@ -294,7 +308,7 @@ function method(r) {
 export function renderMarkdown(run, options) {
   const r = buildReport(run, options);
   const lines = [
-    ...header(r), ...summary(r), ...scope(r), ...fixes(r), ...layers(r), ...scores(r), ...vitals(r), ...search(r), ...aiSection(r), ...logsSection(r), ...observed(r), ...topFixes(r),
+    ...header(r), ...summary(r), ...scope(r), ...fixes(r), ...layers(r), ...scores(r), ...vitals(r), ...search(r), ...aiVisibilitySection(r), ...aiSection(r), ...logsSection(r), ...observed(r), ...topFixes(r),
     ...allFindings(r), ...suggestions(r), ...notRun(r), ...changes(r), ...method(r),
   ];
   return `${lines.join('\n').trimEnd()}\n`;

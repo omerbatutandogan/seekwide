@@ -7,6 +7,7 @@ Notable changes to Seekwide. Versions follow [semantic versioning](https://semve
 ### Added
 
 - **Server logs: which AI crawlers really came.** A new tool, `log_import`, reads the site's Apache or nginx access logs (Common Log Format or combined, plain or gzip, up to 20 files) from the project folder and counts, per AI crawler of `data/ai-bots.json`, the requests its user agent named, the requests for robots.txt, the status classes, the first and last day and the most requested paths. No client address, query string, referrer or time of day is kept. With a saved ai audit, the crawlers that robots.txt keeps off the start page and that still asked for pages are listed. The report gets an "AI crawlers in the server logs (imported)" section, and `/seekwide:ai` asks for the logs. The counts are claims: anyone can send any user agent, and the vendors' address lists are not fetched.
+- **AI reports of Search Console and Bing.** `search_data_import` reads Search Console's "Performance on Search Generative AI Features" export (CSV zip or Excel, source `google_search_console_ai`) and Bing's AI Performance overview (`bing_ai_performance`) and table of pages (`bing_ai_pages`), in the forms real downloads had on 2026-11-23 and 2026-11-24. The report's AI visibility layer is filled for the first time, and a new "AI search performance (imported)" section shows Google's AI impressions and Bing's AI citations, by day and by page, as supplied by the user.
 
 ### Changed
 
