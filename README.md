@@ -375,6 +375,15 @@ What is not read, and why: neither tool documents the column layout of its expor
 
 The import is stored as `.seekwide/imports/google_search_console.json` or `.seekwide/imports/bing_webmaster_tools.json`; a new import from the same source replaces it.
 
+## Server logs
+
+Which AI crawlers really asked your server for pages is in its access logs, not in robots.txt. `/seekwide:ai` asks whether you can copy them into the project folder; it then reads them on your machine with `log_import`.
+
+- **Read:** Apache and nginx access logs in the Common Log Format or the combined format (the default of both), plain or gzip, up to 20 files and 10 million lines per import. JSON logs and CDN exports are not read yet.
+- **Kept:** for each AI crawler Seekwide knows, the requests, the requests for robots.txt, the status classes, the first and last day and the 10 most requested paths, in `.seekwide/imports/server_logs.json`. No client address, query string, referrer or time of day is kept.
+- **Shown:** an "AI crawlers in the server logs (imported)" section in the report, with what robots.txt told each crawler in the audit. A crawler that robots.txt keeps out and that still asked for pages is pointed out.
+- **A claim, not a proof:** a request is counted for the crawler its user agent names, and anyone can send any user agent. To verify one, compare the client addresses with the list the vendor publishes; Seekwide does not download those lists.
+
 ## Files it writes
 
 Run audits from the folder that belongs to the site. An agency keeps one folder per client.

@@ -4,6 +4,10 @@ Notable changes to Seekwide. Versions follow [semantic versioning](https://semve
 
 ## Unreleased
 
+### Added
+
+- **Server logs: which AI crawlers really came.** A new tool, `log_import`, reads the site's Apache or nginx access logs (Common Log Format or combined, plain or gzip, up to 20 files) from the project folder and counts, per AI crawler of `data/ai-bots.json`, the requests its user agent named, the requests for robots.txt, the status classes, the first and last day and the most requested paths. No client address, query string, referrer or time of day is kept. With a saved ai audit, the crawlers that robots.txt keeps off the start page and that still asked for pages are listed. The report gets an "AI crawlers in the server logs (imported)" section, and `/seekwide:ai` asks for the logs. The counts are claims: anyone can send any user agent, and the vendors' address lists are not fetched.
+
 ### Changed
 
 - `plugin.json` declares the two Google hosts the server calls for Core Web Vitals under `network.hosts`, as the plugin directory asks. A test keeps the list equal to the endpoints in the code.

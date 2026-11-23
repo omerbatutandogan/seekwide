@@ -20,7 +20,8 @@ MCP server (plugin/server/src/index.js)
    ├─ fix_plan ──► store/ (a saved run) ──► repo/ (which fix applies, in which file)
    ├─ findings_query, page_get, runs_list, runs_compare, profile_get, profile_set ──► store/
    ├─ search_data_import ──► imports/ (an export file in the project: CSV, zip, Excel) ──► store/ (.seekwide/imports/)
-   └─ report_render ──► report/ (Markdown, HTML), with the imported search data
+   ├─ log_import ──► logs/ (access log files in the project: plain or gzip) ──► store/ (.seekwide/imports/server_logs.json)
+   └─ report_render ──► report/ (Markdown, HTML), with the imported search data and server logs
 ```
 
 Search data comes in as a file: the user downloads a Performance export from Google Search Console or the Pages table of Bing Webmaster Tools' Search Performance report into the project folder, `search_data_import` reads and stores it, and the report shows it and orders findings by the impressions of their pages (4.17). No account is connected and nothing is sent.
@@ -440,7 +441,8 @@ export class ToolError extends Error {}
 | `findings_query` | `run_id` ('last'), `project_dir`, `module`, `severity`, `check_id`, `url_contains`, `limit` 1–200 (50), `offset` | `{run_id, total, returned, next_offset, findings}`; `next_offset` is null on the last page |
 | `page_get` | `job_id`, `url` | selected `PageRecord` fields and counts |
 | `search_data_import` | `path` (required; a file inside the project folder), `source` (required: `google_search_console` or `bing_webmaster_tools`), `project_dir`, `period_start` and `period_end` (YYYY-MM-DD, only for a file without a table of dates), `run_id` ('last') | `{source, saved_to, replaced, file, period, filters, totals, pages, dates, counts, top_pages, match, priority_pages, notes}` (4.17) |
-| `report_render` | `run_id` ('last'), `project_dir`, `formats` (both), `executive_summary` ≤ 4000, `recommendations` ≤ 20, `brand_name`, `logo_path`, `compare_to`, `search_data` (the imported sources to show; every one imported by default, `[]` for none) | `{run_id, files, bytes, search_data}` |
+| `log_import` | `paths` (required; 1 to 20 files inside the project folder), `project_dir`, `run_id` ('last') | `{saved_to, replaced, files, period, counts, bots, not_seen, robots, bots_verified, notes}` (4.21) |
+| `report_render` | `run_id` ('last'), `project_dir`, `formats` (both), `executive_summary` ≤ 4000, `recommendations` ≤ 20, `brand_name`, `logo_path`, `compare_to`, `search_data` (the imported sources to show; every one imported by default, `[]` for none) | `{run_id, files, bytes, search_data, server_logs}` |
 | `runs_list` | `project_dir` | `{project_dir, total, runs}`: the 50 newest runs, newest first |
 | `runs_compare` | `run_id` ('last'), `base_run_id` ('previous'), `project_dir`, `limit` 1–200 (20) | `{base_run_id, run_id, resolved_total, added_total, persisting, scores, notes, resolved, added}`; `resolved` and `added` hold at most `limit` findings each |
 | `profile_get` | `project_dir` | `{exists, profile}` |
@@ -818,4 +820,34 @@ export function observationsProblem(observations)                   // → dotte
 - **Ad metrics.** With `sxo`, `collectAds` (`tools/audit-vitals.js`) calls `deps.measureAds`, which has the key bound in like `measureVitals` (`deps.js`). `measureAds` sends nothing for a crawl `whyNotSent` refuses (local, unknown, not public), without a key or with one that cannot be used, or after the audit was cancelled; otherwise `queryCruxAds` sends one Chrome UX Report request for the origin with the four `experimental_ad_*` metrics and nothing else, never retried, and apart from the Core Web Vitals query and its stored measurement. No data and every refusal become the observation's reason.
 - **Observations** (`Run.observations`, `types/forms.js`). Built after the checks, from the crawl (`croObservations`: consent tool scripts by the hosts the vendors' installation pages name and the TCF stub; tel:, mailto:, forms, contact page links and embedded form services; the start page's first action element) and from what `collectAds` returned. Each is `{id, module, status, reason, values, urls, source}`; values are null, booleans, finite numbers or short text of the plugin's own words. `observationsProblem` checks the stored form only (ids and value names by pattern, at most 20 observations, 20 values, 5 URLs) and accepts a run without the field; `compareRuns` ignores them; the report renders known ids as sentences and an unknown id by its value names (`report/observations.js`). They never change a score and are not findings.
 - **Report.** "Observed (not scored)" after the AI section, in Markdown and HTML, with the plugin's caveats (no legal verdict on a consent banner; the first action's visual position is not measured; no threshold for the ad metrics). The title names "form" and "search experience" when the modules ran.
+
+### 4.21 Server logs: `logs/`, `tools/logs.js`, `report/logs.js`
+
+Which AI crawlers really asked the site for pages, from the site's own access logs. The user copies the files into the project folder; `log_import` reads them on this machine and keeps counts.
+
+```js
+// logs/parse.js                                                      pure
+export function parseLogLine(line)                                  // → LogEntry | null: day (UTC), method, path without query, status, agent
+// logs/bots.js                                                       pure
+export const LOGGED_BOTS                                            // data/ai-bots.json without control tokens and the training preference
+export function botOfAgent(agent)                                   // → AiBot | null: the first token named as a whole product name
+// logs/summary.js
+export class LogSummary { add(entry), result(), counts, period, full }
+// logs/read.js
+export async function readLogFile(projectDir, input, summary)      // → {path, bytes, gzip}
+// logs/record.js                                                     pure
+export function logImportProblem(value)                             // → string | null
+// store/imports.js
+export async function saveLogImport(projectDir, record), loadLogImport(projectDir)
+// report/logs.js                                                     pure
+export function viewLogs(logs, run)                                 // → LogsView | null
+```
+
+- **Formats.** The Common Log Format and the combined format Apache and nginx write by default, one pattern for both, in which every character can be read one way only (a quoted field is a run of non-quote, non-backslash characters or of escapes), so a line cannot make it backtrack; only the first 16 KiB of a line and of its user agent the first 1 KiB are looked at. Apache's `\"` and nginx's `\xHH` are undone. A line in neither format is counted as unread. JSON logs and CDN exports are not read in this version.
+- **Claims, not visits.** A request is counted for the crawler whose token its user agent names as a whole product name (`Googlebot-Image` is not `Googlebot`), case-insensitively, longest token first. Anyone can send any user agent; verifying a request needs the vendor's published addresses (`ip_list`), which the plugin never fetches (principle of 4.19: no request to an AI vendor). The result, the record and the report say so.
+- **What is kept.** Per crawler: requests, requests for `/robots.txt`, status classes, the first and last day, the distinct paths (at most 50,000 counted) and the 10 most requested, without query and clipped to 300 characters. Never a client address, a query string, a referrer or a time of day. At most 10 million lines over at most 20 files are read; past the limit the import says `truncated`.
+- **Where the files may be.** `openImportFile` (`imports/read-file.js`), the rules of an export file: inside the project folder, no link followed, a regular file, at most 2 GB; a gzip file (by its first two bytes) unpacks as a stream to at most 8 GB. Lines are read with `readline`, so a large log is never in memory whole and other tool calls are served between chunks.
+- **A stored import is untrusted** (`logImportProblem`): exact fields, crawlers of the data file in its order, counts that agree with each other, paths on one line without hidden characters, at most 1 MB.
+- **Beside robots.txt.** With a saved run of the ai module, `robots.despite_disallow` lists the crawlers that robots.txt kept off the start page and that still have page requests in the log; the note says robots.txt may have changed during the period, the crawler may not follow it, or another client used its name. Nothing is scored.
+- **Report.** "AI crawlers in the server logs (imported)" after the AI section, in Markdown and HTML: files, period, lines, a table per crawler with the robots.txt access of the audit, and the most requested paths, as data.
 

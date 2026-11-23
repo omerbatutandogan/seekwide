@@ -122,6 +122,20 @@ ${a.statements.filter((_, i) => i !== 1).map((statement) => html`<p class="meta"
 }
 
 /** @param {Report} r */
+function logsSection(r) {
+  const l = r.logs;
+  if (l === null) return '';
+  const rows = l.rows.map((row) => html`<tr><td><code>${row.token}</code></td><td>${row.vendor}</td><td class="n">${row.requests}</td><td class="n">${row.robotsTxt}</td><td>${row.statuses}</td><td>${row.days}</td><td class="n">${row.paths}</td><td>${row.access}</td></tr>`);
+  return html`<section id="server-logs"><h2>AI crawlers in the server logs (imported)</h2>
+<p class="note">${l.supplied}</p>
+<dl><dt>Files</dt><dd>${l.files}</dd><dt>Period</dt><dd>${l.period}</dd><dt>Lines</dt><dd>${l.linesText}</dd></dl>
+${rows.length > 0 ? html`<table><thead><tr><th>Crawler</th><th>Vendor</th><th class="n">Requests</th><th class="n">robots.txt requests</th><th>Statuses</th><th>Days</th><th class="n">Distinct paths</th><th>robots.txt in this audit</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
+${l.topPaths.length > 0 ? html`<h3>Most requested paths</h3><ul>${l.topPaths.map((top) => html`<li><code>${top.token}</code>: ${top.paths}</li>`)}</ul>` : ''}
+${l.notes.map((note) => html`<p class="meta">${note}</p>`)}
+</section>`;
+}
+
+/** @param {Report} r */
 function observed(r) {
   if (r.observations === null) return '';
   return html`<section id="observed"><h2>Observed (not scored)</h2>
@@ -269,7 +283,7 @@ export function renderHtml(run, options) {
 </head>
 <body>
 <main>
-${titleBlock(r)}${summary(r)}${scope(r)}${fixes(r)}${layers(r)}${scores(r)}${vitals(r)}${search(r)}${aiSection(r)}${observed(r)}${topFixes(r)}${allFindings(r)}${suggestions(r)}${notRun(r)}${changes(r)}${method(r)}
+${titleBlock(r)}${summary(r)}${scope(r)}${fixes(r)}${layers(r)}${scores(r)}${vitals(r)}${search(r)}${aiSection(r)}${logsSection(r)}${observed(r)}${topFixes(r)}${allFindings(r)}${suggestions(r)}${notRun(r)}${changes(r)}${method(r)}
 <footer>Seekwide ${r.pluginVersion} &middot; rules ${r.rulesVersion} &middot; run <code>${r.runId}</code> &middot; ${r.date.iso}</footer>
 </main>
 </body>
