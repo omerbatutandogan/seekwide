@@ -2,6 +2,12 @@
 
 Notable changes to Seekwide. Versions follow [semantic versioning](https://semver.org/); the rule set has its own version (`RULES_VERSION`) that changes whenever a check starts reporting something different.
 
+## Unreleased
+
+### Changed
+
+- `plugin.json` declares the two Google hosts the server calls for Core Web Vitals under `network.hosts`, as the plugin directory asks. A test keeps the list equal to the endpoints in the code.
+
 ## 0.3.0 (2026-11-24)
 
 `/seekwide:fix` now fixes internal links (through a redirect, or to a broken page) and image markup (missing width and height, a lazy-loaded main image, and missing or placeholder alt text written from the project's own image file), and the re-audit verifies them. Turkish Search Console exports import. Rule set 0.2.1, unchanged: no check reports anything different.

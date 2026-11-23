@@ -94,7 +94,7 @@ jobs:
 
       # An exact version: an unpinned install would run whatever was published last.
       - name: Install Claude Code
-        run: npm install --global @anthropic-ai/claude-code@2.1.322
+        run: npm install --global @anthropic-ai/claude-code@2.1.331
 
       - name: Validate the marketplace
         run: claude plugin validate . --strict

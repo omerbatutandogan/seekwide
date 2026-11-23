@@ -52,5 +52,11 @@
       "sensitive": true,
       "default": ""
     }
+  },
+  "network": {
+    "hosts": [
+      "pagespeedonline.googleapis.com",
+      "chromeuxreport.googleapis.com"
+    ]
   }
 }
