@@ -72,4 +72,6 @@ Two Bing Webmaster Tools downloads were read the same day:
 
 A Search Console CSV download from an English interface (Performance, web search, the last 3 months) was read the same day, with no change needed: seven files named `Chart.csv` (the dates, not `Dates.csv`), `Countries.csv`, `Devices.csv`, `Filters.csv`, `Pages.csv`, `Queries.csv` and `Search appearance.csv`; every metric header is `Clicks,Impressions,CTR,Position`, the pages column is `Top pages`, the filters are `Filter,Value` with `Search type,Web (text-based)` and `Date,Last 3 months`. Counts above 1,000 (`7114`) are written with no group separator, decimals with a point, dates `YYYY-MM-DD`.
 
-Still not seen: the Excel option, and a Bing download from a Turkish interface.
+The Excel option of the same report (English interface) was read with no change too: seven sheets named `Chart`, `Queries`, `Pages`, `Countries`, `Devices`, `Search appearance` and `Filters`, with the same headers as the CSV files; counts and positions are stored as numbers, the CTR as a fraction (`0.0446`), and the dates as text written `YYYY-MM-DD` (shared strings), not as date-formatted serials.
+
+Still not seen: an Excel download from a Turkish interface, and a Bing download from a Turkish interface.
