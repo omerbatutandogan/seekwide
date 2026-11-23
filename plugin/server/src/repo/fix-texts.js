@@ -168,12 +168,13 @@ export function linkHow({ action, html, line, occurrences, temporary, external, 
 }
 
 /**
- * How to fix the markup of a page's images: give them their size, or load the
- * main image eagerly. The images are named by the fix's `images`, not here.
- * @param {{action: string, html: boolean, count: number, listed: number, unsized: number}} input
+ * How to fix the markup of a page's images: give them their size, load the
+ * main image eagerly, or write their alt text from the image itself. The
+ * images are named by the fix's `images`, not here.
+ * @param {{action: string, html: boolean, count: number, listed: number, unsized: number, remote: number}} input
  * @returns {string}
  */
-export function imageHow({ action, html, count, listed, unsized }) {
+export function imageHow({ action, html, count, listed, unsized, remote }) {
   const which = listed < count ? `The first ${listed} of the ${count} images are under images; fix those, then audit again for the rest.` : 'The images are under images.';
   const where = html
     ? 'Each entry gives the src and, when known, the line of the <img> in this file.'
@@ -189,6 +190,18 @@ export function imageHow({ action, html, count, listed, unsized }) {
         ? `For ${unsized === 1 ? 'one image' : `${unsized} images`} the size is null: the file is not in the project (another host, or an image Next.js built from an import), or its header could not be read. Read the size from the file yourself or ask the user; never guess a size.`
         : '',
       'This check is informational: a style sheet the crawler does not read may already reserve the box. Look at the CSS for the image first, and leave it when its box is already set there.',
+    ].filter(Boolean).join(' ');
+  }
+  if (action === 'write_alt') {
+    return [
+      which,
+      where,
+      'For each image, open the file under file with your file-reading tool and look at the picture itself, then read the page around the image in the source file. Write alt text from what the picture shows and what it does there: a short phrase, in the language of the page; for a linked image, where the link goes; for a picture of text (a logo, a button, a banner), that text. When the picture adds nothing the surrounding text does not say, propose alt="" and say why.',
+      'Never write it from the file name, from a placeholder that is there, or from text copied from another page, and never describe what you cannot see. Show each alt text as a suggestion in the diff; the user can reword it.',
+      remote > 0
+        ? `For ${remote === 1 ? 'one image' : `${remote} images`} file is null: the picture is not a file of the project (another host, or an image Next.js built from an import). Do not download it. Ask the user to describe it, or find the imported file in the source and look at that; otherwise leave the image and say that its finding stays open.`
+        : '',
+      'When the same picture appears on other pages, one alt text written in the shared component fixes all of them.',
     ].filter(Boolean).join(' ');
   }
   return [

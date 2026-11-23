@@ -7,7 +7,8 @@
 // missing canonical, missing Open Graph tags, a missing sitemap (with the
 // robots.txt line that names it), an internal link that goes through a
 // redirect or leads to a broken page, an image without its size, a main
-// image that is lazy-loaded. Anything else is counted, not planned.
+// image that is lazy-loaded, an image without alt text or with a placeholder
+// for it. Anything else is counted, not planned.
 // The plans are in fix-page.js, fix-link.js, fix-image.js and fix-sitemap.js.
 
 /** @import { CrawlResult, Finding, PageRecord, Run } from '../types.js' */
@@ -24,7 +25,7 @@ import { planSitemap } from './fix-sitemap.js';
 /**
  * The checks a fix exists for. `unit` says which pages the check looks at,
  * which the re-audit needs to know before it calls a finding closed.
- * @type {Readonly<Record<string, {type: 'title'|'meta_description'|'canonical'|'open_graph'|'sitemap'|'internal_link'|'image', action: 'add'|'make_unique'|'remove_extra'|'create'|'retarget'|'replace_or_remove'|'add_size'|'load_eagerly', unit: 'indexable'|'html'|'site'|'link'|'image'}>>}
+ * @type {Readonly<Record<string, {type: 'title'|'meta_description'|'canonical'|'open_graph'|'sitemap'|'internal_link'|'image', action: 'add'|'make_unique'|'remove_extra'|'create'|'retarget'|'replace_or_remove'|'add_size'|'load_eagerly'|'write_alt', unit: 'indexable'|'html'|'site'|'link'|'image'}>>}
  */
 export const FIXABLE_CHECKS = Object.freeze({
   'seo.title.missing': { type: 'title', action: 'add', unit: 'indexable' },
@@ -40,6 +41,8 @@ export const FIXABLE_CHECKS = Object.freeze({
   'links.internal.broken': { type: 'internal_link', action: 'replace_or_remove', unit: 'link' },
   'media.image.dimensions_missing': { type: 'image', action: 'add_size', unit: 'image' },
   'media.image.lazy_priority': { type: 'image', action: 'load_eagerly', unit: 'image' },
+  'media.image.alt_missing': { type: 'image', action: 'write_alt', unit: 'image' },
+  'media.image.alt_placeholder': { type: 'image', action: 'write_alt', unit: 'image' },
 });
 
 /** Metadata findings that are deliberately not repaired, with the reason given to the user. */
@@ -56,8 +59,8 @@ const REFUSED_CHECKS = Object.freeze({
  * @property {string} severity
  * @property {string|null} url
  * @property {string} type            What is fixed: 'title', 'meta_description', 'canonical', 'open_graph', 'sitemap', 'internal_link' or 'image'.
- * @property {string} action          'add', 'make_unique', 'remove_extra', 'repair', 'create', 'retarget', 'replace_or_remove', 'add_size'
- *   or 'load_eagerly'.
+ * @property {string} action          'add', 'make_unique', 'remove_extra', 'repair', 'create', 'retarget', 'replace_or_remove', 'add_size',
+ *   'load_eagerly' or 'write_alt'.
  * @property {'next-app'|'html'} kind  How the file is edited: a Next.js file (a metadata export, or a link in the page, a layout or a
  *   component they use), or an HTML file.
  * @property {string|null} file       The file to edit, relative to the project folder; null for a fix that only creates files.
@@ -81,9 +84,10 @@ const REFUSED_CHECKS = Object.freeze({
  * @property {boolean} [external]     A redirected link: the redirect ends on another site.
  * @property {string[]} [candidates]  A link to a broken page: paths of indexable pages of the crawl it could point to instead.
  * @property {string[]} [also_on]     An internal link: other pages of the run with the same link to the same address.
- * @property {{src: string, line: number|null, file: string|null, size: import('../util/image-size.js').ImageSize|null}[]} [images]
+ * @property {{src: string, line: number|null, file: string|null, size?: import('../util/image-size.js').ImageSize|null, alt?: string}[]} [images]
  *   An image fix: the failing images of the page, with the line of each when the file is the page it serves, the project
- *   file the image is served from, and its pixel size read from that file's first bytes.
+ *   file the image is served from, for a missing size its pixel size read from that file's first bytes, and for a
+ *   placeholder alt the alt the page has.
  */
 
 /**

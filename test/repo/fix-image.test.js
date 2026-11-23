@@ -38,6 +38,8 @@ function png(width, height) {
 
 /** @param {string} src @param {number} line @param {Partial<ImageRecord>} [overrides] */
 const unsized = (src, line, overrides = {}) => makeImage({ src, url: new URL(src, SITE).href, width: null, height: null, line, ...overrides });
+/** @param {string} src @param {string|null} alt @param {number} line */
+const alted = (src, alt, line) => makeImage({ src, url: new URL(src, SITE).href, alt, line });
 /** @param {string} path @param {ImageRecord[]} images */
 const page = (path, images) => makePage({ url: `${SITE}${path}`, images });
 
@@ -128,6 +130,25 @@ describe('planning image fixes in a plain HTML project', () => {
     assert.match(fix?.how ?? '', /Remove loading="lazy" from each one/);
   });
 
+  it('alt text: names the project file of each image to look at, and the remote ones that are not to be downloaded', () => {
+    const audited = audit([page('/', [alted('/img/photo.png', null, 14), alted('https://cdn.example.net/a.jpg', null, 20), alted('/img/logo.png', '', 9)])], { '/': 'index.html' });
+    const fix = planFixes({ run: audited.run, sources, crawl: audited.crawl, siteUrl: null }).fixes.find((entry) => entry.check_id === 'media.image.alt_missing');
+    assert.deepEqual([fix?.type, fix?.action, fix?.file, fix?.line], ['image', 'write_alt', 'index.html', 14]);
+    // The decorative alt="" is not listed, and an alt fix carries no size.
+    assert.deepEqual(fix?.images, [{ src: '/img/photo.png', line: 14, file: 'img/photo.png' }, { src: 'https://cdn.example.net/a.jpg', line: 20, file: null }]);
+    assert.match(fix?.how ?? '', /look at the picture itself/);
+    assert.match(fix?.how ?? '', /Never write it from the file name/);
+    assert.match(fix?.how ?? '', /For one image file is null.*Do not download it/);
+    assert.deepEqual(imageFilesToRead({ run: audited.run, sources, crawl: audited.crawl }), []);
+  });
+
+  it('alt text: a placeholder alt is listed with the alt the page has, as data', () => {
+    const audited = audit([page('/', [alted('/img/photo.png', 'IMG_0423.png', 14), alted('/img/logo.png', 'Seekwide logo', 9)])], { '/': 'index.html' });
+    const fix = planFixes({ run: audited.run, sources, crawl: audited.crawl, siteUrl: null }).fixes.find((entry) => entry.check_id === 'media.image.alt_placeholder');
+    assert.deepEqual(fix?.images, [{ src: '/img/photo.png', line: 14, file: 'img/photo.png', alt: 'IMG_0423.png' }]);
+    assert.doesNotMatch(fix?.how ?? '', /IMG_0423/);
+  });
+
   it('refuses an image fix when the crawl is no longer stored, instead of trusting the stored run', () => {
     const audited = audit([page('/', [unsized('/img/photo.png', 14)])], { '/': 'index.html' });
     const refused = planFixes({ run: audited.run, sources, crawl: null, siteUrl: null }).notFixable.find((entry) => entry.check_id === 'media.image.dimensions_missing');
@@ -158,8 +179,16 @@ describe('verifying image fixes', () => {
     assert.match(result.detail, /no longer has an image this check looks at/);
   });
 
+  it('alt text: closed when the image has alt text, unverified when the image is gone from the page', () => {
+    const base = audit([page('/', [alted('/img/photo.png', null, 12)])], {});
+    const [closed] = reaudit(base, [page('/', [alted('/img/photo.png', 'A walking tour on a hill in Lisbon', 12)])]);
+    assert.deepEqual([closed.check_id, closed.outcome], ['media.image.alt_missing', 'closed']);
+    const [gone] = reaudit(base, [page('/', [])]);
+    assert.equal(gone.outcome, 'unverified');
+  });
+
   it('the image checks have no unit on a page without an image they look at, which the re-audit relies on', () => {
-    const crawl = makeCrawl({ pages: [page('/', [unsized('/a.png', 1), lazyMain()]), page('/none', [])] });
+    const crawl = makeCrawl({ pages: [page('/', [unsized('/a.png', 1), lazyMain(), makeImage({ src: '/b.png', alt: 'photo' })]), page('/none', [])] });
     const { checks } = runChecks(allChecks(), buildContext(crawl, {}), { detectedAt: AT });
     for (const id of Object.keys(FIXABLE_CHECKS).filter((key) => FIXABLE_CHECKS[key].unit === 'image')) {
       assert.equal(checks.find((check) => check.id === id)?.applicable, 1, id);
