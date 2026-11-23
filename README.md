@@ -4,7 +4,7 @@
 
 Claude Code plugin for site audits you can re-run and trust: scripted SEO, Core Web Vitals, links, signs of a hacked site, images and video, social sharing previews, app links, AI access and readiness, forms and contact paths and the search experience, with evidence for every finding, repeatable scores, a client-ready report and fixes verified by a second audit.
 
-> **Status: 0.1.1.** Nine modules work on `main`, `seo`, `links`, `security`, `media`, `smo` (social sharing), `aso` (the site's side of its apps), `ai` (AI access and readiness), `cro` (forms and contact paths) and `sxo` (search experience), plus metadata fixes for a project in its own folder; 0.1.1, the latest release, has the first four. The [roadmap](#roadmap) lists what is planned and not built yet.
+> **Status: 0.2.0.** Nine modules work today, `seo`, `links`, `security`, `media`, `smo` (social sharing), `aso` (the site's side of its apps), `ai` (AI access and readiness), `cro` (forms and contact paths) and `sxo` (search experience), plus metadata fixes for a project in its own folder. The [roadmap](#roadmap) lists what is planned and not built yet.
 
 ![The top of a Seekwide report for a fictional café site: the logo and name of the agency that prepared it, a written summary marked as not scored, four measured figures, and the results of all nine modules and the security headers, each with its coverage](docs/images/report-overview.png)
 
