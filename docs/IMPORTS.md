@@ -70,4 +70,6 @@ Two Bing Webmaster Tools downloads were read the same day:
 - The Pages table (the file is named `<site>_PageTrafficReport_<date>.csv`) is read. It starts with a byte order mark, quotes every cell, puts impressions before clicks, and is headed `Page,Impressions,Clicks,CTR,Avg. Position`; a position keeps all its digits (`7.333333333333333`). It records no dates, as expected, so the period comes from the user. `bingPageTrafficDownload` in `test/helpers/exports.js` copies its shape.
 - The overview (`<site>_SearchPerformanceOverview_All_<date>.csv`) is a table of dates only, headed `Date,Clicks,Impressions,Avg. CTR`, with dates written `8/23/2026 12:00:00 AM`. It has no pages, so it is refused, which is right: the Pages table is the one to export.
 
-Still not seen: a Search Console download from an English interface, the Excel option, and a count of 1,000 or more.
+A Search Console CSV download from an English interface (Performance, web search, the last 3 months) was read the same day, with no change needed: seven files named `Chart.csv` (the dates, not `Dates.csv`), `Countries.csv`, `Devices.csv`, `Filters.csv`, `Pages.csv`, `Queries.csv` and `Search appearance.csv`; every metric header is `Clicks,Impressions,CTR,Position`, the pages column is `Top pages`, the filters are `Filter,Value` with `Search type,Web (text-based)` and `Date,Last 3 months`. Counts above 1,000 (`7114`) are written with no group separator, decimals with a point, dates `YYYY-MM-DD`.
+
+Still not seen: the Excel option, and a Bing download from a Turkish interface.
