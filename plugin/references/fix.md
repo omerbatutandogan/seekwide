@@ -28,6 +28,7 @@ Each entry under `fixes`:
 - `create`, `edit`, `sitemap_paths`, `dynamic_routes` (sitemap): the files to add or change and the pages to list.
 - `new_href`, `temporary`, `external` (a link through a redirect): the href to write, in the form the link has (a path for a relative href, the deployed address and the path for a full URL); `null` when the deployed address is needed and not known. `current` holds the link's `href`, its `target_url`, the `final_url` the redirect ends at, and the `occurrences` of the same href on the page.
 - `candidates` (a link to a broken page): paths of indexable pages of the crawl, the closest addresses first. `new_href` is `null`: the user chooses.
+- `images` (images): the failing images of the page, at most 20: `src`, `line` (HTML, when known), `file` (the project file the image is served from, or `null` for an image on another host or one Next.js built from an import) and `size` (`{format, width, height}` read from the file's first bytes, or `null`).
 - `also_on` (links): other pages of the run with the same link to the same address. When the link comes from a shared file, one change fixes them all; pass their finding ids to the re-audit too.
 
 `not_fixable` lists the findings in scope that are left alone, grouped by check and reason: `reason`, how many findings share it (`count`), and a few example URLs and files. It is always complete; `limit` and `offset` page only `fixes`. Pass each reason on with its count. `out_of_scope` counts the findings no fix exists for.
@@ -64,6 +65,14 @@ Always read the file first. The plan knows the file's name, not its content.
 - An href built from data (an array of routes, a CMS entry, a config file) is changed in the data, not in the code that renders it. Say where it came from. When it is outside the project (a CMS), say so and leave it.
 - **Through a redirect:** write `new_href`. With `temporary` (a 302, 303 or 307) or `external` (the redirect ends on another site), ask first whether the link should change: a login, a region switch or a shop on another domain can be what the site means.
 - **To a broken page:** never pick the target yourself. Offer `candidates`, the page's new address if the user knows it, or removing the link (keep its text as plain text when that reads well), and write only what the user chose. Never link to an address the site does not have.
+
+### Images
+
+- Change only the attributes the fix is about. Keep `src`, `alt`, classes and the rest.
+- **Width and height:** use the numbers under `size`: the file's own pixel size. CSS can still scale the image. When `size` is `null`, read the size from the file yourself or ask the user; never guess one. This check is informational, because a style sheet the crawler does not read may already reserve the box: look at the CSS first and leave an image whose box is set there.
+- **next/image:** give `width` and `height` (or `fill` inside a sized parent). An image imported as a module already has its size, so it is not listed.
+- **Lazy main image:** remove `loading="lazy"` and keep `fetchpriority="high"` or the preload. For next/image, use the option its documentation for the project's Next.js version gives for an image above the fold. When a theme, plugin or shared component adds lazy loading to every image, change it there so that the main image is excluded.
+- Format and file size (`legacy_format`, `large_file`) are not fixed: converting or compressing an image needs a tool, and the plugin runs none.
 
 ### Titles and descriptions you write
 

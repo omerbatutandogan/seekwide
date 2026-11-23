@@ -70,6 +70,9 @@ export const LIMITS = Object.freeze({
   // its pixel size, so fewer of them than of the media module's images.
   maxSocialImageChecks: 20,
   socialImageReadBytes: 64 * 1024,
+  // /seekwide:fix: the project's own image files whose pixel size an image fix needs, each read for its first
+  // socialImageReadBytes only.
+  maxFixImageReads: 200,
   // App association files (aso module): read whole up to this size.
   appFileMaxBytes: 1024 * 1024,
   // /llms.txt (ai module): only its first part is read, enough for its title line and links.

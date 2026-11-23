@@ -6,8 +6,9 @@
 // Scope (ARCHITECTURE.md 4.13): a missing or duplicate title and meta description, a
 // missing canonical, missing Open Graph tags, a missing sitemap (with the
 // robots.txt line that names it), an internal link that goes through a
-// redirect or leads to a broken page. Anything else is counted, not planned.
-// The plans are in fix-page.js, fix-link.js and fix-sitemap.js.
+// redirect or leads to a broken page, an image without its size, a main
+// image that is lazy-loaded. Anything else is counted, not planned.
+// The plans are in fix-page.js, fix-link.js, fix-image.js and fix-sitemap.js.
 
 /** @import { CrawlResult, Finding, PageRecord, Run } from '../types.js' */
 /** @import { ProjectSources } from './sources.js' */
@@ -15,6 +16,7 @@
 
 import { SEVERITIES } from '../config.js';
 import { plainPath } from './fix-common.js';
+import { IMAGE_UNITS, MAX_IMAGES, imageFileOf, planImage } from './fix-image.js';
 import { planLink } from './fix-link.js';
 import { layoutsAbove, planPage } from './fix-page.js';
 import { planSitemap } from './fix-sitemap.js';
@@ -22,7 +24,7 @@ import { planSitemap } from './fix-sitemap.js';
 /**
  * The checks a fix exists for. `unit` says which pages the check looks at,
  * which the re-audit needs to know before it calls a finding closed.
- * @type {Readonly<Record<string, {type: 'title'|'meta_description'|'canonical'|'open_graph'|'sitemap'|'internal_link', action: 'add'|'make_unique'|'remove_extra'|'create'|'retarget'|'replace_or_remove', unit: 'indexable'|'html'|'site'|'link'}>>}
+ * @type {Readonly<Record<string, {type: 'title'|'meta_description'|'canonical'|'open_graph'|'sitemap'|'internal_link'|'image', action: 'add'|'make_unique'|'remove_extra'|'create'|'retarget'|'replace_or_remove'|'add_size'|'load_eagerly', unit: 'indexable'|'html'|'site'|'link'|'image'}>>}
  */
 export const FIXABLE_CHECKS = Object.freeze({
   'seo.title.missing': { type: 'title', action: 'add', unit: 'indexable' },
@@ -36,6 +38,8 @@ export const FIXABLE_CHECKS = Object.freeze({
   'seo.sitemap.missing': { type: 'sitemap', action: 'create', unit: 'site' },
   'links.internal.redirect': { type: 'internal_link', action: 'retarget', unit: 'link' },
   'links.internal.broken': { type: 'internal_link', action: 'replace_or_remove', unit: 'link' },
+  'media.image.dimensions_missing': { type: 'image', action: 'add_size', unit: 'image' },
+  'media.image.lazy_priority': { type: 'image', action: 'load_eagerly', unit: 'image' },
 });
 
 /** Metadata findings that are deliberately not repaired, with the reason given to the user. */
@@ -51,8 +55,9 @@ const REFUSED_CHECKS = Object.freeze({
  * @property {string} title
  * @property {string} severity
  * @property {string|null} url
- * @property {string} type            What is fixed: 'title', 'meta_description', 'canonical', 'open_graph', 'sitemap' or 'internal_link'.
- * @property {string} action          'add', 'make_unique', 'remove_extra', 'repair', 'create', 'retarget' or 'replace_or_remove'.
+ * @property {string} type            What is fixed: 'title', 'meta_description', 'canonical', 'open_graph', 'sitemap', 'internal_link' or 'image'.
+ * @property {string} action          'add', 'make_unique', 'remove_extra', 'repair', 'create', 'retarget', 'replace_or_remove', 'add_size'
+ *   or 'load_eagerly'.
  * @property {'next-app'|'html'} kind  How the file is edited: a Next.js file (a metadata export, or a link in the page, a layout or a
  *   component they use), or an HTML file.
  * @property {string|null} file       The file to edit, relative to the project folder; null for a fix that only creates files.
@@ -76,6 +81,9 @@ const REFUSED_CHECKS = Object.freeze({
  * @property {boolean} [external]     A redirected link: the redirect ends on another site.
  * @property {string[]} [candidates]  A link to a broken page: paths of indexable pages of the crawl it could point to instead.
  * @property {string[]} [also_on]     An internal link: other pages of the run with the same link to the same address.
+ * @property {{src: string, line: number|null, file: string|null, size: import('../util/image-size.js').ImageSize|null}[]} [images]
+ *   An image fix: the failing images of the page, with the line of each when the file is the page it serves, the project
+ *   file the image is served from, and its pixel size read from that file's first bytes.
  */
 
 /**
@@ -102,12 +110,13 @@ const REFUSED_CHECKS = Object.freeze({
  * passed on only when it is a plain relative path. Text taken from a page
  * appears only under `current` and in URLs and routes.
  *
- * @param {{run: Run, sources: ProjectSources, crawl: CrawlResult|null, siteUrl: string|null, titles?: Record<string, string>}} input
+ * @param {{run: Run, sources: ProjectSources, crawl: CrawlResult|null, siteUrl: string|null, titles?: Record<string, string>, imageSizes?: Map<string, import('../util/image-size.js').ImageSize|null>}} input
  *   `crawl`: the crawl the run was made from, when it is still stored. `siteUrl`: the origin the site is deployed at.
- *   `titles`: the title of each check, by id; a check without one is named by its id.
+ *   `titles`: the title of each check, by id; a check without one is named by its id. `imageSizes`: the pixel size of image
+ *   files of the project, by their name in the listing (`imageFilesToRead` says which), as the caller read them.
  * @returns {FixPlan}
  */
-export function planFixes({ run, sources, crawl, siteUrl, titles = {} }) {
+export function planFixes({ run, sources, crawl, siteUrl, titles = {}, imageSizes = new Map() }) {
   const files = new Set(sources.files);
   const prefix = sources.relative === '' ? '' : `${sources.relative}/`;
   const inProject = (/** @type {string} */ file) => `${prefix}${file}`;
@@ -155,6 +164,7 @@ export function planFixes({ run, sources, crawl, siteUrl, titles = {} }) {
   /** @type {PlanContext} */
   const ctx = {
     sources, files, crawl, siteUrl, appDir, isNext, pages, byCheckAndUrl, inProject, listed, refuse, base,
+    imageSizes,
     findingsOf: (checkId) => byCheck.get(checkId) ?? [],
     layoutsOf: (file) => (appDir === null ? [] : layoutsAbove(file, appDir, files)),
     add: (fix) => {
@@ -168,8 +178,35 @@ export function planFixes({ run, sources, crawl, siteUrl, titles = {} }) {
       else outOfScope.set(finding.check_id, (outOfScope.get(finding.check_id) ?? 0) + 1);
     } else if (fix.type === 'sitemap') planSitemap(ctx, finding);
     else if (fix.type === 'internal_link') planLink(ctx, finding, fix);
+    else if (fix.type === 'image') planImage(ctx, finding, fix);
     else planPage(ctx, finding, fix);
   }
   plan.outOfScope = Object.fromEntries(outOfScope);
   return plan;
+}
+
+/**
+ * The project image files whose size the image fixes of a run need: the
+ * failing images of the pages with a `media.image.dimensions_missing`
+ * finding, mapped to files of the listing. The caller reads the first bytes
+ * of each and passes the sizes to `planFixes`.
+ * @param {{run: Run, sources: ProjectSources, crawl: CrawlResult|null}} input
+ * @returns {string[]}  Names in the listing, relative to the source folder, each once.
+ */
+export function imageFilesToRead({ run, sources, crawl }) {
+  if (crawl === null) return [];
+  const files = new Set(sources.files);
+  const isNext = sources.detection.framework === 'next-app' && sources.detection.app_dir !== null;
+  const rule = IMAGE_UNITS['media.image.dimensions_missing'];
+  /** @type {Set<string>} */
+  const wanted = new Set();
+  const urls = new Set(run.findings.filter((finding) => finding.check_id === 'media.image.dimensions_missing' && finding.url !== null).map((finding) => finding.url));
+  for (const page of crawl.pages) {
+    if (!urls.has(page.url)) continue;
+    for (const image of rule.units(page).filter(rule.fails).slice(0, MAX_IMAGES)) {
+      const file = imageFileOf(image.url, crawl.site_origin, { isNext, files });
+      if (file !== null) wanted.add(file);
+    }
+  }
+  return [...wanted];
 }

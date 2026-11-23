@@ -109,7 +109,7 @@ The pictures below come from one run of the plugin on [`fixtures/sample-site`](f
 - **Checks the search experience**: titles Google documents as reasons to write its own title link (half-empty, an older year than the heading, another writing system than the page), a viewport that stops zooming, and pages that redirect to one page carrying their address (the pattern of a consent, age or language wall); with a key, the Chrome UX Report's experimental ad metrics as an observation. It never requests a search result.
 - **Never contacts Google Play or a social platform.** No check sends a request to Google Play, Facebook, Instagram, X, LinkedIn, Pinterest, TikTok, YouTube, Telegram, Discord and the like, not even for their robots.txt; links and images there are listed in the report as not checked, by rule.
 - **Names the source file** when you audit a project in its own folder (repo mode). For a Next.js App Router project or a plain HTML site, the audit runs against the project's local server and each finding says which file it comes from: `app/about/page.tsx` for the route `/about`, or `services.html:17` for a broken link on line 17. See [Auditing a project in its folder](#auditing-a-project-in-its-folder).
-- **Fixes what it found, and checks the fix.** For a project audited in its folder, `/seekwide:fix` proposes changes for metadata findings (a missing or duplicate title or meta description, a missing canonical, missing Open Graph tags, a missing sitemap) and internal links (through a redirect, or to a broken page) in the file each one comes from. Every change is shown as a diff and written only after you say yes; nothing is committed. A second audit then says, finding by finding, whether it is closed, still open, replaced by another finding, or could not be verified. See [Fixing findings](#fixing-findings).
+- **Fixes what it found, and checks the fix.** For a project audited in its folder, `/seekwide:fix` proposes changes for metadata findings (a missing or duplicate title or meta description, a missing canonical, missing Open Graph tags, a missing sitemap) internal links (through a redirect, or to a broken page) and image markup (width and height from the image file's own size, a main image that is lazy-loaded) in the file each one comes from. Every change is shown as a diff and written only after you say yes; nothing is committed. A second audit then says, finding by finding, whether it is closed, still open, replaced by another finding, or could not be verified. See [Fixing findings](#fixing-findings).
 - **Uses the search data you export.** A Search Console or Bing Webmaster Tools export saved in the project folder adds clicks, impressions and positions to the report and lists findings on the pages with the most impressions first, with no account connection (see [Search Console and Bing data](#search-console-and-bing-data)). Scores do not depend on it.
 - **Writes a report** as Markdown and as one self-contained HTML file, with an optional agency name and logo. The HTML prints cleanly to PDF.
 - **Keeps facts and advice apart.** Claude writes the summary and can suggest better titles, and the report labels those parts as suggestions. They never change a score.
@@ -120,7 +120,7 @@ The pictures below come from one run of the plugin on [`fixtures/sample-site`](f
 - It does not run JavaScript. Content that appears only after scripts run is not seen.
 - It does not get around firewalls, CAPTCHAs or robots.txt. When a site blocks it, it says so and stops. Pages the site refuses to serve to the crawler are counted and left out of the checks; they are never reported as errors of the site.
 - It does not measure Core Web Vitals of every page. A lab test takes many seconds and Google limits how many can be run, so a few pages stand for the rest.
-- It does not change your code by itself. The plugin's own server never writes into a project. With `/seekwide:fix`, Claude edits files with its normal tools, after showing you each diff and getting your yes, and it never commits. Only metadata and internal-link fixes exist; images and content are not touched.
+- It does not change your code by itself. The plugin's own server never writes into a project. With `/seekwide:fix`, Claude edits files with its normal tools, after showing you each diff and getting your yes, and it never commits. Only metadata, internal-link and image-markup fixes exist; image files and content are not touched.
 - It does not look for cloaking or sneaky redirects, and it does not test a site's defences. Finding cloaking needs a request that pretends to be Google, which this crawler never sends, so a clean security result is not proof of a clean site.
 - It does not look at images themselves: it cannot tell whether alt text describes a picture, and it does not write alt text or convert images. It has no local SEO module yet.
 - It does not pretend to be an AI crawler and does not contact AI vendors. Whether GPTBot, ClaudeBot or PerplexityBot may read a site is read from its robots.txt with that crawler's own token; what a CDN or firewall does to the real crawler is not tested, and the report says so.
@@ -141,7 +141,7 @@ The pictures below come from one run of the plugin on [`fixtures/sample-site`](f
 | `/seekwide:cro [url]` | Forms and contact paths: field names, autofill, input types, blocked pasting, forms that send over http, tel and mailto links, tap targets; markup only, never a submitted form | 100 |
 | `/seekwide:sxo [url]` | Search experience: titles Google is likely to rewrite, zooming on a phone, redirects to a consent page, with the seo module's titles, HTTPS and Core Web Vitals | 100 |
 | `/seekwide:all [url]` | Every installed module in one report | 200 |
-| `/seekwide:fix [run-id]` | Fix metadata and internal-link findings of an audit of the project in this folder, with your approval for each change, then audit again to verify | The first audit's |
+| `/seekwide:fix [run-id]` | Fix metadata, internal-link and image-markup findings of an audit of the project in this folder, with your approval for each change, then audit again to verify | The first audit's |
 | `/seekwide:report [run-id]` | Rebuild a report, brand it, or compare two audits | — |
 | `/seekwide:setup [url]` | Save a project profile (with the apps and the AI policy) and report branding | — |
 
@@ -180,7 +180,7 @@ What to know:
 
 ## Fixing findings
 
-`/seekwide:fix` works on a saved audit of the project in the current folder (run `/seekwide:seo` without a URL first, or `/seekwide:basic` or `/seekwide:links` for the link fixes, which need the `links` module). It never works on a site audited by URL only, because then there is no source file to change, and it never fixes something no finding reports.
+`/seekwide:fix` works on a saved audit of the project in the current folder (run `/seekwide:seo` without a URL first, or `/seekwide:basic` or `/seekwide:links` for the link fixes and `/seekwide:media` for the image fixes, which need those modules). It never works on a site audited by URL only, because then there is no source file to change, and it never fixes something no finding reports.
 
 What it can fix, and where the change goes:
 
@@ -192,6 +192,8 @@ What it can fix, and where the change goes:
 | No sitemap | `app/sitemap.js` (or `.ts`), and the sitemap line in `app/robots.js` or `robots.txt` | `sitemap.xml`, and the `Sitemap:` line in `robots.txt` |
 | Internal link through a redirect | The `href` in the page, a layout or a shared component (Claude finds it), changed to the final address | The `href` on the line the audit names |
 | Internal link to a broken page | The same; you choose the new target from the site's pages, or remove the link | The same |
+| Image without width and height | `width` and `height` on the `<Image>` or `<img>`, from the pixel size in the image file's header | `width` and `height` on the `<img>` on the line the audit names |
+| Main image lazy-loaded | `loading="lazy"` removed from it, or from the shared component that adds it | The same, in the file |
 
 How it goes:
 

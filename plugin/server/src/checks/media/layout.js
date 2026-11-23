@@ -18,7 +18,7 @@ export function reservesSpace(image) {
  * live whose box the theme's style sheet sets.
  * @param {ImageRecord} image
  */
-function contentImage(image) {
+export function contentImage(image) {
   return isRendered(image) && image.chrome !== true;
 }
 
@@ -26,7 +26,7 @@ function contentImage(image) {
  * The page marks the image as its most important one: a priority hint or a preload.
  * @param {ImageRecord} image
  */
-function markedMain(image) {
+export function markedMain(image) {
   return image.fetchpriority === 'high' || image.preloaded === true;
 }
 
