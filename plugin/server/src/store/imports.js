@@ -3,12 +3,14 @@
 // nothing from an export or an argument becomes part of a path.
 
 /** @import { ImportSource, SearchImport } from '../imports/parse.js' */
+/** @import { LogImport } from '../logs/record.js' */
 
 import path from 'node:path';
 import { IMPORT_SOURCES } from '../imports/parse.js';
 import { storeError } from './errors.js';
 import { assertRealDir, makeRealDirs, readStoreFile, writeFileAtomic } from './fs-util.js';
 import { importProblem } from './import-validate.js';
+import { logImportProblem } from '../logs/record.js';
 import { ensureProject, projectPaths } from './project.js';
 
 /** The largest import file the plugin writes or reads: 50,000 pages and dates at most. */
@@ -90,4 +92,58 @@ export async function loadSearchImport(projectDir, source) {
   const problem = importProblem(value, source);
   if (problem !== null) throw corrupt(relative, problem);
   return /** @type {SearchImport} */ (value);
+}
+
+/** The largest log import the plugin writes or reads: 23 crawlers of 10 paths, far below it. */
+export const LOG_STORE_BYTES = 1024 * 1024;
+
+/** @param {string} projectDir */
+function logPaths(projectDir) {
+  const paths = projectPaths(projectDir);
+  const dir = path.join(paths.root, 'imports');
+  return { dir, file: path.join(dir, 'server_logs.json'), relative: '.seekwide/imports/server_logs.json', paths };
+}
+
+/**
+ * Store a log import, replacing the earlier one, with the guarantees of `saveSearchImport`.
+ * @param {string} projectDir
+ * @param {LogImport} record
+ * @returns {Promise<{file: string, relative: string}>}
+ */
+export async function saveLogImport(projectDir, record) {
+  const { dir, file, relative, paths } = logPaths(projectDir);
+  const problem = logImportProblem(record);
+  if (problem !== null) throw storeError('IMPORT_INVALID', `The log import could not be saved: ${problem}.`);
+  const text = `${JSON.stringify(record)}\n`;
+  if (Buffer.byteLength(text, 'utf8') > LOG_STORE_BYTES) throw storeError('IMPORT_TOO_LARGE', `The log import would take more than ${LOG_STORE_BYTES / 1048576} MB, the most Seekwide stores.`);
+  await ensureProject(projectDir);
+  await makeRealDirs([paths.root, dir], paths.projectDir);
+  await writeFileAtomic(file, text);
+  return { file, relative };
+}
+
+/**
+ * The stored log import, or null when there is none, with the guarantees of `loadSearchImport`.
+ * @param {string} projectDir
+ * @returns {Promise<LogImport|null>}
+ */
+export async function loadLogImport(projectDir) {
+  const { dir, file, relative, paths } = logPaths(projectDir);
+  if (!(await assertRealDir(paths.root, paths.projectDir)) || !(await assertRealDir(dir, paths.projectDir))) return null;
+  let text;
+  try {
+    text = await readStoreFile(file, LOG_STORE_BYTES, paths.projectDir);
+  } catch (error) {
+    if (/** @type {NodeJS.ErrnoException} */ (error).code === 'ENOENT') return null;
+    throw error;
+  }
+  let value;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    throw storeError('IMPORT_CORRUPT', `The log import in ${relative} is damaged or was not written by Seekwide: it is not JSON.`);
+  }
+  const problem = logImportProblem(value);
+  if (problem !== null) throw storeError('IMPORT_CORRUPT', `The log import in ${relative} is damaged or was not written by Seekwide: ${problem}.`);
+  return /** @type {LogImport} */ (value);
 }

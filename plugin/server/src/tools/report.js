@@ -103,6 +103,8 @@ export function reportTools(deps) {
           search.push({ data, match: matchPages(data, run, await crawlOfRun(deps, run)) });
         }
 
+        const logs = await withStoreErrors(() => deps.loadLogImport(projectDir));
+
         const options = {
           ...(args.executive_summary !== undefined ? { executiveSummary: args.executive_summary } : {}),
           ...(args.recommendations !== undefined ? { recommendations: args.recommendations } : {}),
@@ -110,6 +112,7 @@ export function reportTools(deps) {
           ...(logoDataUri ? { logoDataUri } : {}),
           ...(comparison ? { comparison } : {}),
           ...(search.length > 0 ? { search } : {}),
+          ...(logs !== null ? { logs } : {}),
         };
 
         const formats = args.formats && args.formats.length > 0 ? [...new Set(/** @type {('markdown'|'html')[]} */ (args.formats))] : [...FORMATS];
@@ -133,7 +136,7 @@ export function reportTools(deps) {
           files[format] = file;
           bytes[format] = Buffer.byteLength(content, 'utf8');
         }
-        return { run_id: run.run_id, files, bytes, search_data: search.map((entry) => entry.data.source) };
+        return { run_id: run.run_id, files, bytes, search_data: search.map((entry) => entry.data.source), server_logs: logs !== null };
       },
     },
   ];

@@ -7,6 +7,7 @@ import { SEVERITIES } from '../config.js';
 import { InputError } from '../util/errors.js';
 import { clip, collapseWhitespace } from '../util/strings.js';
 import { aiLayer, viewAi } from './ai.js';
+import { viewLogs } from './logs.js';
 import { viewObservations } from './observations.js';
 import { aiAccessNotJudged } from '../util/ai-summary.js';
 import { methodSections, reportTitle } from './copy.js';
@@ -57,6 +58,8 @@ function readOptions(run, options) {
   if (!Array.isArray(search) || !search.every((entry) => obj(entry).data !== undefined && obj(entry).match !== undefined)) {
     throw new TypeError('search must be an array of {data, match}.');
   }
+  const logs = o.logs ?? null;
+  if (logs !== null && (obj(logs).source !== 'server_logs' || !Array.isArray(obj(logs).bots))) throw new TypeError('logs must be a log import.');
   const comparison = o.comparison ?? null;
   if (comparison !== null && obj(comparison).run_id !== run.run_id) {
     throw new TypeError(`The comparison belongs to run ${String(obj(comparison).run_id)}, not to run ${run.run_id}.`);
@@ -68,6 +71,7 @@ function readOptions(run, options) {
     brand: text(o.brandName).slice(0, 200),
     comparison: /** @type {RunComparison|null} */ (comparison),
     search: /** @type {SearchEntry[]} */ (search),
+    logs: /** @type {import('../logs/record.js').LogImport|null} */ (logs),
     recommendations: recommendations.map((item, index) => {
       const entry = obj(item);
       const title = text(entry.title);
@@ -248,6 +252,7 @@ export function buildReport(run, options = {}) {
     ai: aiView,
     observations: viewObservations(run),
     search: viewSearch(opts.search, findings),
+    logs: viewLogs(opts.logs, run),
     scores,
     vitals,
     groups,

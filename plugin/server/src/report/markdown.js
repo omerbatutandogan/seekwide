@@ -168,6 +168,20 @@ function aiSection(r) {
 }
 
 /** @param {Report} r */
+function logsSection(r) {
+  const l = r.logs;
+  if (l === null) return [];
+  const lines = ['## AI crawlers in the server logs (imported)', '', `*${mdText(l.supplied)}*`, '', `- **Files:** ${mdText(l.files)}`, `- **Period:** ${mdText(l.period)}`, `- **Lines:** ${mdText(l.linesText)}`, ''];
+  if (l.rows.length > 0) {
+    lines.push(...table(['Crawler', 'Vendor', 'Requests', 'robots.txt requests', 'Statuses', 'Days', 'Distinct paths', 'robots.txt in this audit'],
+      l.rows.map((row) => [mdCode(row.token), mdText(row.vendor), row.requests, row.robotsTxt, mdText(row.statuses), mdText(row.days), row.paths, mdText(row.access)])), '');
+  }
+  if (l.topPaths.length > 0) lines.push('**Most requested paths:**', '', ...l.topPaths.map((top) => `- ${mdCode(top.token)}: ${mdText(top.paths)}`), '');
+  if (l.notes.length > 0) lines.push(...l.notes.map((note) => `*${mdText(note)}*`), '');
+  return lines;
+}
+
+/** @param {Report} r */
 function observed(r) {
   if (r.observations === null) return [];
   const lines = ['## Observed (not scored)', '', `*${mdText(OBSERVED_NOTE)}*`, ''];
@@ -280,7 +294,7 @@ function method(r) {
 export function renderMarkdown(run, options) {
   const r = buildReport(run, options);
   const lines = [
-    ...header(r), ...summary(r), ...scope(r), ...fixes(r), ...layers(r), ...scores(r), ...vitals(r), ...search(r), ...aiSection(r), ...observed(r), ...topFixes(r),
+    ...header(r), ...summary(r), ...scope(r), ...fixes(r), ...layers(r), ...scores(r), ...vitals(r), ...search(r), ...aiSection(r), ...logsSection(r), ...observed(r), ...topFixes(r),
     ...allFindings(r), ...suggestions(r), ...notRun(r), ...changes(r), ...method(r),
   ];
   return `${lines.join('\n').trimEnd()}\n`;

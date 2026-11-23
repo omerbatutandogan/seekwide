@@ -19,6 +19,7 @@ import { fixTools } from './fix.js';
 import { profileTools } from './profile.js';
 import { reportTools } from './report.js';
 import { runTools } from './runs.js';
+import { logTools } from './logs.js';
 import { searchDataTools } from './search-data.js';
 
 /**
@@ -73,6 +74,10 @@ import { searchDataTools } from './search-data.js';
  *   Store an imported export under .seekwide/imports/, replacing the one from the same source.
  * @property {(projectDir: string, source: ImportSource) => Promise<SearchImport|null>} loadSearchImport
  *   The stored import from one source, checked like a run; null when there is none.
+ * @property {(projectDir: string, record: import('../logs/record.js').LogImport) => Promise<{file: string, relative: string}>} saveLogImport
+ *   Store a log import under .seekwide/imports/, replacing the earlier one.
+ * @property {(projectDir: string) => Promise<import('../logs/record.js').LogImport|null>} loadLogImport
+ *   The stored log import, checked like a run; null when there is none.
  * @property {() => Date} now
  * @property {() => string} defaultProjectDir
  * @property {{SEEKWIDE_REPORT_BRAND?: string, SEEKWIDE_REPORT_LOGO?: string}} env
@@ -80,10 +85,10 @@ import { searchDataTools } from './search-data.js';
  */
 
 /**
- * Build the tool definitions in a fixed order (crawl, project, audit, fix, runs, search data, report, profile).
+ * Build the tool definitions in a fixed order (crawl, project, audit, fix, runs, search data, logs, report, profile).
  * @param {ToolDeps} deps
  * @returns {ToolDef[]}
  */
 export function createTools(deps) {
-  return [...crawlTools(deps), ...projectTools(deps), ...auditTools(deps), ...fixTools(deps), ...runTools(deps), ...searchDataTools(deps), ...reportTools(deps), ...profileTools(deps)];
+  return [...crawlTools(deps), ...projectTools(deps), ...auditTools(deps), ...fixTools(deps), ...runTools(deps), ...searchDataTools(deps), ...logTools(deps), ...reportTools(deps), ...profileTools(deps)];
 }
