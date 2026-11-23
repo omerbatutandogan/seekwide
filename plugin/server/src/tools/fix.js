@@ -171,8 +171,9 @@ export function fixTools(deps) {
       name: 'fix_plan',
       title: 'Plan fixes for a run',
       description:
-        'For a saved run made in repo mode, say which findings a metadata fix exists for (a missing or duplicate title or meta description, ' +
-        'a missing canonical, missing Open Graph tags, a missing sitemap), which file each fix belongs in, what the page sends today and how to change it. ' +
+        'For a saved run made in repo mode, say which findings a fix exists for (a missing or duplicate title or meta description, ' +
+        'a missing canonical, missing Open Graph tags, a missing sitemap, an internal link that goes through a redirect or leads to a broken page), ' +
+        'which file each fix belongs in, what the page sends today and how to change it. ' +
         'Findings that cannot be fixed safely are listed with the reason, grouped by check and reason with counts and examples. Reads the saved run and the project\'s file names; it changes nothing.',
       inputSchema: {
         type: 'object',

@@ -128,3 +128,41 @@ export function sitemapHow({ next, hasRobots, siteUrl }) {
       : `The project has no robots.txt. Create the second file under create with "User-agent: *", "Allow: /" and the line "Sitemap: ${site}/sitemap.xml".`,
   ].join(' ') + need;
 }
+
+/**
+ * How to fix an internal link: point a redirected link at the final address,
+ * or change or remove a link to a broken page. The href to write and the
+ * candidate pages are named by the fix's fields (new_href, candidates), not
+ * here.
+ * @param {{action: string, html: boolean, line: number|null, occurrences: number, temporary: boolean, external: boolean, needsSiteUrl: boolean, shared: boolean}} input
+ * @returns {string}
+ */
+export function linkHow({ action, html, line, occurrences, temporary, external, needsSiteUrl, shared }) {
+  const onLine = Number.isSafeInteger(line) && /** @type {number} */ (line) > 0 ? ` on line ${line}` : '';
+  const where = html
+    ? `The link is in this file${onLine}.${occurrences > 1 ? ` The page has ${occurrences} links with the same href (current.occurrences): change each of them.` : ''}`
+    : 'Find the link whose href is current.href: in this page file, in a layout under layouts, or in a component they import. A link in a header, footer or menu is shared by many pages, so one change there fixes all of them.';
+  const sharedText = shared ? ' The pages under also_on have the same link: when it comes from a shared file, one change fixes them all, and their findings can be verified together.' : '';
+  const built = html ? '' : ' If the href is built from data (a list of routes, a CMS, a config file), change the data rather than the code that renders it, and say so.';
+  const keep = 'Change only the href: keep the link text and the other attributes.';
+  if (action === 'retarget') {
+    return [
+      where,
+      needsSiteUrl
+        ? `It is written as a full URL, so the new one needs the deployed address of the site. ${NEED_SITE_URL}`
+        : 'Change its href to new_href, the address the redirect ends at.',
+      keep,
+      temporary ? 'The redirect is temporary (302, 303 or 307), which a site can mean, for example for a login, a region or a cart: ask the user whether the page moved for good before changing the link.' : '',
+      external ? 'The redirect ends on another site, so the link would then point there: ask the user whether that is what the link should do.' : '',
+      built,
+      sharedText,
+    ].filter(Boolean).join(' ');
+  }
+  return [
+    where,
+    'It points to an address that answered an error. Ask the user what it should point to: one of the pages under candidates (pages the site has, closest addresses first), the new address of the page if it moved, or no link at all (keep the text, drop the link, when that reads well). Never point it to an address the site does not have, and never choose for the user.',
+    keep,
+    built,
+    sharedText,
+  ].filter(Boolean).join(' ');
+}
