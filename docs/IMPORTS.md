@@ -28,7 +28,7 @@ Seekwide reads only files the user saved in the project folder. There is no OAut
 
 Because the headers are not documented, nothing depends on the header of the column that names the pages or dates, on a file name, or on a sheet name.
 
-- **A metric column** is known by the name the tool's help page gives the metric, in English or Turkish (the table above), compared without letter case or accents, with one leading "total", "average", "avg." ("toplam", "ortalama") allowed and a closing part in brackets ignored. A name no help page gives, such as the plural "Tıklamalar", is not read.
+- **A metric column** is known by the name the tool's help page gives the metric, in English or Turkish (the table above), compared without letter case or accents, with one leading "total", "average", "avg." ("toplam", "ortalama") allowed and a closing part in brackets ignored. A real Turkish download writes other names than its help page, "Tıklamalar", "Gösterimler", "TO" and "Pozisyon" (below), so those are read as well. A name that neither a help page nor a real download uses, such as "Tıklama", is not read.
 - **The table of pages** is the one table with clicks and impressions columns and exactly one other column, every value of which is an address starting with `http://` or `https://`. **The table of dates** is the same with dates written `YYYY-MM-DD` (in an Excel file, also a number formatted as a date). **The filters** are a table of two columns and no metric, read as name and value after its first row. Every other table (queries, countries, devices, search appearance) is counted and not used.
 - **Counts** (clicks, impressions) are digits, optionally in groups of three with one separator (`1,234`, `1.234`, `1 234`): a count is a whole number, so a separator in it cannot be a decimal mark. **Position** is digits with at most one decimal mark, a dot or a comma, and never a group separator; 0 and an empty cell mean no position. **CTR is not read**: it is clicks divided by impressions, as both help pages define it, and Seekwide computes it.
 - A row with more cells than its header names is refused, even when the extra cell is empty: a decimal comma written without quotes in a comma-separated file splits a number in two and would shift every later column. In an Excel file, empty cells at the end of a row (cells that only carry a style) do not count.
@@ -55,3 +55,23 @@ A file of at most 10 MB; a zip of at most 200 entries, 20 MB unpacked per entry 
 ## Checking with a real export
 
 The synthetic files in the tests (`test/helpers/exports.js`) follow the table above; the header of the page column, the file names and the number formats in them are stand-ins. A real export from a Search Console account in English and one in Turkish, and a Bing Pages export, settle what this page lists as undocumented. For each: the file as downloaded, the interface language, the report (Performance, search type), the date range and filters chosen, and whether it was the CSV, Excel or Google Sheets option.
+
+### What a real export showed (2026-11-23)
+
+One Search Console CSV download from a Turkish interface (Performance, web search, the last 3 months, no other filter) was read on 2026-11-23. It is not kept in the repository; `googleZipTurkishDownload` in `test/helpers/exports.js` copies its shape with made-up values.
+
+- Seven files: `Arama görünümü.csv`, `Cihazlar.csv`, `Filtreler.csv`, `Grafik.csv` (the dates), `Sayfa sayısı.csv` (the pages), `Sorgular.csv`, `Ülkeler.csv`. The community page's `Tarihler.csv` is `Grafik.csv` here.
+- Every table's metric header is `Tıklamalar,Gösterimler,TO,Pozisyon`, not the help page's "Tıklama sayısı", "Gösterim sayısı", "Ortalama konum". Seekwide 0.2.0 refused it.
+- The pages column is headed `En alakalı sayfalar`, the queries column `En çok yapılan sorgular`, the filters table `Filtre uygula,Değer` with `Arama türü,Web (metin tabanlı)` and `Tarih,Son 3 ay`.
+- Numbers use a decimal point, not a comma (`6.04`, `1.83%`), with no group separator in counts up to 657. Dates are `YYYY-MM-DD`. No cell is quoted.
+
+Two Bing Webmaster Tools downloads were read the same day:
+
+- The Pages table (the file is named `<site>_PageTrafficReport_<date>.csv`) is read. It starts with a byte order mark, quotes every cell, puts impressions before clicks, and is headed `Page,Impressions,Clicks,CTR,Avg. Position`; a position keeps all its digits (`7.333333333333333`). It records no dates, as expected, so the period comes from the user. `bingPageTrafficDownload` in `test/helpers/exports.js` copies its shape.
+- The overview (`<site>_SearchPerformanceOverview_All_<date>.csv`) is a table of dates only, headed `Date,Clicks,Impressions,Avg. CTR`, with dates written `8/23/2026 12:00:00 AM`. It has no pages, so it is refused, which is right: the Pages table is the one to export.
+
+A Search Console CSV download from an English interface (Performance, web search, the last 3 months) was read the same day, with no change needed: seven files named `Chart.csv` (the dates, not `Dates.csv`), `Countries.csv`, `Devices.csv`, `Filters.csv`, `Pages.csv`, `Queries.csv` and `Search appearance.csv`; every metric header is `Clicks,Impressions,CTR,Position`, the pages column is `Top pages`, the filters are `Filter,Value` with `Search type,Web (text-based)` and `Date,Last 3 months`. Counts above 1,000 (`7114`) are written with no group separator, decimals with a point, dates `YYYY-MM-DD`.
+
+The Excel option of the same report (English interface) was read with no change too: seven sheets named `Chart`, `Queries`, `Pages`, `Countries`, `Devices`, `Search appearance` and `Filters`, with the same headers as the CSV files; counts and positions are stored as numbers, the CTR as a fraction (`0.0446`), and the dates as text written `YYYY-MM-DD` (shared strings), not as date-formatted serials.
+
+Still not seen: an Excel download from a Turkish interface, and a Bing download from a Turkish interface.

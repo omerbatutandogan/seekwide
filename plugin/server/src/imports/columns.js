@@ -7,6 +7,9 @@
 //   https://support.google.com/webmasters/answer/7576553?hl=tr  Tıklama sayısı, Gösterim sayısı, TO (Tıklama oranı), Ortalama konum
 //   https://www.bing.com/webmasters/help/search-performance-c680da36  Clicks, Impressions, Avg. CTR, Avg. position,
 //     Average Click-Through Rate(CTR), Average Position
+// A real Search Console CSV download from a Turkish interface (Performance, web search, last 3 months, downloaded
+// 2026-11-23) does not use the help page's Turkish names: its header is "Tıklamalar, Gösterimler, TO, Pozisyon",
+// so those three are read too. They are what the download writes, not what a help page documents.
 // The help pages also name the chart's figures "total clicks, total impressions, average CTR and average position"
 // ("toplam tıklama sayısı, toplam gösterim sayısı, ortalama TO'su ve ortalama konumu"), so a leading "total",
 // "average", "avg." ("toplam", "ortalama") is allowed, and so is a closing part in brackets.
@@ -18,17 +21,17 @@ import { looksLikePageUrl, parseDate } from './values.js';
 
 /** Metric names after `fold`, without a qualifier or a part in brackets. */
 const METRIC_NAMES = /** @type {Record<Metric, string[]>} */ ({
-  clicks: ['clicks', 'tiklama sayisi'],
-  impressions: ['impressions', 'gosterim sayisi'],
+  clicks: ['clicks', 'tiklama sayisi', 'tiklamalar'],
+  impressions: ['impressions', 'gosterim sayisi', 'gosterimler'],
   ctr: ['ctr', 'click-through rate', 'to', 'tiklama orani'],
-  position: ['position', 'konum'],
+  position: ['position', 'konum', 'pozisyon'],
 });
 const QUALIFIERS = ['total ', 'average ', 'avg. ', 'avg ', 'toplam ', 'ortalama '];
 
 /** The metric names Seekwide reads, as the help pages write them, for messages. */
 export const KNOWN_HEADERS =
   'Clicks, Impressions, CTR, Position, Average position, Avg. CTR, Avg. position (English); ' +
-  'Tıklama sayısı, Gösterim sayısı, TO (Tıklama oranı), Ortalama konum (Turkish)';
+  'Tıklamalar, Gösterimler, TO, Pozisyon, Tıklama sayısı, Gösterim sayısı, Tıklama oranı, Ortalama konum (Turkish)';
 
 /**
  * Lower case, Turkish dotted and dotless i folded to i and the other letters to

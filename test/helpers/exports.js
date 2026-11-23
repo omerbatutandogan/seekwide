@@ -70,6 +70,25 @@ export function googleZipTurkish() {
   ]);
 }
 
+/**
+ * Search Console's CSV download from a Turkish interface as a real one was
+ * written on 2026-11-23: the header "Tıklamalar, Gösterimler, TO, Pozisyon",
+ * decimal points, a CTR such as "1.83%", the dates in "Grafik.csv" and the
+ * filters under "Filtre uygula". The values here are made up.
+ */
+export function googleZipTurkishDownload() {
+  const header = (/** @type {string} */ first) => [first, 'Tıklamalar', 'Gösterimler', 'TO', 'Pozisyon'];
+  return makeZip([
+    { name: 'Arama görünümü.csv', data: csv(header('Arama Görünümü'), []) },
+    { name: 'Cihazlar.csv', data: csv(header('Cihaz'), [['Masaüstü', 12, 600, '2%', 6.04], ['Mobil', 4, 300, '1.33%', 10.2]]) },
+    { name: 'Filtreler.csv', data: csv(['Filtre uygula', 'Değer'], [['Arama türü', 'Web (metin tabanlı)'], ['Tarih', 'Son 3 ay']]) },
+    { name: 'Grafik.csv', data: csv(header('Tarih'), [['2026-10-01', 9, 500, '1.8%', 5.4], ['2026-10-02', 7, 400, '1.75%', 7]]) },
+    { name: 'Sayfa sayısı.csv', data: csv(header('En alakalı sayfalar'), [[`${SITE}/`, 11, 640, '1.72%', 6.2], [`${SITE}/tr`, 2, 106, '1.89%', 6.57], [`${SITE}/about`, 3, 154, '1.95%', 11.19]]) },
+    { name: 'Sorgular.csv', data: csv(header('En çok yapılan sorgular'), [['fiyat', 5, 45, '11.11%', 3.96]]) },
+    { name: 'Ülkeler.csv', data: csv(header('Ülke'), [['Türkiye', 10, 221, '4.52%', 5.33]]) },
+  ]);
+}
+
 /** Search Console's Excel file: one sheet per table, numbers stored as numbers, dates as date-formatted serials. */
 export function googleXlsx() {
   const header = (/** @type {string} */ first) => [first, 'Clicks', 'Impressions', 'CTR', 'Position'];
@@ -88,4 +107,18 @@ export function bingPagesCsv() {
     [`${SITE}/`, 800, 30, '3.75%', 3.1],
     [`${SITE}/about`, 200, 4, '2.00%', 7.4],
   ]);
+}
+
+/**
+ * Bing's Page Traffic report as a real download was written on 2026-11-23: a
+ * byte order mark, every cell quoted, impressions before clicks, "CTR" and
+ * "Avg. Position", and a position with all its digits. The values are made up.
+ */
+export function bingPageTrafficDownload() {
+  const quoted = (/** @type {string[]} */ row) => row.map((cell) => `"${cell}"`).join(',');
+  return '\uFEFF' + [
+    quoted(['Page', 'Impressions', 'Clicks', 'CTR', 'Avg. Position']),
+    quoted([`${SITE}/blog/post`, '3', '0', '0%', '7.333333333333333']),
+    quoted([`${SITE}/`, '5', '1', '20%', '6']),
+  ].join('\r\n') + '\r\n';
 }

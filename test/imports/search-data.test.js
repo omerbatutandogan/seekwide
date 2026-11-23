@@ -4,7 +4,7 @@ import { metricOf, tableShape } from '../../plugin/server/src/imports/columns.js
 import { ImportError } from '../../plugin/server/src/imports/errors.js';
 import { importExport } from '../../plugin/server/src/imports/parse.js';
 import { parseCount, parseDate, parsePosition } from '../../plugin/server/src/imports/values.js';
-import { SITE, bingPagesCsv, csv, googleXlsx, googleZipEnglish, googleZipTurkish } from '../helpers/exports.js';
+import { SITE, bingPagesCsv, csv, googleXlsx, googleZipEnglish, googleZipTurkish, googleZipTurkishDownload, bingPageTrafficDownload } from '../helpers/exports.js';
 import { makeZip } from '../helpers/zip.js';
 
 const AT = '2026-11-13T10:00:00.000Z';
@@ -28,8 +28,14 @@ describe('metric names', () => {
     ])) assert.equal(metricOf(header), metric, header);
   });
 
-  it('reads no other name as a metric: an undocumented plural, a page column, a number', () => {
-    for (const header of ['Tıklamalar', 'Gösterimler', 'Top pages', 'Page', 'Clicks per day', '', 5]) assert.equal(metricOf(header), null, String(header));
+  it('reads the names a real Turkish download writes: Tıklamalar, Gösterimler, Pozisyon', () => {
+    for (const [header, metric] of /** @type {const} */ ([
+      ['Tıklamalar', 'clicks'], ['TIKLAMALAR', 'clicks'], ['Gösterimler', 'impressions'], ['Pozisyon', 'position'], ['Ortalama pozisyon', 'position'],
+    ])) assert.equal(metricOf(header), metric, header);
+  });
+
+  it('reads no other name as a metric: a name no help page or download uses, a page column, a number', () => {
+    for (const header of ['Tıklama', 'Gösterim', 'Sıra', 'Top pages', 'Page', 'Clicks per day', '', 5]) assert.equal(metricOf(header), null, String(header));
   });
 });
 
@@ -94,9 +100,25 @@ describe('importExport', () => {
     assert.deepEqual(data.filters, [{ name: 'Arama türü', value: 'Web' }]);
   });
 
-  it('refuses a Turkish export whose metric columns use names the help page does not give', async () => {
-    const plural = csv(['Sayfa', 'Tıklamalar', 'Gösterimler'], [[`${SITE}/`, 1, 2]]);
-    await assert.rejects(read(plural), importError('UNSUPPORTED', /no table of pages/));
+  it('reads a Turkish download as it is really written: plural metric names, decimal points, dates in Grafik.csv', async () => {
+    const data = await read(googleZipTurkishDownload());
+    assert.deepEqual(data.pages.map((page) => [page.url, page.clicks, page.impressions, page.position]), [[`${SITE}/`, 11, 640, 6.2], [`${SITE}/about`, 3, 154, 11.19], [`${SITE}/tr`, 2, 106, 6.57]]);
+    assert.equal(data.totals.clicks, 16);
+    assert.equal(data.totals.impressions, 900);
+    assert.equal(data.totals.from, 'dates');
+    assert.deepEqual(data.filters, [{ name: 'Arama türü', value: 'Web (metin tabanlı)' }, { name: 'Tarih', value: 'Son 3 ay' }]);
+    assert.deepEqual(data.counts, { tables: 7, other_tables: 4, skipped_pages: 0, merged_pages: 0 });
+  });
+
+  it('refuses a Turkish export whose metric columns use names neither a help page nor a download gives', async () => {
+    const other = csv(['Sayfa', 'Tıklama', 'Gösterim'], [[`${SITE}/`, 1, 2]]);
+    await assert.rejects(read(other), importError('UNSUPPORTED', /no table of pages/));
+  });
+
+  it('reads Bing\'s Page Traffic report as a real download writes it: byte order mark, quoted cells, a long position', async () => {
+    const data = await read(bingPageTrafficDownload(), 'bing_webmaster_tools');
+    assert.deepEqual(data.pages.map((page) => [page.url, page.clicks, page.impressions, page.position]), [[`${SITE}/`, 1, 5, 6], [`${SITE}/blog/post`, 0, 3, 7.333333333333333]]);
+    assert.deepEqual({ clicks: data.totals.clicks, impressions: data.totals.impressions, from: data.totals.from }, { clicks: 1, impressions: 8, from: 'pages' });
   });
 
   it('reads Search Console\'s Excel file, with dates stored as date-formatted numbers', async () => {
