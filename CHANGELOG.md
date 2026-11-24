@@ -7,6 +7,7 @@ Notable changes to Seekwide. Versions follow [semantic versioning](https://semve
 ### Added
 
 - **Google Play reviews (report).** `search_data_import` reads Play Console's monthly reviews report (`google_play_reviews`; one CSV, or a zip of several months) by the columns Google's help page lists. The report gets a "Google Play reviews (imported)" section: reviews per month, the average stars of those reviews, the share with a developer reply, and the newest 1- and 2-star reviews without a reply, linked to Play Console. What reviewers wrote is never stored, the average is not the rating Google Play shows, and no check, finding or score changes.
+- **Search on YouTube (report).** `search_data_import` reads two exports of YouTube Studio's Advanced mode ("Export current view"): the Traffic source tab (`youtube_traffic_sources`) and its YouTube search terms (`youtube_search_terms`), in the form a real download had on 2026-11-24 (docs/IMPORTS.md). The report gets a "Search on YouTube (imported)" section with the share of views from YouTube's search and the top search terms. No request goes to YouTube, and no check, finding or score changes.
 
 ## 0.8.0 (2026-11-24)
 

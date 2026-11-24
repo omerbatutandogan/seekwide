@@ -195,6 +195,17 @@ ${app.unanswered.length > 0 ? html`<p class="meta">Newest reviews of 1 or 2 star
 }
 
 /** @param {Report} r */
+function youtubeSection(r) {
+  const y = r.youtube;
+  if (y === null) return '';
+  /** @param {string} heading @param {NonNullable<typeof y.terms>} p @param {string} first */
+  const part = (heading, p, first) => html`<h3>${heading}</h3><p class="meta">From the file <code>${p.file}</code>, imported on ${p.imported}. Period: ${p.period}.</p><div class="figs">${p.figures.map((f) => html`<div class="fig"><b>${f.value}</b><span>${f.label}</span></div>`)}</div>
+<table><thead><tr><th>${first}</th><th class="n">Views</th><th class="n">Share</th><th class="n">Watch time (hours)</th></tr></thead><tbody>${p.rows.map((row) => html`<tr><td>${row.name}</td><td class="n">${row.views}</td><td class="n">${row.share}</td><td class="n">${row.hours}</td></tr>`)}</tbody></table>
+${p.notes.length > 0 ? html`<ul class="meta">${p.notes.map((note) => html`<li>${note}</li>`)}</ul>` : ''}`;
+  return html`<section id="search-on-youtube"><h2>Search on YouTube (imported)</h2><p class="note">${y.supplied}</p>${y.terms === null ? '' : part('YouTube search terms', y.terms, 'Search term')}${y.sources === null ? '' : part('Traffic sources', y.sources, 'Traffic source')}</section>`;
+}
+
+/** @param {Report} r */
 function search(r) {
   const s = r.search;
   if (s === null) return '';
@@ -332,7 +343,7 @@ export function renderHtml(run, options) {
 </head>
 <body>
 <main>
-${titleBlock(r)}${summary(r)}${scope(r)}${fixes(r)}${layers(r)}${scores(r)}${vitals(r)}${search(r)}${linksSection(r)}${reviewsSection(r)}${aiVisibilitySection(r)}${aiSection(r)}${logsSection(r)}${observed(r)}${topFixes(r)}${allFindings(r)}${suggestions(r)}${notRun(r)}${changes(r)}${method(r)}
+${titleBlock(r)}${summary(r)}${scope(r)}${fixes(r)}${layers(r)}${scores(r)}${vitals(r)}${search(r)}${linksSection(r)}${reviewsSection(r)}${youtubeSection(r)}${aiVisibilitySection(r)}${aiSection(r)}${logsSection(r)}${observed(r)}${topFixes(r)}${allFindings(r)}${suggestions(r)}${notRun(r)}${changes(r)}${method(r)}
 <footer>Seekwide ${r.pluginVersion} &middot; rules ${r.rulesVersion} &middot; run <code>${r.runId}</code> &middot; ${r.date.iso}</footer>
 </main>
 </body>

@@ -16,6 +16,7 @@ Seekwide reads only files the user saved in the project folder. There is no OAut
 | Search Console's generative AI performance report has an export button; its metric is impressions, by page, country, date and device, with the usual 1,000-row limit. The formats and columns are not stated. | https://support.google.com/webmasters/answer/16984139 |
 | Bing's AI Performance report exports CSV and Excel with grounding queries and citation counts, page-level citations and time series. No column is named. | https://www.bing.com/webmasters/help/ai-performance-9f8e7d6c |
 | Play Console's reviews report is a monthly CSV per app (`reviews_<package>_YYYYMM.csv`), downloaded from Download reports or the developer's Cloud Storage bucket. Its columns are listed: Package Name, App Version Code, App Version Name, Reviewer Language, Device, Review Submit Date and Time, Review Submit Millis Since Epoch, Review Last Update Date and Time, Review Last Update Millis Since Epoch, Star Rating, Review Title, Review Text, Developer Reply Date and Time, Developer Reply Millis Since Epoch, Developer Reply Text, Review Link. The files are UTF-16. | https://support.google.com/googleplay/android-developer/answer/6135870 (read 2026-11-24) |
+| YouTube Studio's Advanced mode can export the current view ("Export current view"); a download holds at most 500 rows. The "YouTube search" traffic source can be opened to show the searches that led to the channel. Formats and columns are not stated. | https://support.google.com/youtube/answer/9717005?hl=en (read 2026-11-24) |
 | Search Console's Links report shows external links (top linked pages, top linking sites, top linking text), internal links, and can export "latest links" and the sample tables. Google says it "isn't a comprehensive list of every link on your site". The columns of an export are not named. | https://support.google.com/webmasters/answer/9049606 |
 
 ## What no official page documents
@@ -104,3 +105,14 @@ The reviews report is the one store export whose columns Google lists, so it is 
 Kept: per app and month, the reviews by stars and how many have a developer reply; for 1- and 2-star reviews without a reply, the day, stars, reviewer language, app version code and the Review Link when it is an https address on play.google.com. Review Title, Review Text, Device and the reply text are read only to tell whether a reply exists, and never stored.
 
 Not read yet, for want of a real download: Play's statistics (ratings, installs) and store performance reports, whose columns the page does not list in full, and App Store Connect's analytics, which Apple documents only as tab-separated `.txt.gz` files of its Analytics Reports API, behind an API key.
+
+### YouTube Studio (2026-11-24)
+
+Three downloads of YouTube Studio's Advanced mode ("Export current view") were read, from a Turkish interface; none is kept in the repository, and `youtubeSearchTermsZip` and `youtubeTrafficSourcesZip` in `test/helpers/exports.js` copy their shapes with made-up values.
+
+- Each is a zip of three UTF-8 CSV files named in the interface's language (`Tablo verileri.csv`, `Grafik verileri.csv`, `Toplamlar.csv`) with English headers: the table, the chart by day (`Date` first) and the totals by day (`Date,Views`). Dates are `YYYY-MM-DD`; watch time is hours with a decimal point (`4.6356`); the table starts with a `Total` row.
+- **Traffic source tab** (`youtube_traffic_sources`): `Traffic source,Views,Watch time (hours),Average view duration,Thumbnail impressions,Thumbnail click-through rate (%)`, one row per source with English names (`Shorts feed`, `YouTube search`, `Browse features`).
+- **YouTube search terms** (the YouTube search row opened; `youtube_search_terms`): `Traffic source,Source type,Source title,Views,…`, the source written `YT_SEARCH.<term>` and the term again in `Source title`. A table cut at the limit ends with a line `Showing top 500 results`, read as the stated limit.
+- The Content tab (`Content,Video title,Video publish time,…`) is not read.
+
+Not seen: an export with Google Sheets, an interface in another language, and the exports of other platforms.
