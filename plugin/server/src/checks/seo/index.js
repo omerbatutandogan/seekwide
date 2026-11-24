@@ -2,6 +2,7 @@
 
 import { canonicalChecks } from './canonical.js';
 import { contentChecks } from './content.js';
+import { templateChecks } from './template.js';
 import { cwvChecks } from './cwv.js';
 import { headingChecks } from './headings.js';
 import { htmlChecks } from './html.js';
@@ -38,6 +39,7 @@ export const checks = [
   ...mobileChecks,
   ...htmlChecks,
   ...contentChecks,
+  ...templateChecks,
   ...structuredDataChecks,
   ...localChecks,
   ...socialChecks,

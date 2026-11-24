@@ -38,6 +38,7 @@ export const DOCS = Object.freeze({
   HEADINGS: 'https://www.w3.org/WAI/tutorials/page-structure/headings/',
   STRUCTURED_DATA: 'https://developers.google.com/search/docs/appearance/structured-data/sd-policies',
   HELPFUL_CONTENT: 'https://developers.google.com/search/docs/fundamentals/creating-helpful-content',
+  SPAM_POLICIES: 'https://developers.google.com/search/docs/essentials/spam-policies',
   LOCAL_BUSINESS: 'https://developers.google.com/search/docs/appearance/structured-data/local-business',
   LOCALIZED_VERSIONS: 'https://developers.google.com/search/docs/specialty/international/localized-versions',
   OPEN_GRAPH: 'https://ogp.me/',

@@ -2,6 +2,14 @@
 
 Notable changes to Seekwide. Versions follow [semantic versioning](https://semver.org/); the rule set has its own version (`RULES_VERSION`) that changes whenever a check starts reporting something different.
 
+## Unreleased
+
+Rule set 0.2.4.
+
+### Added
+
+- **Pages from one template (seo module).** `seo.content.template_near_duplicate` (information) groups indexable pages by URL pattern (`/service/*`) and reports a pattern with 5 or more pages whose texts are nearly the same but not identical: 80 % or more of their word triples in common, compared on the first 2000 characters of visible text without the menus and footer the rest of the site shares. Google's spam policies give pages targeted at specific cities that funnel users to one page, and substantially similar pages, as examples of doorway pages; similar text alone does not show that, so the check scores nothing and does not call the pages spam.
+
 ## 0.6.0 (2026-11-24)
 
 International and local search: the seo module now checks hreflang annotations and LocalBusiness markup. Rule set 0.2.3: thirteen new checks, eight of them scored, so the seo module's count has eight more checks.
