@@ -366,7 +366,7 @@ Seekwide can show what search engines report about the site: clicks, impressions
 2. Save the file in the project folder, the one that holds `.seekwide/`.
 3. Ask Claude to import it, or run `/seekwide:setup` and say you have an export. With a Bing file, say which dates it covers: the file does not record them.
 
-The next report then has a "Search performance (imported)" section: totals and the pages with the most clicks, with the period, the filters and the file they come from, and how many of those pages the audit crawled. The "Search visibility" layer says the figures were imported, not measured. Findings of the same severity are listed by the impressions of the pages they are on, so the problems on the pages people see most come first. Scores and findings do not change.
+The next report then has a "Search performance (imported)" section: totals and the pages with the most clicks, with the period, the filters and the file they come from, and how many of those pages the audit crawled. It also compares each page's click-through rate with the median of the site's own pages at about the same position (1, 2, 3, 4–5, 6–10; pages with 100 or more impressions) and lists those under half of it, next to any title or description findings they have: neither Google nor Bing publishes an expected rate per position, so the site is compared only with itself. The "Search visibility" layer says the figures were imported, not measured. Findings of the same severity are listed by the impressions of the pages they are on, so the problems on the pages people see most come first. Scores and findings do not change.
 
 What is read:
 
@@ -454,7 +454,7 @@ A project profile (`/seekwide:setup`) overrides them for one client.
 Planned, in this order, and not built yet:
 
 1. E-E-A-T, international, local, programmatic pages. (First-party AI evidence: server logs and the AI reports of Search Console and Bing are imported since 0.4.0; the entity and agent readiness checks since 0.5.0. International (hreflang) and local business checks are in since 0.6.0; near-duplicate template pages and article authorship since 0.7.0.)
-2. Backlinks, measured AI visibility (sampled through your own API keys, as a rate with an interval), app store listings (from your own App Store Connect and Play data), Search Console click-through by position for the search experience, and social search. (Search Console and Bing data can already be [imported from an export](#search-console-and-bing-data).)
+2. Backlinks, measured AI visibility (sampled through your own API keys, as a rate with an interval), app store listings (from your own App Store Connect and Play data), and social search. (Search Console click-through by position is built and comes with the next release.) (Search Console and Bing data can already be [imported from an export](#search-console-and-bing-data).)
 3. WordPress core and plugin vulnerabilities, using Wordfence Intelligence with your own key.
 
 Seekwide will never pretend to be a search engine's crawler to look for cloaking.

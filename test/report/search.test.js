@@ -5,7 +5,7 @@ import { importExport } from '../../plugin/server/src/imports/parse.js';
 import { renderHtml } from '../../plugin/server/src/report/html.js';
 import { renderMarkdown } from '../../plugin/server/src/report/markdown.js';
 import { buildReport } from '../../plugin/server/src/report/model.js';
-import { formatCount } from '../../plugin/server/src/report/search.js';
+import { formatCount, lowClickThrough } from '../../plugin/server/src/report/search.js';
 import { makeCrawl, makePage } from '../helpers/factories.js';
 import { SITE, bingPagesCsv, csv, googleZipEnglish } from '../helpers/exports.js';
 import { makeFinding, makeRun } from '../helpers/run-factory.js';
@@ -174,5 +174,36 @@ describe('the report with imported search data', () => {
   it('formats counts with thousands separated by commas', () => {
     assert.equal(formatCount(0), '0');
     assert.equal(formatCount(1234567), '1,234,567');
+  });
+
+  it('lists pages whose click-through rate is under half the median at their position, among the site\'s own pages', async () => {
+    const rows = [
+      [`${SITE}/a`, 300, 1000, '1.2'], [`${SITE}/b`, 280, 1000, '1.0'], [`${SITE}/c`, 320, 1000, '1.0'], [`${SITE}/d`, 300, 1000, '1.4'],
+      [`${SITE}/e`, 290, 1000, '1.1'], [`${SITE}/weak`, 50, 1000, '1.3'],
+      [`${SITE}/few`, 1, 99, '1.0'],
+      [`${SITE}/p2`, 1, 500, '2.0'], [`${SITE}/p2b`, 100, 500, '2.2'],
+      [`${SITE}/deep`, 0, 5000, '24.0'],
+    ];
+    const data = await importExport({ bytes: Buffer.from(csv(['Page', 'Clicks', 'Impressions', 'Position'], rows)), path: 'p.csv', source: 'google_search_console', importedAt: AT });
+    const view = lowClickThrough(data, (page) => page.url, new Map([[`${SITE}/weak`, ['Title is likely to be rewritten']]]));
+    assert.equal(view.compared, true);
+    assert.deepEqual(view.bands.slice(0, 2), [{ label: '1', pages: 6, median: '29.5%' }, { label: '2', pages: 2, median: '—' }]);
+    assert.equal(view.listed, 1, 'a band of two pages is not compared; a page with 99 impressions or at position 24 is not counted');
+    assert.deepEqual(view.pages[0], { url: `${SITE}/weak`, impressions: '1,000', position: '1.3', ctr: '5.0%', median: '29.5%', snippet: ['Title is likely to be rewritten'] });
+
+    const run = makeRun({ findings: [makeFinding({ url: `${SITE}/weak`, check_id: 'sxo.title.rewrite_likely', title: 'Title is likely to be rewritten' })] });
+    const md = renderMarkdown(run, withSearch(run, [data]));
+    assert.match(md, /#### Click-through rate by position/);
+    assert.match(md, /\| 1\.3 \| 1,000 \| 5\.0% \| 29\.5% \| Title is likely to be rewritten \|/);
+    assert.match(md, /Neither Google nor Bing publishes an expected click-through rate/);
+    const page = renderHtml(run, withSearch(run, [data]));
+    assert.match(page, /<h4>Click-through rate by position<\/h4>/);
+    assert.equal(buildReport(run, withSearch(run, [data])).summary.score, buildReport(run).summary.score, 'the section changes no score');
+  });
+
+  it('says when too few pages can be compared', async () => {
+    const data = await importExport({ bytes: Buffer.from(csv(['Page', 'Clicks', 'Impressions', 'Position'], [[`${SITE}/a`, 1, 500, '1.0']])), path: 'p.csv', source: 'google_search_console', importedAt: AT });
+    const run = makeRun({ findings: [] });
+    assert.match(renderMarkdown(run, withSearch(run, [data])), /Too few pages to compare: each position band needs 5 pages with 100 or more impressions\./);
   });
 });
