@@ -2,7 +2,9 @@
 
 Notable changes to Seekwide. Versions follow [semantic versioning](https://semver.org/); the rule set has its own version (`RULES_VERSION`) that changes whenever a check starts reporting something different.
 
-## Unreleased
+## 0.8.0 (2026-11-24)
+
+The first part of roadmap item 2: imported search data now shows which pages get fewer clicks than the site's own pages at about the same position, and Search Console's Links report shows which pages other sites link to and how each answered in the audit. Both are report views of data the user exported: the rule set stays 0.2.4 and no score changes.
 
 ### Added
 
