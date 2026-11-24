@@ -89,8 +89,11 @@ describe('openZip', () => {
     it('stops unpacking at its stated size when it claims to be small', async () => {
       const zip = openZip(makeZip([{ name: 'a.csv', data: zeros.subarray(0, 1024), packed: bomb, size: 1024 }]));
       await assert.rejects(zip.read('a.csv'), importError('MALFORMED', /does not unpack to the size/));
-      const ms = await cpuMs(() => openZip(makeZip([{ name: 'b.csv', data: zeros.subarray(0, 1024), packed: bomb, size: 1024 }])).read('b.csv'));
-      assert.ok(ms < 20, `took ${ms} ms of CPU; unpacking the whole bomb takes far longer`);
+      // Five reads, timed together and built outside the timing: Windows counts CPU time in steps of about 15.6 ms,
+      // so one short read can show 30 ms. Unpacking the whole bomb takes over 50 ms each time.
+      const zips = Array.from({ length: 5 }, () => openZip(makeZip([{ name: 'b.csv', data: zeros.subarray(0, 1024), packed: bomb, size: 1024 }])));
+      const ms = await cpuMs(() => Promise.allSettled(zips.map((each) => each.read('b.csv'))));
+      assert.ok(ms < 100, `took ${ms} ms of CPU for five reads; unpacking the whole bomb takes far longer`);
     });
 
     it('cannot unpack more than the total budget through entries that point at the same data', async () => {

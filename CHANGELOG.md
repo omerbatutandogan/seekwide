@@ -2,9 +2,9 @@
 
 Notable changes to Seekwide. Versions follow [semantic versioning](https://semver.org/); the rule set has its own version (`RULES_VERSION`) that changes whenever a check starts reporting something different.
 
-## Unreleased
+## 0.7.0 (2026-11-24)
 
-Rule set 0.2.4.
+The end of roadmap item 1: the seo module now points out near-duplicate pages made from one template and reads the authors and dates of article markup. Rule set 0.2.4: four new checks, all information, so no score changes.
 
 ### Added
 
