@@ -40,6 +40,7 @@ export const DOCS = Object.freeze({
   HELPFUL_CONTENT: 'https://developers.google.com/search/docs/fundamentals/creating-helpful-content',
   SPAM_POLICIES: 'https://developers.google.com/search/docs/essentials/spam-policies',
   LOCAL_BUSINESS: 'https://developers.google.com/search/docs/appearance/structured-data/local-business',
+  ARTICLE: 'https://developers.google.com/search/docs/appearance/structured-data/article',
   LOCALIZED_VERSIONS: 'https://developers.google.com/search/docs/specialty/international/localized-versions',
   OPEN_GRAPH: 'https://ogp.me/',
   LCP: 'https://web.dev/articles/lcp',

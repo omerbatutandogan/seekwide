@@ -114,7 +114,7 @@ export const SEVERITIES = Object.freeze(['critical', 'high', 'medium', 'low', 'i
  * a crawl of a site that is not on this machine: the response headers of a local development server say nothing about the
  * deployed site.
  */
-export const CAPABILITIES = Object.freeze(['full_crawl', 'sitemap', 'robots', 'outbound', 'lab_data', 'field_data', 'live_site', 'image_files', 'social_images', 'app_files', 'llms_txt', 'ai_robots', 'ai_pages', 'form_pages', 'entity_pages', 'agent_pages', 'local_pages', 'lab_audits']);
+export const CAPABILITIES = Object.freeze(['full_crawl', 'sitemap', 'robots', 'outbound', 'lab_data', 'field_data', 'live_site', 'image_files', 'social_images', 'app_files', 'llms_txt', 'ai_robots', 'ai_pages', 'form_pages', 'entity_pages', 'agent_pages', 'local_pages', 'article_pages', 'lab_audits']);
 
 /** An API key is sent in a request header, so it must be printable ASCII without spaces. */
 const API_KEY_PATTERN = /^[\x21-\x7E]{1,256}$/;

@@ -167,6 +167,18 @@ export {};
  */
 
 /**
+ * An Article, NewsArticle or BlogPosting described in JSON-LD, and what it says of its authors and dates (seo module's
+ * article checks).
+ * @typedef {Object} ArticleSummary
+ * @property {string} type
+ * @property {number} authors         `author` entries given: text, or a Person or Organization object.
+ * @property {number} named_authors   Entries that are text or have a `name`.
+ * @property {number} linked_authors  Object entries with a `url` or a `sameAs`.
+ * @property {boolean} date_published
+ * @property {boolean} date_modified
+ */
+
+/**
  * @typedef {Object} JsonLdBlock
  * @property {boolean} valid          False when the script content is not valid JSON.
  * @property {string[]} types         `@type` values found at the top level and in `@graph`.
@@ -175,6 +187,8 @@ export {};
  * @property {VideoObjectSummary[]} [videos]  Every `VideoObject` in the block, anywhere in it, in document order (media module).
  * @property {ProfileEntity[]} [profiles]  Every Organization, business or Person at the top level of the block or in its
  *   `@graph`, in document order (smo module, rule set 0.1.9). Absent in records made before.
+ * @property {ArticleSummary[]} [articles]  Every Article, NewsArticle or BlogPosting at the top level of the block or in its
+ *   `@graph` (rule set 0.2.4). Absent in records made before.
  */
 
 /**

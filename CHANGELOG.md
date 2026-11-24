@@ -9,6 +9,11 @@ Rule set 0.2.4.
 ### Added
 
 - **Pages from one template (seo module).** `seo.content.template_near_duplicate` (information) groups indexable pages by URL pattern (`/service/*`) and reports a pattern with 5 or more pages whose texts are nearly the same but not identical: 80 % or more of their word triples in common, compared on the first 2000 characters of visible text without the menus and footer the rest of the site shares. Google's spam policies give pages targeted at specific cities that funnel users to one page, and substantially similar pages, as examples of doorway pages; similar text alone does not show that, so the check scores nothing and does not call the pages spam.
+- **Article authors and dates (seo module).** Three information checks read Article, NewsArticle and BlogPosting markup, after Google's Article page and its page on helpful content: no author with a name (`seo.article.author_missing`), named authors without a `url` or `sameAs` that leads to more about them (`seo.article.author_unlinked`), and no `datePublished` (`seo.article.date_missing`). Google says E-E-A-T is not a ranking factor in itself and Article markup has no required properties, so none is scored. The crawl now records each article's authors and dates; a crawl made before skips the checks. The visible byline is not read.
+
+### Fixed
+
+- CHECKS-SPEC: the LOCAL_BUSINESS reference had been written into the row of `seo.hreflang.invalid_code`; both are back in their places.
 
 ## 0.6.0 (2026-11-24)
 
