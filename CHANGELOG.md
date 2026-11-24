@@ -9,6 +9,7 @@ Rule set 0.2.2.
 ### Added
 
 - **Entity checks (ai module).** Three information checks read the Organization, business and Person markup of the crawled pages' JSON-LD, after Google's Organization structured data page: no page has one (`ai.entity.missing`), the home page's Organization gives another site's address as its `url` (`ai.entity.url_offsite`), and one of the site's entities has two names or two logos on different pages (`ai.entity.inconsistent`). Google requires none of these properties, so they change no count. The crawl now records each entity's `@id`, `name`, `url` and `logo`; a crawl made before skips the checks and says to crawl again.
+- **Agent readiness (ai module).** `ai.agent.button_unnamed` (low) reports a page with a visible button that has no accessible name, which agents that act for a user read from the accessibility tree, as Chrome and OpenAI document. `ai.agent.webmcp_incomplete` (information) reports a form with only one of the WebMCP attributes `toolname` and `tooldescription`, after Lighthouse's experimental audit. The crawl now records the page's buttons and those two attributes; a crawl made before skips the checks.
 
 ## 0.4.0 (2026-11-24)
 

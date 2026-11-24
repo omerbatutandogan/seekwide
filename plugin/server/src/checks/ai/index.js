@@ -1,6 +1,7 @@
 /** @import { CheckDef } from '../../types.js' */
 
 import { accessChecks } from './access.js';
+import { agentChecks } from './agent.js';
 import { contentChecks } from './content.js';
 import { entityChecks } from './entity.js';
 import { snippetChecks } from './snippet.js';
@@ -10,7 +11,7 @@ import { trainingChecks } from './training.js';
  * The ai module, honest AI access and readiness: which AI crawlers robots.txt
  * lets in, the training and grounding preferences the site states, whether
  * its pages may be quoted in AI answers, and what a crawler that runs no
- * script sees, and whether the site says who is behind it. Shown as a count, never as a score. Defined in `docs/CHECKS-SPEC.md`.
+ * script sees, whether the site says who is behind it, and whether agents can name its buttons. Shown as a count, never as a score. Defined in `docs/CHECKS-SPEC.md`.
  * @type {CheckDef[]}
  */
 export const checks = [
@@ -19,4 +20,5 @@ export const checks = [
   ...snippetChecks,
   ...contentChecks,
   ...entityChecks,
+  ...agentChecks,
 ];
