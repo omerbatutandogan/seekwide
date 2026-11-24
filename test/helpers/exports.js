@@ -227,3 +227,38 @@ export function playReviewsOctober() {
 export function playReviewsNovember() {
   return playReviewsCsv([['2026-11-03', 2, true, 'e'], ['2026-11-04', 1, false, 'f'], ['2026-10-21', 4, false, 'd']]);
 }
+
+/**
+ * An export of YouTube Studio's Advanced mode, as a real download was written on 2026-11-24 (English headers from a
+ * Turkish interface): a zip of the table, the chart by day and the totals by day. The values are made up.
+ * @param {string[]} header @param {(string|number)[][]} rows @param {string[]} chartHeader @param {(string|number)[][]} chart @param {string} [trailer]
+ */
+function youtubeZip(header, rows, chartHeader, chart, trailer) {
+  const table = csv(header, rows) + (trailer === undefined ? '' : `${trailer}\r\n`);
+  return makeZip([
+    { name: 'Tablo verileri.csv', data: Buffer.from(table) },
+    { name: 'Grafik verileri.csv', data: Buffer.from(csv(chartHeader, chart)) },
+    { name: 'Toplamlar.csv', data: Buffer.from(csv(['Date', 'Views'], [['2026-10-27', 40], ['2026-10-28', 30], ['2026-10-29', 21]])) },
+  ]);
+}
+
+/** The YouTube search terms of the Traffic source tab, cut at a stated row limit. */
+export function youtubeSearchTermsZip() {
+  return youtubeZip(
+    ['Traffic source', 'Source type', 'Source title', 'Views', 'Watch time (hours)', 'Average view duration', 'Thumbnail impressions', 'Thumbnail click-through rate (%)'],
+    [['Total', '', '', 91, '1.5', '0:00:59', 300, '3.1'], ['YT_SEARCH.example widgets', '', 'example widgets', 40, '0.75', '0:01:07', 0, ''], ['YT_SEARCH.widget repair', '', 'widget repair', 30, '0.5', '0:01:00', 0, ''], ['YT_SEARCH.blue widget', '', 'blue widget', 21, '0.25', '0:00:43', 0, '']],
+    ['Date', 'Traffic source', 'Source type', 'Source title', 'Views'],
+    [['2026-10-27', 'YT_SEARCH.example widgets', '', 'example widgets', 20], ['2026-10-29', 'YT_SEARCH.blue widget', '', 'blue widget', 21]],
+    'Showing top 3 results',
+  );
+}
+
+/** The Traffic source tab. */
+export function youtubeTrafficSourcesZip() {
+  return youtubeZip(
+    ['Traffic source', 'Views', 'Watch time (hours)', 'Average view duration', 'Thumbnail impressions', 'Thumbnail click-through rate (%)'],
+    [['Total', 400, '5', '0:00:45', 1000, '4'], ['Shorts feed', 250, '3', '0:00:43', '', ''], ['YouTube search', 91, '1.5', '0:00:59', 300, '3.1'], ['Browse features', 59, '0.5', '0:00:30', 700, '8']],
+    ['Date', 'Traffic source', 'Views'],
+    [['2026-10-27', 'Shorts feed', 100], ['2026-10-29', 'YouTube search', 21]],
+  );
+}

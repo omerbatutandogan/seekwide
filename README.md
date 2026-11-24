@@ -381,6 +381,8 @@ Links from other sites come from Search Console's Links report, exported the sam
 
 Reviews of an Android app come from Play Console: open Download reports, then Reviews, and download a month as CSV (several months can go in one zip). Imported with source `google_play_reviews`, the report gets a "Google Play reviews (imported)" section: reviews per month, the average stars of those reviews, how many have a reply, and the newest 1- and 2-star reviews still without one, with a link to each in Play Console. What reviewers wrote is not kept, and the average is not the rating Google Play shows.
 
+Search on YouTube comes from YouTube Studio: open Analytics, Advanced mode, the Traffic source tab, and use "Export current view" (`youtube_traffic_sources`); then click YouTube search and export again for the search terms (`youtube_search_terms`). The report gets a "Search on YouTube (imported)" section: the share of views that came from YouTube's search and the terms people searched for before they watched. YouTube exports at most 500 rows, and Seekwide sends no request to YouTube.
+
 ## Server logs
 
 Which AI crawlers really asked your server for pages is in its access logs, not in robots.txt. `/seekwide:ai` asks whether you can copy them into the project folder; it then reads them on your machine with `log_import`.

@@ -14,6 +14,8 @@ import { LINK_IMPORT_SCHEMA_VERSION } from '../imports/links-record.js';
 import { linkStates } from '../report/links.js';
 import { REVIEW_SOURCES, reviewTables } from '../imports/reviews-data.js';
 import { REVIEW_IMPORT_SCHEMA_VERSION } from '../imports/reviews-record.js';
+import { YOUTUBE_SOURCES, youtubeTables } from '../imports/youtube-data.js';
+import { YOUTUBE_IMPORT_SCHEMA_VERSION } from '../imports/youtube-record.js';
 import { ImportError } from '../imports/errors.js';
 import { matchPages, trafficOf } from '../imports/match.js';
 import { IMPORT_SOURCES, importExport, readTables } from '../imports/parse.js';
@@ -39,6 +41,8 @@ const LISTED = 10;
 /** @import { LinkSource } from '../imports/links-data.js' */
 /** @import { ReviewImport } from '../imports/reviews-record.js' */
 /** @import { ReviewSource } from '../imports/reviews-data.js' */
+/** @import { YoutubeImport } from '../imports/youtube-record.js' */
+/** @import { YoutubeSource } from '../imports/youtube-data.js' */
 
 /**
  * Import a table of Search Console's Links report: read, store, and say how its pages fared in the latest audit.
@@ -107,6 +111,59 @@ async function importLinkReport(deps, projectDir, source, input, runId) {
     top_targets: record.targets.slice(0, LISTED),
     latest_linking: record.linking.slice(0, LISTED),
     linked_pages_with_problems: problems,
+    notes,
+    _note: IMPORT_NOTE,
+  };
+}
+
+/**
+ * Import an export of YouTube Studio's traffic sources or YouTube search terms: read, store, and say what it holds.
+ * @param {ToolDeps} deps
+ * @param {string} projectDir
+ * @param {YoutubeSource} source
+ * @param {unknown} input
+ */
+async function importYoutubeReport(deps, projectDir, source, input) {
+  /** @type {YoutubeImport} */
+  let record;
+  try {
+    const file = await readImportFile(projectDir, /** @type {string} */ (input));
+    const { format, tables } = await readTables(file.bytes);
+    record = {
+      schema_version: YOUTUBE_IMPORT_SCHEMA_VERSION,
+      source,
+      imported_at: deps.now().toISOString(),
+      file: { path: clip(collapseWhitespace(file.relative), 300), format, bytes: file.bytes.length, sha256: createHash('sha256').update(file.bytes).digest('hex') },
+      ...youtubeTables(tables, source),
+    };
+  } catch (error) {
+    if (!(error instanceof ImportError)) throw error;
+    throw new ToolError(error.message);
+  }
+  /** @type {string[]} */
+  const notes = [];
+  let previous = null;
+  try {
+    previous = await deps.loadYoutubeImport(projectDir, source);
+  } catch (error) {
+    const code = /** @type {{code?: unknown}} */ (error)?.code;
+    if (code !== 'IMPORT_CORRUPT' && code !== 'STORE_FILE_TOO_LARGE') await withStoreErrors(() => Promise.reject(error));
+    notes.push('The earlier import from this source could not be read, so it was replaced without being compared.');
+  }
+  const saved = await withStoreErrors(() => deps.saveYoutubeImport(projectDir, record));
+  if (record.period === null) notes.push('The file has no table by day, so its period is unknown. Export the view again as the zip YouTube Studio offers.');
+  if (record.truncated_at !== null) notes.push(`YouTube lists the top ${record.truncated_at} rows only, so the rest of the view is not in the file.`);
+  if (source === 'youtube_search_terms') notes.push('These are searches on YouTube, not on the web: they say what people look for on YouTube, not how the site does in web search.');
+  return {
+    source,
+    saved_to: saved.relative,
+    replaced: previous === null ? null : { imported_at: previous.imported_at },
+    file: { path: record.file.path, format: record.file.format, bytes: record.file.bytes },
+    period: record.period,
+    total: record.total,
+    rows: record.rows.length,
+    top: record.rows.slice(0, LISTED),
+    counts: record.counts,
     notes,
     _note: IMPORT_NOTE,
   };
@@ -324,14 +381,15 @@ export function searchDataTools(deps) {
         '(CSV; source google_search_console_links) or Latest links (CSV; google_search_console_latest_links); or one of the AI reports: Search Console\'s ' +
         '"Performance on Search Generative AI Features" (CSV zip or Excel; source google_search_console_ai), the overview of Bing\'s AI Performance report ' +
         '(CSV; bing_ai_performance) or its table of pages (CSV; bing_ai_pages); or the reviews report of Google Play Console (a monthly CSV, or a zip of several; ' +
-        'source google_play_reviews). The file must be inside the project folder. It is stored in ' +
+        'source google_play_reviews); or an export of YouTube Studio\'s Advanced mode ("Export current view", the zip): the Traffic source tab ' +
+        '(youtube_traffic_sources) or its YouTube search terms (youtube_search_terms). The file must be inside the project folder. It is stored in ' +
         '.seekwide/imports/ (replacing the previous import from the same source) and used by report_render. The result says how its pages match the latest audit. ' +
         'Nothing is sent anywhere.',
       inputSchema: {
         type: 'object',
         properties: {
           path: { type: 'string', maxLength: 4096, description: 'The export file, absolute or relative to project_dir. It must be inside the project folder.' },
-          source: { type: 'string', enum: [...IMPORT_SOURCES, ...AI_SOURCES, ...LINK_SOURCES, ...REVIEW_SOURCES], description: 'Where the user exported the file from, and which report.' },
+          source: { type: 'string', enum: [...IMPORT_SOURCES, ...AI_SOURCES, ...LINK_SOURCES, ...REVIEW_SOURCES, ...YOUTUBE_SOURCES], description: 'Where the user exported the file from, and which report.' },
           project_dir: PROJECT_DIR_SCHEMA,
           period_start: { ...DATE_SCHEMA, description: 'YYYY-MM-DD: the first day the export covers, as chosen in the report. Only for a file without a table of dates (Bing\'s Pages tables).' },
           period_end: { ...DATE_SCHEMA, description: 'YYYY-MM-DD: the last day the export covers. Only together with period_start.' },
@@ -343,6 +401,10 @@ export function searchDataTools(deps) {
       async handler(args) {
         const projectDir = resolveProjectDir(args.project_dir, deps.defaultProjectDir);
         const period = statedPeriod(args.period_start, args.period_end);
+        if (YOUTUBE_SOURCES.includes(/** @type {YoutubeSource} */ (args.source))) {
+          if (period !== undefined) throw new ToolError('A YouTube Studio export states its days. Leave period_start and period_end out.');
+          return importYoutubeReport(deps, projectDir, /** @type {YoutubeSource} */ (args.source), args.path);
+        }
         if (REVIEW_SOURCES.includes(/** @type {ReviewSource} */ (args.source))) {
           if (period !== undefined) throw new ToolError('The reviews report states its months. Leave period_start and period_end out.');
           return importReviewReport(deps, projectDir, /** @type {ReviewSource} */ (args.source), args.path);

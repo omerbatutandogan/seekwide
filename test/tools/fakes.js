@@ -4,7 +4,7 @@
 
 import path from 'node:path';
 import { attachSources, loadProjectSources } from '../../plugin/server/src/repo/sources.js';
-import { loadAiImport, loadLinkImport, loadLogImport, loadSearchImport, saveAiImport, saveLinkImport, saveLogImport, saveSearchImport, saveReviewImport, loadReviewImport } from '../../plugin/server/src/store/imports.js';
+import { loadAiImport, loadLinkImport, loadLogImport, loadSearchImport, saveAiImport, saveLinkImport, saveLogImport, saveSearchImport, saveReviewImport, loadReviewImport, saveYoutubeImport, loadYoutubeImport } from '../../plugin/server/src/store/imports.js';
 import { assertRunId, projectPaths } from '../../plugin/server/src/store/project.js';
 import { InputError } from '../../plugin/server/src/util/errors.js';
 import { makeCrawl, makeLink, makePage, makeVitals } from '../helpers/factories.js';
@@ -166,6 +166,8 @@ export function makeDeps(seed = {}) {
     loadLinkImport,
     saveReviewImport,
     loadReviewImport,
+    saveYoutubeImport,
+    loadYoutubeImport,
     projectPaths,
     /** @param {string} dir */
     async ensureProject(dir) {

@@ -207,6 +207,23 @@ function reviewsSection(r) {
 }
 
 /** @param {Report} r */
+function youtubeSection(r) {
+  const y = r.youtube;
+  if (y === null) return [];
+  const lines = ['## Search on YouTube (imported)', '', `*${mdText(y.supplied)}*`, ''];
+  /** @param {string} heading @param {NonNullable<typeof y.terms>} part @param {string} first */
+  const part = (heading, part, first) => {
+    lines.push(`### ${heading}`, '', `- **File:** ${mdCode(part.file)}, imported on ${mdText(part.imported)}.`, `- **Period:** ${mdText(part.period)}`);
+    lines.push(`- **Totals:** ${part.figures.map((f) => `${mdText(f.label)}: ${mdText(f.value)}`).join(' · ')}`, '');
+    lines.push(...table([first, 'Views', 'Share', 'Watch time (hours)'], part.rows.map((row) => [mdCode(row.name, true), row.views, row.share, row.hours])), '');
+    if (part.notes.length > 0) lines.push(...part.notes.map((note) => `- ${mdText(note)}`), '');
+  };
+  if (y.terms !== null) part('YouTube search terms', y.terms, 'Search term');
+  if (y.sources !== null) part('Traffic sources', y.sources, 'Traffic source');
+  return lines;
+}
+
+/** @param {Report} r */
 function aiSection(r) {
   const a = r.ai;
   if (a === null) return [];
@@ -363,7 +380,7 @@ function method(r) {
 export function renderMarkdown(run, options) {
   const r = buildReport(run, options);
   const lines = [
-    ...header(r), ...summary(r), ...scope(r), ...fixes(r), ...layers(r), ...scores(r), ...vitals(r), ...search(r), ...linksSection(r), ...reviewsSection(r), ...aiVisibilitySection(r), ...aiSection(r), ...logsSection(r), ...observed(r), ...topFixes(r),
+    ...header(r), ...summary(r), ...scope(r), ...fixes(r), ...layers(r), ...scores(r), ...vitals(r), ...search(r), ...linksSection(r), ...reviewsSection(r), ...youtubeSection(r), ...aiVisibilitySection(r), ...aiSection(r), ...logsSection(r), ...observed(r), ...topFixes(r),
     ...allFindings(r), ...suggestions(r), ...notRun(r), ...changes(r), ...method(r),
   ];
   return `${lines.join('\n').trimEnd()}\n`;

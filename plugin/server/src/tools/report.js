@@ -13,6 +13,7 @@ import { AI_SOURCES } from '../imports/ai-data.js';
 import { LINK_SOURCES } from '../imports/links-data.js';
 import { linkStates } from '../report/links.js';
 import { REVIEW_SOURCES } from '../imports/reviews-data.js';
+import { YOUTUBE_SOURCES } from '../imports/youtube-data.js';
 import { matchPages } from '../imports/match.js';
 import { loadLogo } from './logo.js';
 import { crawlOfRun } from './search-data.js';
@@ -71,9 +72,9 @@ export function reportTools(deps) {
           compare_to: runRefSchema('Run id, or "previous" for the newest run older than the one rendered, to include a "changes since" section.'),
           search_data: {
             type: 'array',
-            items: { type: 'string', enum: [...IMPORT_SOURCES, ...AI_SOURCES, ...LINK_SOURCES, ...REVIEW_SOURCES] },
-            maxItems: IMPORT_SOURCES.length + AI_SOURCES.length + LINK_SOURCES.length + REVIEW_SOURCES.length,
-            description: 'Imported search data, AI reports, Links report tables and Play reviews to show (search_data_import). Defaults to every source imported into the project; [] leaves them out.',
+            items: { type: 'string', enum: [...IMPORT_SOURCES, ...AI_SOURCES, ...LINK_SOURCES, ...REVIEW_SOURCES, ...YOUTUBE_SOURCES] },
+            maxItems: IMPORT_SOURCES.length + AI_SOURCES.length + LINK_SOURCES.length + REVIEW_SOURCES.length + YOUTUBE_SOURCES.length,
+            description: 'Imported search data, AI reports, Links report tables, Play reviews and YouTube Studio exports to show (search_data_import). Defaults to every source imported into the project; [] leaves them out.',
           },
         },
         additionalProperties: false,
@@ -135,6 +136,15 @@ export function reportTools(deps) {
           }
           reviews = { data, declared: (await withStoreErrors(() => deps.readProfile(projectDir)))?.apps?.android?.packages ?? null };
         }
+        const youtube = [];
+        for (const source of named === null ? YOUTUBE_SOURCES : YOUTUBE_SOURCES.filter((item) => named.has(item))) {
+          const data = await withStoreErrors(() => deps.loadYoutubeImport(projectDir, source));
+          if (data === null) {
+            if (named === null) continue;
+            throw new ToolError(`No YouTube Studio export from ${source} was imported into this project. Import it with search_data_import, or leave it out of search_data.`);
+          }
+          youtube.push(data);
+        }
         const logs = await withStoreErrors(() => deps.loadLogImport(projectDir));
 
         const options = {
@@ -148,6 +158,7 @@ export function reportTools(deps) {
           ...(aiSearch.length > 0 ? { aiSearch } : {}),
           ...(links.length > 0 ? { links } : {}),
           ...(reviews !== null ? { reviews } : {}),
+          ...(youtube.length > 0 ? { youtube } : {}),
         };
 
         const formats = args.formats && args.formats.length > 0 ? [...new Set(/** @type {('markdown'|'html')[]} */ (args.formats))] : [...FORMATS];
@@ -171,7 +182,7 @@ export function reportTools(deps) {
           files[format] = file;
           bytes[format] = Buffer.byteLength(content, 'utf8');
         }
-        return { run_id: run.run_id, files, bytes, search_data: [...search.map((entry) => entry.data.source), ...aiSearch.map((data) => data.source), ...links.map((entry) => entry.data.source), ...(reviews === null ? [] : [reviews.data.source])], server_logs: logs !== null };
+        return { run_id: run.run_id, files, bytes, search_data: [...search.map((entry) => entry.data.source), ...aiSearch.map((data) => data.source), ...links.map((entry) => entry.data.source), ...(reviews === null ? [] : [reviews.data.source]), ...youtube.map((data) => data.source)], server_logs: logs !== null };
       },
     },
   ];
