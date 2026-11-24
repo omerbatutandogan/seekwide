@@ -2,9 +2,9 @@
 
 Notable changes to Seekwide. Versions follow [semantic versioning](https://semver.org/); the rule set has its own version (`RULES_VERSION`) that changes whenever a check starts reporting something different.
 
-## Unreleased
+## 0.5.0 (2026-11-24)
 
-Rule set 0.2.2.
+The rest of first-party AI evidence: the ai module now checks whether the site says in JSON-LD who is behind it, and whether agents that act for a user can name its buttons. Rule set 0.2.2: five new checks, one of them scored (`ai.agent.button_unnamed`), so the ai module's count has one more check.
 
 ### Added
 
