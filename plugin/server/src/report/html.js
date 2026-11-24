@@ -167,6 +167,19 @@ function clickThrough(c) {
 }
 
 /** @param {Report} r */
+function linksSection(r) {
+  const l = r.links;
+  if (l === null) return '';
+  const figs = (/** @type {{label: string, value: string}[]} */ figures) => html`<div class="figs">${figures.map((f) => html`<div class="fig"><b>${f.value}</b><span>${f.label}</span></div>`)}</div>`;
+  const notes = (/** @type {string[]} */ items) => (items.length > 0 ? html`<ul class="meta">${items.map((note) => html`<li>${note}</li>`)}</ul>` : '');
+  const targets = l.targets === null ? '' : html`<h3>Pages other sites link to</h3><p class="meta">From the file <code>${l.targets.file}</code>, imported on ${l.targets.imported}.</p>${figs(l.targets.figures)}
+<table><thead><tr><th>Page</th><th class="n">Incoming links</th><th class="n">Linking sites</th><th>In this audit</th></tr></thead><tbody>${l.targets.rows.map((row) => html`<tr><td>${urlHtml(row.url)}</td><td class="n">${row.links}</td><td class="n">${row.sites}</td><td>${row.problem ? html`<b>${row.state}</b>` : row.state}</td></tr>`)}</tbody></table>${notes(l.targets.notes)}`;
+  const latest = l.latest === null ? '' : html`<h3>Latest links</h3><p class="meta">From the file <code>${l.latest.file}</code>, imported on ${l.latest.imported}.</p>${figs(l.latest.figures)}
+<table><thead><tr><th>Linking site</th><th class="n">Linking pages</th><th>Last crawled</th></tr></thead><tbody>${l.latest.hosts.map((host) => html`<tr><td><code>${host.host}</code></td><td class="n">${host.pages}</td><td>${host.newest}</td></tr>`)}</tbody></table>${notes(l.latest.notes)}`;
+  return html`<section id="links-from-other-sites"><h2>Links from other sites (imported)</h2><p class="note">${l.supplied}</p>${targets}${latest}</section>`;
+}
+
+/** @param {Report} r */
 function search(r) {
   const s = r.search;
   if (s === null) return '';
@@ -304,7 +317,7 @@ export function renderHtml(run, options) {
 </head>
 <body>
 <main>
-${titleBlock(r)}${summary(r)}${scope(r)}${fixes(r)}${layers(r)}${scores(r)}${vitals(r)}${search(r)}${aiVisibilitySection(r)}${aiSection(r)}${logsSection(r)}${observed(r)}${topFixes(r)}${allFindings(r)}${suggestions(r)}${notRun(r)}${changes(r)}${method(r)}
+${titleBlock(r)}${summary(r)}${scope(r)}${fixes(r)}${layers(r)}${scores(r)}${vitals(r)}${search(r)}${linksSection(r)}${aiVisibilitySection(r)}${aiSection(r)}${logsSection(r)}${observed(r)}${topFixes(r)}${allFindings(r)}${suggestions(r)}${notRun(r)}${changes(r)}${method(r)}
 <footer>Seekwide ${r.pluginVersion} &middot; rules ${r.rulesVersion} &middot; run <code>${r.runId}</code> &middot; ${r.date.iso}</footer>
 </main>
 </body>

@@ -377,6 +377,8 @@ What is not read, and why: neither tool documents the column layout of its expor
 
 The import is stored as `.seekwide/imports/google_search_console.json` or `.seekwide/imports/bing_webmaster_tools.json`; a new import from the same source replaces it.
 
+Links from other sites come from Search Console's Links report, exported the same way: open Links, then under External links "Top linked pages", More, and Export as CSV; or Export, "Latest links", as CSV. Imported, the report gets a "Links from other sites (imported)" section that lists the pages other sites link to with how each answered in the audit (a page that fails, redirects or is not indexable comes first, since a link to it leads somewhere else) and the sites the latest links come from. Google calls the report a sample, not every link, and Seekwide does not visit the linking pages; scores and findings do not change.
+
 ## Server logs
 
 Which AI crawlers really asked your server for pages is in its access logs, not in robots.txt. `/seekwide:ai` asks whether you can copy them into the project folder; it then reads them on your machine with `log_import`.

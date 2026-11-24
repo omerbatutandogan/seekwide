@@ -164,3 +164,30 @@ export function bingAiOverviewCsv() {
 export function bingAiPagesCsv() {
   return bingQuoted([['Page', 'Citations'], [`${SITE}/about`, '1'], [`${SITE}/`, '3']]);
 }
+
+/** The top linked pages of Search Console's Links report, as a real download was written on 2026-11-24. The values are made up. */
+export function googleTopLinkedCsv() {
+  return csv(['Target page', 'Incoming links', 'Linking sites'], [
+    [`${SITE}/`, 30, 12],
+    [`${SITE}/pricing`, 4, 2],
+    [`${SITE}/old-page`, 3, 3],
+    [`${SITE}/gone`, 2, 1],
+    ['not a page', 1, 1],
+  ]);
+}
+
+/**
+ * Latest links of Search Console's Links report, as a real download was written on 2026-11-24: newest first, dates
+ * YYYY-MM-DD, and a long address broken over lines inside its quotes. The values are made up.
+ */
+export function googleLatestLinksCsv() {
+  return [
+    'Linking page,Last crawled',
+    'https://blog.other.test/post,2026-11-15',
+    '"https://directory.other.test/list?employees%5B3%5D=50 \r\n- 249&page=7",2026-10-28',
+    'https://tr.social.test/in/someone,2026-10-20',
+    'https://www.social.test/company/example,2026-06-14',
+    'https://blog.other.test/post,2026-06-01',
+    '',
+  ].join('\r\n');
+}

@@ -7,6 +7,7 @@ Notable changes to Seekwide. Versions follow [semantic versioning](https://semve
 ### Added
 
 - **Click-through rate by position (report).** With imported Search Console or Bing data, the "Search performance (imported)" section now groups the export's pages with 100 or more impressions by average position (1, 2, 3, 4–5, 6–10), gives each group's median click-through rate when it has 5 or more pages, and lists the pages under half of it, most impressions first, with their title and description findings. Neither search engine publishes an expected rate per position, so pages are compared only with the site's own. It is a place to look, not a finding: no check, finding or score changes, and the rule set stays 0.2.4.
+- **Links from other sites (report).** `search_data_import` reads two exports of Search Console's Links report: the top linked pages (`google_search_console_links`: target page, incoming links, linking sites) and Latest links (`google_search_console_latest_links`: linking page, last crawled), in the forms a real download had on 2026-11-24 (docs/IMPORTS.md). The report gets a "Links from other sites (imported)" section: each linked page with how it answered in the audit's crawl, the ones that fail, redirect or are not indexable first, and the linking pages grouped by site. Google calls the report a sample; the linking pages are not visited, and no check, finding or score changes.
 
 ## 0.7.0 (2026-11-24)
 
