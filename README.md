@@ -137,7 +137,7 @@ The pictures below come from one run of the plugin on [`fixtures/sample-site`](f
 | `/seekwide:media [url]` | Images and video: alt text, sizes, formats, broken files, robots.txt for Google, captions and video structured data | 100 |
 | `/seekwide:smo [url]` | Social sharing previews: Open Graph tags, where they stand in the HTML, the sharing image's size and weight, robots.txt for Meta's preview crawler | 100 |
 | `/seekwide:aso [url]` | The site's side of its apps: the Smart App Banner, and the association files for iOS universal links and Android App Links | 25 |
-| `/seekwide:ai [url]` | AI access and readiness: which AI crawlers robots.txt lets in, training preferences, snippet controls for AI answers, content in the served HTML, Organization markup, `/llms.txt` as information | 25 |
+| `/seekwide:ai [url]` | AI access and readiness: which AI crawlers robots.txt lets in, training preferences, snippet controls for AI answers, content in the served HTML, Organization markup, button names for agents, `/llms.txt` as information | 25 |
 | `/seekwide:cro [url]` | Forms and contact paths: field names, autofill, input types, blocked pasting, forms that send over http, tel and mailto links, tap targets; markup only, never a submitted form | 100 |
 | `/seekwide:sxo [url]` | Search experience: titles Google is likely to rewrite, zooming on a phone, redirects to a consent page, with the seo module's titles, HTTPS and Core Web Vitals | 100 |
 | `/seekwide:all [url]` | Every installed module in one report | 200 |
@@ -343,6 +343,7 @@ The `ai` module (`/seekwide:ai`, and part of `/seekwide:all`) checks only what t
 - **May the pages be quoted?** Google uses only pages that are indexed and eligible to be shown with a snippet in AI Overviews and AI Mode; `nosnippet` keeps a page out of them and `max-snippet` limits how much may be used. Text marked `data-nosnippet` is left out of Google's and Bing's AI answers. Bing's new page-level `ai-training` and `ai-grounding` directives and the `noarchive` and `nocache` they replace after 2027-03-01 are listed.
 - **What a crawler that runs no script sees.** A page whose content appears only after scripts run (an empty `#root` and a script) is reported; Bing advises against it, and the other AI vendors say nothing about running scripts.
 - **Who is behind the site.** The JSON-LD of the crawled pages is read for an Organization, a business or a Person, as Google recommends on the home page or the about page: none at all, a home-page Organization whose `url` is another site's, and one entity named or given a logo differently on two pages are reported as information. Google requires none of these properties, so they change no count.
+- **Agents that act for a user.** Chrome says agents rely on the accessibility tree and OpenAI says ChatGPT Atlas reads ARIA labels, so a visible button with no name (an icon without an `aria-label`) is reported. A form that declares a WebMCP tool, a proposed standard in a Chrome origin trial, with only one of `toolname` and `tooldescription` is reported as information.
 - **`/llms.txt`** is requested once and reported as information only: Google says such files neither harm nor help visibility in Google Search, which ignores them.
 
 The report's AI search readiness section gives the counts ("AI search crawlers that robots.txt lets read the start page: 5 of 6"), a table of every known crawler with its vendor's page and the day it was read, and Google's own statement that there are no additional requirements to appear in AI Overviews or AI Mode, nor special optimizations. It lists what to check by hand: the "Search generative AI" setting in Search Console, your CDN's bot settings (on Cloudflare, Block also blocks Googlebot, Bingbot and Applebot since 2026-09-15), and your server logs. The vendor data ships with the plugin in [`plugin/references/ai-bots.md`](plugin/references/ai-bots.md) and is re-read from each vendor's page at every release and at least monthly.
@@ -452,7 +453,7 @@ A project profile (`/seekwide:setup`) overrides them for one client.
 
 Planned, in this order, and not built yet:
 
-1. First-party AI evidence: agent readiness. Then E-E-A-T, international, local, programmatic pages. (Server logs and the AI reports of Search Console and Bing are imported since 0.4.0; the entity checks are in the next release.)
+1. E-E-A-T, international, local, programmatic pages. (First-party AI evidence: server logs and the AI reports of Search Console and Bing are imported since 0.4.0; the entity and agent readiness checks are in the next release.)
 2. Backlinks, measured AI visibility (sampled through your own API keys, as a rate with an interval), app store listings (from your own App Store Connect and Play data), Search Console click-through by position for the search experience, and social search. (Search Console and Bing data can already be [imported from an export](#search-console-and-bing-data).)
 3. WordPress core and plugin vulnerabilities, using Wordfence Intelligence with your own key.
 

@@ -118,7 +118,7 @@ export function makePage(overrides = {}) {
     video_markup: false,
     social: { outside_head: [], streamed: false, head_end: { bytes: 1024, by: 'head' }, app_banners: [], rel_me: [] },
     ai: { bingbot: [], nosnippet_elements: 0, nosnippet_words: 0, nosnippet_h1: null, body_scripts: 0, empty_mount: null },
-    forms: { forms: [], controls: [], hidden_controls: 0, tcf_stub: false, first_action: null },
+    forms: { forms: [], controls: [], hidden_controls: 0, tcf_stub: false, first_action: null, buttons: { visible: 0, unnamed: 0, examples: [] } },
     ...overrides,
   };
 }

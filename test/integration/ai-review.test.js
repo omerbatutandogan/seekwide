@@ -184,7 +184,7 @@ test('D4: a robots.txt that refused the crawler skips the robots checks with the
     const html = await readFile((await run.call('report_render', { run_id: run.runs[0].result.run_id, format: 'html', project_dir: run.projectDir })).files.html, 'utf8');
     assert.match(html, /AI readiness checks passed\. robots\.txt answered HTTP 403 to Seekwide&#39;s crawler/);
     assert.match(html, /AI search readiness \(this run\)[\s\S]*?robots\.txt answered HTTP 403/);
-    assert.ok(saved.modules.ai.coverage < 0.6);
+    assert.ok(saved.modules.ai.coverage <= 0.6, "the 8 checks that read robots.txt are skipped out of 20");
     const report = await run.call('report_render', { run_id: run.runs[0].result.run_id, format: 'markdown', project_dir: run.projectDir });
     const markdown = await readFile(report.files.markdown, 'utf8');
     assert.match(markdown, /Training preference:\*\* Not known: robots\.txt was not read for AI crawlers/);

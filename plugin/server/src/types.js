@@ -43,6 +43,8 @@ export {};
 /** @typedef {import('./types/forms.js').NameSource} NameSource */
 /** @typedef {import('./types/forms.js').ControlRecord} ControlRecord */
 /** @typedef {import('./types/forms.js').FirstAction} FirstAction */
+/** @typedef {import('./types/forms.js').ButtonExample} ButtonExample */
+/** @typedef {import('./types/forms.js').ButtonsRecord} ButtonsRecord */
 /** @typedef {import('./types/forms.js').FormsRecord} FormsRecord */
 /** @typedef {import('./types/forms.js').Observation} Observation */
 

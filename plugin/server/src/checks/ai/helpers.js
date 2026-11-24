@@ -35,6 +35,9 @@ export const DOCS = Object.freeze({
   GOOGLE_AI_TRAINING_BLOG: 'https://developers.google.com/search/blog/2026/10/ai-training-control',
   LLMSTXT: 'https://llmstxt.org/',
   GOOGLE_ORG: 'https://developers.google.com/search/docs/appearance/structured-data/organization',
+  CHROME_AGENT_READY: 'https://developer.chrome.com/blog/agent-ready-toolkit',
+  LIGHTHOUSE_WEBMCP: 'https://developer.chrome.com/docs/lighthouse/agentic-browsing/webmcp-schema-validity',
+  OPENAI_PUBLISHERS: 'https://help.openai.com/en/articles/12627856-publishers-and-developers-faq',
 });
 
 /** The words of a recommendation when the site's intent is not known: a block may be on purpose. */

@@ -1,10 +1,11 @@
 // What the cro module reads from a page (rule set 0.2.1): its forms, the visible
 // controls with the source of their accessible name, the IAB TCF consent API
 // stub and the first action element. Pure; html.js walks the document and calls
-// these for every element. Only the markup is read: nothing is ever typed into
+// these for every element. Since rule set 0.2.2 also the WebMCP attributes of
+// each form and the buttons without a name (ai module). Only the markup is read: nothing is ever typed into
 // a form, no form is submitted and no action URL is requested.
 
-/** @import { ControlRecord, FirstAction, FormRecord, FormsRecord, NameSource } from '../types.js' */
+/** @import { ButtonExample, ButtonsRecord, ControlRecord, FirstAction, FormRecord, FormsRecord, NameSource } from '../types.js' */
 /** @import { DomNode } from './dom.js' */
 /** @import { Frame } from './html-elements.js' */
 
@@ -20,6 +21,11 @@ export const MAX_CONTROLS = 200;
 export const MAX_SEEN_CONTROLS = 2000;
 /** Element ids remembered per page (the first element of each); a name past this is not judged. */
 export const MAX_IDS = 20_000;
+/** Buttons looked at per page, hidden ones included, and the unnamed ones kept as examples. */
+export const MAX_SEEN_BUTTONS = 2000;
+export const MAX_BUTTON_EXAMPLES = 20;
+/** Bindings a framework sets an input button's label with. */
+const VALUE_BINDINGS = [':value', 'v-bind:value', 'x-bind:value', '[value]', '[attr.value]'];
 const SHORT = 100;
 /** Only the start of an inline script is searched for the consent API's name. */
 const SCRIPT_PREFIX = 65_536;
@@ -46,6 +52,15 @@ const PLACEHOLDER_BINDINGS = [':placeholder', 'v-bind:placeholder', 'x-bind:plac
  */
 
 /**
+ * A visible button whose name may depend on the ids `aria-labelledby` names, which are known only once the page is read.
+ * @typedef {Object} PendingButton
+ * @property {DomNode} node
+ * @property {ButtonExample} example
+ * @property {boolean} named      Its own attributes or content give it a name.
+ * @property {string[]} labelledby
+ */
+
+/**
  * @typedef {Object} FormsState
  * @property {string} baseUrl
  * @property {FormRecord[]} forms
@@ -68,6 +83,8 @@ const PLACEHOLDER_BINDINGS = [':placeholder', 'v-bind:placeholder', 'x-bind:plac
  * @property {number} elements        Elements of the body read so far.
  * @property {{node: DomNode, elements: number, text: number}|null} main  Where the first main element starts.
  * @property {{inMain: boolean, tag: 'button'|'input', elements: number, text: number, line: number|null}|null} action
+ * @property {PendingButton[]} buttons
+ * @property {number} buttonsSeen
  * @property {Set<string>} limits
  * @property {boolean} failed
  */
@@ -80,13 +97,13 @@ export function formsState(baseUrl) {
   return {
     baseUrl, forms: [], formIndex: new WeakMap(), formIds: new Map(), pending: [], firstById: new Map(), idsFull: false, labelFor: new Set(),
     labelText: new WeakMap(), labelFirst: new WeakMap(), namesGiven: new WeakMap(), ownHidden: new WeakMap(), seen: 0, hidden: 0, unjudged: 0, unread: 0, tcf: false, elements: 0, main: null, action: null,
-    limits: new Set(), failed: false,
+    buttons: [], buttonsSeen: 0, limits: new Set(), failed: false,
   };
 }
 
 /** @returns {FormsRecord} The record of a page without HTML content. */
 export function emptyForms() {
-  return { forms: [], controls: [], hidden_controls: 0, tcf_stub: false, first_action: null };
+  return { forms: [], controls: [], hidden_controls: 0, tcf_stub: false, first_action: null, buttons: { visible: 0, unnamed: 0, examples: [] } };
 }
 
 /** @param {string|null} value @returns {string|null} */
@@ -120,6 +137,7 @@ function readForm(node, state) {
     line: lineOf(node), id: short(rawId), name: short(attr(node, 'name')),
     action: filled(raw) ? normalizeUrl(/** @type {string} */ (raw).trim(), state.baseUrl) : null,
     method: clip((attr(node, 'method') ?? '').trim().toLowerCase() || 'get', 20), search: isSearchForm(node, node), fields: 0,
+    tool_name: short(attr(node, 'toolname')), tool_description: short(attr(node, 'tooldescription')),
   });
 }
 
@@ -164,6 +182,31 @@ function readControl(node, tag, type, state) {
 }
 
 /**
+ * A `<button>`, or an `<input>` of type button or image: whether it is visible and, when it is, whether its own
+ * attributes or content name it (HTML-AAM: `aria-label`, the content for a button, `value` for an input button, `alt`
+ * for an image button, then `title`; a framework binding of any of them counts as a name). An input of type submit or
+ * reset is named by the browser and is not read.
+ * @param {DomNode} node @param {'button'|'input'} tag @param {string} type @param {FormsState} state
+ */
+function readButton(node, tag, type, state) {
+  if (state.buttonsSeen >= MAX_SEEN_BUTTONS) {
+    state.limits.add('forms.buttons');
+    return;
+  }
+  state.buttonsSeen += 1;
+  const { hidden, complete } = surroundings(node, state, null);
+  if (hidden || !complete) return;
+  const content = tag === 'button' ? givesName(node, state)
+    : type === 'image' ? filled(attr(node, 'alt'))
+      : filled(attr(node, 'value')) || VALUE_BINDINGS.some((name) => attr(node, name) !== null);
+  const named = content || filled(attr(node, 'aria-label')) || filled(attr(node, 'title')) || NAME_BINDINGS.some((name) => attr(node, name) !== null);
+  state.buttons.push({
+    node, named, example: { tag, type: clip(type, 30), line: lineOf(node) },
+    labelledby: (attr(node, 'aria-labelledby') ?? '').split(/[\t\n\f\r ]+/).filter(Boolean).slice(0, 10),
+  });
+}
+
+/**
  * @param {DomNode} node @param {Frame} frame @param {FormsState} state @param {number} textAt
  */
 function read(node, frame, state, textAt) {
@@ -188,9 +231,11 @@ function read(node, frame, state, textAt) {
     if (attr(node, 'name') === '__tcfapiLocator') state.tcf = true;
   } else if (tag === 'button') {
     actionElement(node, frame, state, 'button', textAt);
+    if (frame.body) readButton(node, 'button', (attr(node, 'type') ?? '').trim().toLowerCase() || 'submit', state);
   } else if (tag === 'input' || tag === 'select' || tag === 'textarea') {
     const type = tag === 'input' ? (attr(node, 'type') ?? '').trim().toLowerCase() || 'text' : tag;
     if (tag === 'input' && ACTION_INPUTS.has(type)) actionElement(node, frame, state, 'input', textAt);
+    if (tag === 'input' && frame.body && (type === 'button' || type === 'image')) readButton(node, 'input', type, state);
     if (!(tag === 'input' && NOT_FILLED.has(type))) readControl(node, tag, type, state);
   }
 }
@@ -275,11 +320,34 @@ export function formsRecord(state, text, word) {
       ...(state.unjudged > 0 ? { unjudged_controls: state.unjudged } : {}),
       ...(state.pending.length > MAX_CONTROLS ? { visible_controls: state.pending.length } : {}),
       ...(state.unread > 0 ? { unread_controls: state.unread } : {}),
-      tcf_stub: state.tcf, first_action: firstAction(state, text, word),
+      tcf_stub: state.tcf, first_action: firstAction(state, text, word), buttons: buttonsRecord(state),
     };
   } catch {
     return { ...emptyForms(), failed: true };
   }
+}
+
+/**
+ * The visible buttons of the page and those without a name. A button `aria-labelledby` could name through an id past
+ * the remembered ones is not judged.
+ * @param {FormsState} state
+ * @returns {ButtonsRecord}
+ */
+function buttonsRecord(state) {
+  /** @type {ButtonExample[]} */
+  const examples = [];
+  let visible = 0;
+  let unnamed = 0;
+  const target = (/** @type {string} */ id) => state.firstById.get(id);
+  for (const button of state.buttons) {
+    const labelled = button.labelledby.some((id) => { const node = target(id); return node !== undefined && node !== button.node && givesName(node, state); });
+    if (!button.named && !labelled && state.idsFull && button.labelledby.some((id) => target(id) === undefined)) continue;
+    visible += 1;
+    if (button.named || labelled) continue;
+    unnamed += 1;
+    if (examples.length < MAX_BUTTON_EXAMPLES) examples.push(button.example);
+  }
+  return { visible, unnamed, examples };
 }
 
 /**

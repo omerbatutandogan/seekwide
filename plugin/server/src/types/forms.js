@@ -15,6 +15,26 @@ export {};
  * @property {boolean} search         A search form: `role="search"` on it or an element around it, inside a `<search>` element,
  *   or holding an `<input type="search">`.
  * @property {number} fields          Visible controls that belong to it (`ControlRecord.form`), counted past the stored cap too.
+ * @property {string|null} [tool_name]  The WebMCP `toolname` attribute, whitespace-collapsed and clipped to 100 characters;
+ *   null when absent or empty. Both are absent in records made before rule set 0.2.2.
+ * @property {string|null} [tool_description]  The WebMCP `tooldescription` attribute, the same way.
+ */
+
+/**
+ * A visible button without a name, as an example.
+ * @typedef {Object} ButtonExample
+ * @property {'button'|'input'} tag
+ * @property {string} type            Lower-cased `type` ('submit' for a `<button>` without one).
+ * @property {number|null} line
+ */
+
+/**
+ * The page's visible `<button>` elements and inputs of type button or image (ai module, rule set 0.2.2), not hidden by
+ * their markup or an element around them, and how many have no accessible name.
+ * @typedef {Object} ButtonsRecord
+ * @property {number} visible
+ * @property {number} unnamed
+ * @property {ButtonExample[]} examples  The first unnamed ones, at most 20.
  */
 
 /**
@@ -72,6 +92,7 @@ export {};
  * @property {boolean} tcf_stub       An inline script names `__tcfapi`, or a frame is named `__tcfapiLocator`: the IAB TCF
  *   consent API is on the page.
  * @property {FirstAction|null} first_action
+ * @property {ButtonsRecord} [buttons]  Absent in records made before rule set 0.2.2.
  * @property {true} [upgrade_insecure]  The page upgrades insecure requests (Content-Security-Policy `upgrade-insecure-requests`
  *   as a header or a meta tag in the head), so an http action is upgraded too.
  * @property {true} [failed]          The reading of the forms stopped on an error; nothing else here is complete, and the page
