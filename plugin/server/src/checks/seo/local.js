@@ -130,7 +130,7 @@ const geoImprecise = {
 };
 
 /** @type {CheckDef} */
-const telephoneNoCountry = {
+const internationalPrefix = {
   ...BASE,
   id: 'seo.local.telephone_no_country_code',
   title: 'LocalBusiness telephone has no international prefix',
@@ -270,4 +270,4 @@ function distinct(items, field, key) {
   return [...seen.values()];
 }
 
-export const localChecks = [requiredMissing, recommendedMissing, geoImprecise, telephoneNoCountry, priceRangeLong, inconsistent];
+export const localChecks = [requiredMissing, recommendedMissing, geoImprecise, internationalPrefix, priceRangeLong, inconsistent];
