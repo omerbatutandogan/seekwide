@@ -20,6 +20,7 @@ test('the SEO module ships exactly the checks in CHECKS-SPEC.md', () => {
     'seo.canonical.streamed_in_body',
     'seo.canonical.target_not_ok',
     'seo.content.duplicate_body',
+    'seo.content.template_near_duplicate',
     'seo.content.thin',
     'seo.cwv.field_cls',
     'seo.cwv.field_inp',
@@ -129,6 +130,7 @@ test('severity, weight, confidence, scope and requirements match the spec', () =
     'seo.html.lang_missing': ['low', 1, 'confirmed', 'page', []],
     'seo.content.duplicate_body': ['medium', 3, 'confirmed', 'page', []],
     'seo.content.thin': ['info', 0, 'likely', 'page', []],
+    'seo.content.template_near_duplicate': ['info', 0, 'likely', 'site', []],
     'seo.structured_data.invalid_json': ['medium', 3, 'confirmed', 'page', []],
     'seo.social.og_incomplete': ['info', 0, 'likely', 'page', []],
     'seo.cwv.field_lcp': ['medium', 3, 'confirmed', 'page', ['field_data']],
@@ -146,7 +148,7 @@ test('severity, weight, confidence, scope and requirements match the spec', () =
       check.id,
     );
     assert.equal(check.module, 'seo');
-    assert.equal(check.last_verified, /^seo\.(?:hreflang|local)\./.test(check.id) ? '2026-11-24' : '2026-11-11', check.id);
+    assert.equal(check.last_verified, /^seo\.(?:hreflang|local)\.|^seo\.content\.template_/.test(check.id) ? '2026-11-24' : '2026-11-11', check.id);
   }
 });
 
