@@ -2,9 +2,9 @@
 
 Notable changes to Seekwide. Versions follow [semantic versioning](https://semver.org/); the rule set has its own version (`RULES_VERSION`) that changes whenever a check starts reporting something different.
 
-## Unreleased
+## 0.6.0 (2026-11-24)
 
-Rule set 0.2.3.
+International and local search: the seo module now checks hreflang annotations and LocalBusiness markup. Rule set 0.2.3: thirteen new checks, eight of them scored, so the seo module's count has eight more checks.
 
 ### Added
 
