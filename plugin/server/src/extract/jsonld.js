@@ -101,10 +101,37 @@ function* objectsIn(data) {
 }
 
 /**
+ * The first non-empty string of a value that is a string or an array of them, trimmed and clipped, or null.
+ * @param {unknown} value
+ * @returns {string|null}
+ */
+function firstText(value) {
+  const found = (Array.isArray(value) ? value : [value]).find(filled);
+  return typeof found === 'string' ? clip(found.trim(), LIMITS.maxStringLength) : null;
+}
+
+/**
+ * The address of the first image a `logo` value gives: a URL, an ImageObject with a `url` or `contentUrl`, or an array
+ * of either. Null when it gives none.
+ * @param {unknown} value
+ * @returns {string|null}
+ */
+function firstImage(value) {
+  for (const item of Array.isArray(value) ? value : [value]) {
+    if (filled(item)) return firstText(item);
+    if (isObject(item)) {
+      const url = firstText(item.url) ?? firstText(item.contentUrl);
+      if (url !== null) return url;
+    }
+  }
+  return null;
+}
+
+/**
  * Every Organization, business or Person at the top level of parsed JSON-LD
  * (the object, each object of a top-level array, and the objects in their
  * `@graph`), in document order, with how many non-empty `sameAs` URLs it gives
- * (a string or an array of them). An author or publisher nested inside another
+ * (a string or an array of them), and its `@id`, `name`, `url` and `logo` (since rule set 0.2.2). An author or publisher nested inside another
  * object describes someone else, so it is not read. At most `MAX_PROFILES`.
  * @param {unknown} data
  * @returns {ProfileEntity[]}
@@ -126,7 +153,14 @@ function profileEntities(data) {
       .find((item) => typeof item === 'string' && PROFILE_TYPE.test(item.trim()));
     if (typeof type !== 'string') continue;
     const sameAs = Array.isArray(value.sameAs) ? value.sameAs : [value.sameAs];
-    profiles.push({ type: clip(type.trim(), LIMITS.maxStringLength), same_as: sameAs.filter(filled).length });
+    profiles.push({
+      type: clip(type.trim(), LIMITS.maxStringLength),
+      same_as: sameAs.filter(filled).length,
+      id: firstText(value['@id']),
+      name: firstText(value.name),
+      url: firstText(value.url),
+      logo: firstImage(value.logo),
+    });
   }
   return profiles;
 }

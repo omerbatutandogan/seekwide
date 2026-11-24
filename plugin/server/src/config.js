@@ -10,7 +10,7 @@ const pkg = JSON.parse(readFileSync(path.join(PLUGIN_ROOT, 'package.json'), 'utf
 export const VERSION = /** @type {string} */ (pkg.version);
 
 /** Version of the rule set. Bump it whenever a check changes what it reports. */
-export const RULES_VERSION = '0.2.1';
+export const RULES_VERSION = '0.2.2';
 
 /** Version of the JSON written under `.seekwide/`. */
 export const SCHEMA_VERSION = 1;
@@ -114,7 +114,7 @@ export const SEVERITIES = Object.freeze(['critical', 'high', 'medium', 'low', 'i
  * a crawl of a site that is not on this machine: the response headers of a local development server say nothing about the
  * deployed site.
  */
-export const CAPABILITIES = Object.freeze(['full_crawl', 'sitemap', 'robots', 'outbound', 'lab_data', 'field_data', 'live_site', 'image_files', 'social_images', 'app_files', 'llms_txt', 'ai_robots', 'ai_pages', 'form_pages', 'lab_audits']);
+export const CAPABILITIES = Object.freeze(['full_crawl', 'sitemap', 'robots', 'outbound', 'lab_data', 'field_data', 'live_site', 'image_files', 'social_images', 'app_files', 'llms_txt', 'ai_robots', 'ai_pages', 'form_pages', 'entity_pages', 'lab_audits']);
 
 /** An API key is sent in a request header, so it must be printable ASCII without spaces. */
 const API_KEY_PATTERN = /^[\x21-\x7E]{1,256}$/;

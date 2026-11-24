@@ -34,6 +34,7 @@ export const DOCS = Object.freeze({
   GOOGLE_ROBOTS_META: 'https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag',
   GOOGLE_AI_TRAINING_BLOG: 'https://developers.google.com/search/blog/2026/10/ai-training-control',
   LLMSTXT: 'https://llmstxt.org/',
+  GOOGLE_ORG: 'https://developers.google.com/search/docs/appearance/structured-data/organization',
 });
 
 /** The words of a recommendation when the site's intent is not known: a block may be on purpose. */
