@@ -2,6 +2,14 @@
 
 Notable changes to Seekwide. Versions follow [semantic versioning](https://semver.org/); the rule set has its own version (`RULES_VERSION`) that changes whenever a check starts reporting something different.
 
+## Unreleased
+
+Rule set 0.2.3.
+
+### Added
+
+- **hreflang (seo module).** Seven checks read the language versions a page names with `<link rel="alternate" hreflang>` and `Link` headers, after Google's page on localized versions: a value Google does not support (a region alone, `es-419`, `en-UK`), an address that is not a full URL, links outside the head, a page that does not list itself, an alternate page that does not point back (Google then ignores both), and, as information, an alternate that redirects, fails or is not indexable, and no `x-default`. The ISO 639-1, ISO 15924 and ISO 3166-1 codes are in `plugin/server/data/iso-codes.json`, written by `scripts/gen-iso-codes.js`. The crawl now records whether each hreflang link is in the head. Annotations in sitemaps are not read yet.
+
 ## 0.5.0 (2026-11-24)
 
 The rest of first-party AI evidence: the ai module now checks whether the site says in JSON-LD who is behind it, and whether agents that act for a user can name its buttons. Rule set 0.2.2: five new checks, one of them scored (`ai.agent.button_unnamed`), so the ai module's count has one more check.

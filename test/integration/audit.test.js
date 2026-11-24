@@ -226,8 +226,8 @@ test('scores and coverage are reported for every module', () => {
     'smo.og.image_broken', 'smo.og.image_heavy', 'smo.og.image_preview_shape', 'smo.og.image_too_small',
   ]);
   assert.equal(seo.checks_skipped, 6);
-  assert.equal(seo.checks_total, 47);
-  assert.equal(seo.coverage, 0.87);
+  assert.equal(seo.checks_total, 54);
+  assert.equal(seo.coverage, 0.89);
   assert.equal(links.checks_skipped, 1);
   // The header checks count toward a score of their own (security_headers), which a local crawl cannot give.
   assert.equal(security.checks_total, 5);

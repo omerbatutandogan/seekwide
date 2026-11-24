@@ -110,3 +110,9 @@ A new copy can change what the checks report, so raise `RULES_VERSION` in `plugi
 
 Some hosting services give each customer a host of their own but are not on the list, which would make all their customers one site. They are kept in a hand list next to it, `TENANT_DOMAINS` in `plugin/server/src/util/public-suffix.js`. Add a domain there only with the service's own page that says each customer gets a host under it, quoted with its address and the date it was read in the comment above the list, and drop one that the Public Suffix List has taken in. The tests in `test/util/public-suffix.test.js` check that two customers of every listed domain are two sites; a change to the hand list also raises `RULES_VERSION`.
 
+The codes an hreflang value may use are in `plugin/server/data/iso-codes.json`, written from the JSON files of Debian's [iso-codes](https://salsa.debian.org/iso-codes-team/iso-codes) package (on Debian or Ubuntu, `apt install iso-codes` puts them in `/usr/share/iso-codes/json`). Regenerate it with the package's version, then raise `RULES_VERSION` and update the counts in `test/checks/seo/hreflang.test.js`:
+
+```bash
+node scripts/gen-iso-codes.js /usr/share/iso-codes/json 4.16.0
+```
+

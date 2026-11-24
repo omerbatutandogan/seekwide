@@ -204,7 +204,7 @@ export function visitElement(node, frame, state) {
     if (rel.includes('alternate') && lang && href !== null && hasRoom(state.out.hreflang, CAPS.hreflang) && state.listChars < MAX_LIST_CHARS) {
       keep(state, state.out.hreflang, {
         hreflang: clip(lang, LIMITS.maxStringLength), href: clip(href, LIMITS.maxStringLength),
-        url: normalizeUrl(href, state.baseUrl), source: 'html',
+        url: normalizeUrl(href, state.baseUrl), source: 'html', in_head: frame.head,
       });
     }
     if (rel.includes('stylesheet')) addMixed(state, href);
