@@ -147,6 +147,23 @@ export {};
  * @property {string|null} [name]
  * @property {string|null} [url]
  * @property {string|null} [logo]  The logo's address: the value, or the `url` or `contentUrl` of an ImageObject.
+ * @property {LocalBusinessFields|null} [local]  For a LocalBusiness or one of its subtypes; null for another type. Absent in
+ *   records made before rule set 0.2.3.
+ */
+
+/**
+ * What Google's local business rules read of a LocalBusiness.
+ * @typedef {Object} LocalBusinessFields
+ * @property {'text'|'parts'|null} address  A text address, a PostalAddress with one or more of its parts, or none.
+ * @property {string[]} address_parts  The PostalAddress parts given: streetAddress, addressLocality, addressRegion, postalCode,
+ *   addressCountry.
+ * @property {string|null} address_text  The text address, or the parts given joined with ", ", clipped; null without one.
+ * @property {string|null} telephone
+ * @property {{latitude: {value: number, places: number}|null, longitude: {value: number, places: number}|null}|null} geo
+ *   The coordinates of `geo` and their decimal places as written; null without a `geo` object.
+ * @property {boolean} hours_specification  `openingHoursSpecification` gives one or more objects.
+ * @property {boolean} hours_text  `openingHours` gives text.
+ * @property {number|null} price_range_length  Characters of `priceRange` before clipping; null without one.
  */
 
 /**

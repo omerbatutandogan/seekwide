@@ -51,8 +51,9 @@ Only `plugin/` ships: the marketplace's `source` is `./plugin`, so Claude Code c
 ```
 plugin/server/src/
   config.js  types.js (+ types/)  log.js   shared
-  util/{url,hash,strings,site-identity,public-suffix,errors,plain-host,off-limits,image-size,ai-bots,iso-codes}.js  shared
+  util/{url,hash,strings,site-identity,public-suffix,errors,plain-host,off-limits,image-size,ai-bots,iso-codes,local-business}.js  shared
 plugin/server/data/public-suffixes.txt  the Public Suffix List, compacted (scripts/gen-public-suffixes.js)
+plugin/server/data/local-business-types.json  schema.org's LocalBusiness subtree (scripts/gen-local-business-types.js)
 plugin/server/data/iso-codes.json       the ISO 639-1, ISO 15924 and ISO 3166-1 alpha-2 codes hreflang may use (scripts/gen-iso-codes.js)
 plugin/server/data/ai-bots.json         AI crawlers and robots.txt tokens from the vendors' pages (util/ai-bots.js, 4.19)
   checks/{engine,scoring,validate,registry,page-helpers}.js   shared

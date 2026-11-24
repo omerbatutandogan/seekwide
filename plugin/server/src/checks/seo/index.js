@@ -9,6 +9,7 @@ import { httpChecks } from './http.js';
 import { hreflangChecks } from './hreflang.js';
 import { httpsChecks } from './https.js';
 import { indexingChecks } from './indexing.js';
+import { localChecks } from './local.js';
 import { metaDescriptionChecks } from './meta-description.js';
 import { mobileChecks } from './mobile.js';
 import { redirectChecks } from './redirect.js';
@@ -38,6 +39,7 @@ export const checks = [
   ...htmlChecks,
   ...contentChecks,
   ...structuredDataChecks,
+  ...localChecks,
   ...socialChecks,
   ...cwvChecks,
 ];

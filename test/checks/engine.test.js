@@ -51,7 +51,7 @@ test('buildContext indexes pages, inlinks and capabilities', () => {
   assert.equal(ctx.inlinks.get(`${SITE}/a`)?.length, 2);
   assert.equal(ctx.inlinks.has('https://other.test/x'), false);
   assert.equal(ctx.sitemapUrls.has(`${SITE}/a`), true);
-  assert.deepEqual([...ctx.capabilities].sort(), ['agent_pages', 'ai_pages', 'entity_pages', 'form_pages', 'full_crawl', 'live_site', 'robots', 'sitemap']);
+  assert.deepEqual([...ctx.capabilities].sort(), ['agent_pages', 'ai_pages', 'entity_pages', 'form_pages', 'full_crawl', 'live_site', 'local_pages', 'robots', 'sitemap']);
   assert.deepEqual(ctx.site, { origin: SITE, host: 'example.test', https: true, start_url: `${SITE}/` });
   assert.equal(ctx.outbound, null);
   assert.equal(ctx.vitals, null);

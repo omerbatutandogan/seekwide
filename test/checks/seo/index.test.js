@@ -45,6 +45,12 @@ test('the SEO module ships exactly the checks in CHECKS-SPEC.md', () => {
     'seo.https.site_not_https',
     'seo.indexing.homepage_noindex',
     'seo.indexing.noindex_in_sitemap',
+    'seo.local.geo_imprecise',
+    'seo.local.inconsistent',
+    'seo.local.price_range_long',
+    'seo.local.recommended_missing',
+    'seo.local.required_missing',
+    'seo.local.telephone_no_country_code',
     'seo.meta_description.duplicate',
     'seo.meta_description.missing',
     'seo.meta_description.multiple',
@@ -109,6 +115,12 @@ test('severity, weight, confidence, scope and requirements match the spec', () =
     'seo.hreflang.no_return': ['medium', 3, 'confirmed', 'page', []],
     'seo.hreflang.target_not_ok': ['info', 0, 'likely', 'page', []],
     'seo.hreflang.x_default_missing': ['info', 0, 'confirmed', 'site', []],
+    'seo.local.required_missing': ['medium', 2, 'confirmed', 'page', ['entity_pages', 'local_pages']],
+    'seo.local.recommended_missing': ['info', 0, 'confirmed', 'page', ['entity_pages', 'local_pages']],
+    'seo.local.geo_imprecise': ['low', 1, 'confirmed', 'page', ['entity_pages', 'local_pages']],
+    'seo.local.telephone_no_country_code': ['info', 0, 'likely', 'page', ['entity_pages', 'local_pages']],
+    'seo.local.price_range_long': ['low', 1, 'confirmed', 'page', ['entity_pages', 'local_pages']],
+    'seo.local.inconsistent': ['info', 0, 'likely', 'site', ['entity_pages', 'local_pages']],
     'seo.indexing.noindex_in_sitemap': ['high', 4, 'confirmed', 'page', ['sitemap']],
     'seo.sitemap.url_not_ok': ['medium', 3, 'confirmed', 'page', ['sitemap']],
     'seo.sitemap.url_canonicalized': ['medium', 2, 'confirmed', 'page', ['sitemap']],
@@ -134,7 +146,7 @@ test('severity, weight, confidence, scope and requirements match the spec', () =
       check.id,
     );
     assert.equal(check.module, 'seo');
-    assert.equal(check.last_verified, check.id.startsWith('seo.hreflang.') ? '2026-11-24' : '2026-11-11', check.id);
+    assert.equal(check.last_verified, /^seo\.(?:hreflang|local)\./.test(check.id) ? '2026-11-24' : '2026-11-11', check.id);
   }
 });
 
