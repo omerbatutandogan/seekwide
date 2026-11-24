@@ -83,6 +83,8 @@ import { searchDataTools } from './search-data.js';
  * @property {(projectDir: string, source: import('../imports/ai-data.js').AiSource) => Promise<import('../imports/ai-record.js').AiImport|null>} loadAiImport
  * @property {(projectDir: string, record: import('../imports/links-record.js').LinkImport) => Promise<{file: string, relative: string}>} saveLinkImport
  * @property {(projectDir: string, source: import('../imports/links-data.js').LinkSource) => Promise<import('../imports/links-record.js').LinkImport|null>} loadLinkImport
+ * @property {(projectDir: string, record: import('../imports/reviews-record.js').ReviewImport) => Promise<{file: string, relative: string}>} saveReviewImport
+ * @property {(projectDir: string, source: import('../imports/reviews-data.js').ReviewSource) => Promise<import('../imports/reviews-record.js').ReviewImport|null>} loadReviewImport
  *   The stored AI report import from one source; null when there is none.
  * @property {() => Date} now
  * @property {() => string} defaultProjectDir

@@ -379,6 +379,8 @@ The import is stored as `.seekwide/imports/google_search_console.json` or `.seek
 
 Links from other sites come from Search Console's Links report, exported the same way: open Links, then under External links "Top linked pages", More, and Export as CSV; or Export, "Latest links", as CSV. Imported, the report gets a "Links from other sites (imported)" section that lists the pages other sites link to with how each answered in the audit (a page that fails, redirects or is not indexable comes first, since a link to it leads somewhere else) and the sites the latest links come from. Google calls the report a sample, not every link, and Seekwide does not visit the linking pages; scores and findings do not change.
 
+Reviews of an Android app come from Play Console: open Download reports, then Reviews, and download a month as CSV (several months can go in one zip). Imported with source `google_play_reviews`, the report gets a "Google Play reviews (imported)" section: reviews per month, the average stars of those reviews, how many have a reply, and the newest 1- and 2-star reviews still without one, with a link to each in Play Console. What reviewers wrote is not kept, and the average is not the rating Google Play shows.
+
 ## Server logs
 
 Which AI crawlers really asked your server for pages is in its access logs, not in robots.txt. `/seekwide:ai` asks whether you can copy them into the project folder; it then reads them on your machine with `log_import`.

@@ -2,6 +2,12 @@
 
 Notable changes to Seekwide. Versions follow [semantic versioning](https://semver.org/); the rule set has its own version (`RULES_VERSION`) that changes whenever a check starts reporting something different.
 
+## Unreleased
+
+### Added
+
+- **Google Play reviews (report).** `search_data_import` reads Play Console's monthly reviews report (`google_play_reviews`; one CSV, or a zip of several months) by the columns Google's help page lists. The report gets a "Google Play reviews (imported)" section: reviews per month, the average stars of those reviews, the share with a developer reply, and the newest 1- and 2-star reviews without a reply, linked to Play Console. What reviewers wrote is never stored, the average is not the rating Google Play shows, and no check, finding or score changes.
+
 ## 0.8.0 (2026-11-24)
 
 The first part of roadmap item 2: imported search data now shows which pages get fewer clicks than the site's own pages at about the same position, and Search Console's Links report shows which pages other sites link to and how each answered in the audit. Both are report views of data the user exported: the rule set stays 0.2.4 and no score changes.

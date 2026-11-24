@@ -189,6 +189,24 @@ function linksSection(r) {
 }
 
 /** @param {Report} r */
+function reviewsSection(r) {
+  const v = r.reviews;
+  if (v === null) return [];
+  const lines = ['## Google Play reviews (imported)', '', `*${mdText(v.supplied)}*`, '', `- **File:** ${mdCode(v.file)}, imported on ${mdText(v.imported)}.`, ''];
+  for (const app of v.apps) {
+    lines.push(`### ${mdCode(app.package)}`, '', `- **Totals:** ${app.figures.map((f) => `${mdText(f.label)}: ${mdText(f.value)}`).join(' · ')}`, '');
+    lines.push(...table(['Month', 'Reviews', 'Average stars', 'Replied to'], app.months.map((m) => [mdText(m.month), m.reviews, m.average, m.replied])), '');
+    if (app.unanswered.length > 0) {
+      lines.push('Newest reviews of 1 or 2 stars without a reply:', '');
+      lines.push(...table(['Submitted', 'Stars', 'Language', 'Version code', 'Review'], app.unanswered.map((u) => [mdText(u.submitted), u.stars, mdText(u.language), mdText(u.version), u.link === null ? '—' : mdUrl(u.link, true)])), '');
+    }
+    if (app.notes.length > 0) lines.push(...app.notes.map((note) => `- ${mdText(note)}`), '');
+  }
+  if (v.notes.length > 0) lines.push(...v.notes.map((note) => `- ${mdText(note)}`), '');
+  return lines;
+}
+
+/** @param {Report} r */
 function aiSection(r) {
   const a = r.ai;
   if (a === null) return [];
@@ -345,7 +363,7 @@ function method(r) {
 export function renderMarkdown(run, options) {
   const r = buildReport(run, options);
   const lines = [
-    ...header(r), ...summary(r), ...scope(r), ...fixes(r), ...layers(r), ...scores(r), ...vitals(r), ...search(r), ...linksSection(r), ...aiVisibilitySection(r), ...aiSection(r), ...logsSection(r), ...observed(r), ...topFixes(r),
+    ...header(r), ...summary(r), ...scope(r), ...fixes(r), ...layers(r), ...scores(r), ...vitals(r), ...search(r), ...linksSection(r), ...reviewsSection(r), ...aiVisibilitySection(r), ...aiSection(r), ...logsSection(r), ...observed(r), ...topFixes(r),
     ...allFindings(r), ...suggestions(r), ...notRun(r), ...changes(r), ...method(r),
   ];
   return `${lines.join('\n').trimEnd()}\n`;
