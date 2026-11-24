@@ -12,6 +12,8 @@ import { AI_IMPORT_SCHEMA_VERSION } from '../imports/ai-record.js';
 import { LINK_SOURCES, linkTables } from '../imports/links-data.js';
 import { LINK_IMPORT_SCHEMA_VERSION } from '../imports/links-record.js';
 import { linkStates } from '../report/links.js';
+import { REVIEW_SOURCES, reviewTables } from '../imports/reviews-data.js';
+import { REVIEW_IMPORT_SCHEMA_VERSION } from '../imports/reviews-record.js';
 import { ImportError } from '../imports/errors.js';
 import { matchPages, trafficOf } from '../imports/match.js';
 import { IMPORT_SOURCES, importExport, readTables } from '../imports/parse.js';
@@ -35,6 +37,8 @@ const LISTED = 10;
 /** @import { AiSource } from '../imports/ai-data.js' */
 /** @import { LinkImport } from '../imports/links-record.js' */
 /** @import { LinkSource } from '../imports/links-data.js' */
+/** @import { ReviewImport } from '../imports/reviews-record.js' */
+/** @import { ReviewSource } from '../imports/reviews-data.js' */
 
 /**
  * Import a table of Search Console's Links report: read, store, and say how its pages fared in the latest audit.
@@ -103,6 +107,71 @@ async function importLinkReport(deps, projectDir, source, input, runId) {
     top_targets: record.targets.slice(0, LISTED),
     latest_linking: record.linking.slice(0, LISTED),
     linked_pages_with_problems: problems,
+    notes,
+    _note: IMPORT_NOTE,
+  };
+}
+
+/**
+ * Import Play Console's reviews report: read, store, and say what it holds.
+ * @param {ToolDeps} deps
+ * @param {string} projectDir
+ * @param {ReviewSource} source
+ * @param {unknown} input
+ */
+async function importReviewReport(deps, projectDir, source, input) {
+  /** @type {ReviewImport} */
+  let record;
+  try {
+    const file = await readImportFile(projectDir, /** @type {string} */ (input));
+    const { format, tables } = await readTables(file.bytes);
+    record = {
+      schema_version: REVIEW_IMPORT_SCHEMA_VERSION,
+      source,
+      imported_at: deps.now().toISOString(),
+      file: { path: clip(collapseWhitespace(file.relative), 300), format, bytes: file.bytes.length, sha256: createHash('sha256').update(file.bytes).digest('hex') },
+      ...reviewTables(tables),
+    };
+  } catch (error) {
+    if (!(error instanceof ImportError)) throw error;
+    throw new ToolError(error.message);
+  }
+  /** @type {string[]} */
+  const notes = [];
+  let previous = null;
+  try {
+    previous = await deps.loadReviewImport(projectDir, source);
+  } catch (error) {
+    const code = /** @type {{code?: unknown}} */ (error)?.code;
+    if (code !== 'IMPORT_CORRUPT' && code !== 'STORE_FILE_TOO_LARGE') await withStoreErrors(() => Promise.reject(error));
+    notes.push('The earlier import from this source could not be read, so it was replaced without being compared.');
+  }
+  const saved = await withStoreErrors(() => deps.saveReviewImport(projectDir, record));
+  notes.push('A new import replaces the earlier one: to keep several months, zip their files and import the zip.');
+  notes.push('The averages are of the reviews in the file, not the rating Google Play shows.');
+  const declared = (await withStoreErrors(() => deps.readProfile(projectDir)))?.apps?.android?.packages ?? null;
+  const unknown = declared === null ? [] : record.apps.filter((app) => !declared.includes(app.package)).map((app) => app.package);
+  if (unknown.length > 0) notes.push(`The project profile does not name ${unknown.join(', ')} among its Android apps.`);
+  return {
+    source,
+    saved_to: saved.relative,
+    replaced: previous === null ? null : { imported_at: previous.imported_at },
+    file: { path: record.file.path, format: record.file.format, bytes: record.file.bytes },
+    apps: record.apps.map((app) => {
+      const reviews = app.months.reduce((sum, month) => sum + month.reviews, 0);
+      const replied = app.months.reduce((sum, month) => sum + month.replied, 0);
+      const stars = app.months.reduce((sum, month) => sum + month.stars.reduce((total, n, i) => total + n * (i + 1), 0), 0);
+      return {
+        package: app.package,
+        first_month: app.months[0].month,
+        last_month: app.months[app.months.length - 1].month,
+        reviews,
+        average_stars: Math.round((stars / reviews) * 100) / 100,
+        replied,
+        unanswered_low_ratings: app.unanswered_total,
+      };
+    }),
+    counts: record.counts,
     notes,
     _note: IMPORT_NOTE,
   };
@@ -254,14 +323,15 @@ export function searchDataTools(deps) {
         "or the Pages table of Bing Webmaster Tools' Search Performance report (CSV); or a table of Search Console's Links report: its top linked pages " +
         '(CSV; source google_search_console_links) or Latest links (CSV; google_search_console_latest_links); or one of the AI reports: Search Console\'s ' +
         '"Performance on Search Generative AI Features" (CSV zip or Excel; source google_search_console_ai), the overview of Bing\'s AI Performance report ' +
-        '(CSV; bing_ai_performance) or its table of pages (CSV; bing_ai_pages). The file must be inside the project folder. It is stored in ' +
+        '(CSV; bing_ai_performance) or its table of pages (CSV; bing_ai_pages); or the reviews report of Google Play Console (a monthly CSV, or a zip of several; ' +
+        'source google_play_reviews). The file must be inside the project folder. It is stored in ' +
         '.seekwide/imports/ (replacing the previous import from the same source) and used by report_render. The result says how its pages match the latest audit. ' +
         'Nothing is sent anywhere.',
       inputSchema: {
         type: 'object',
         properties: {
           path: { type: 'string', maxLength: 4096, description: 'The export file, absolute or relative to project_dir. It must be inside the project folder.' },
-          source: { type: 'string', enum: [...IMPORT_SOURCES, ...AI_SOURCES, ...LINK_SOURCES], description: 'Where the user exported the file from, and which report.' },
+          source: { type: 'string', enum: [...IMPORT_SOURCES, ...AI_SOURCES, ...LINK_SOURCES, ...REVIEW_SOURCES], description: 'Where the user exported the file from, and which report.' },
           project_dir: PROJECT_DIR_SCHEMA,
           period_start: { ...DATE_SCHEMA, description: 'YYYY-MM-DD: the first day the export covers, as chosen in the report. Only for a file without a table of dates (Bing\'s Pages tables).' },
           period_end: { ...DATE_SCHEMA, description: 'YYYY-MM-DD: the last day the export covers. Only together with period_start.' },
@@ -273,6 +343,10 @@ export function searchDataTools(deps) {
       async handler(args) {
         const projectDir = resolveProjectDir(args.project_dir, deps.defaultProjectDir);
         const period = statedPeriod(args.period_start, args.period_end);
+        if (REVIEW_SOURCES.includes(/** @type {ReviewSource} */ (args.source))) {
+          if (period !== undefined) throw new ToolError('The reviews report states its months. Leave period_start and period_end out.');
+          return importReviewReport(deps, projectDir, /** @type {ReviewSource} */ (args.source), args.path);
+        }
         if (LINK_SOURCES.includes(/** @type {LinkSource} */ (args.source))) {
           if (period !== undefined) throw new ToolError('The Links report states no period. Leave period_start and period_end out.');
           return importLinkReport(deps, projectDir, /** @type {LinkSource} */ (args.source), args.path, args.run_id);

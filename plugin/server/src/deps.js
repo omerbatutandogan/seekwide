@@ -12,7 +12,7 @@ import { checkExternalLinks } from './net/link-check.js';
 import { renderHtml } from './report/html.js';
 import { renderMarkdown } from './report/markdown.js';
 import { attachSources, loadProjectSources } from './repo/sources.js';
-import { compareRuns, ensureProject, listRuns, loadAiImport, loadLinkImport, loadLogImport, loadRun, loadSearchImport, newRunId, projectPaths, readProfile, saveAiImport, saveLinkImport, saveLogImport, saveRun, saveSearchImport, writeProfile } from './store/index.js';
+import { compareRuns, ensureProject, listRuns, loadAiImport, loadLinkImport, loadLogImport, loadRun, loadSearchImport, newRunId, projectPaths, readProfile, saveAiImport, saveLinkImport, saveLogImport, saveReviewImport, loadReviewImport, saveRun, saveSearchImport, writeProfile } from './store/index.js';
 import { measureAds } from './vitals/ads.js';
 import { measureVitals } from './vitals/measure.js';
 
@@ -69,6 +69,8 @@ export function createToolDeps(env = process.env, measure = measureVitals) {
     loadAiImport,
     saveLinkImport,
     loadLinkImport,
+    saveReviewImport,
+    loadReviewImport,
     now: () => new Date(),
     defaultProjectDir: () => defaultProjectDir(env),
     env: toolSettings(env),

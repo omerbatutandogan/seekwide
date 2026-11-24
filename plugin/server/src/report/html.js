@@ -180,6 +180,21 @@ function linksSection(r) {
 }
 
 /** @param {Report} r */
+function reviewsSection(r) {
+  const v = r.reviews;
+  if (v === null) return '';
+  const notes = (/** @type {string[]} */ items) => (items.length > 0 ? html`<ul class="meta">${items.map((note) => html`<li>${note}</li>`)}</ul>` : '');
+  const link = (/** @type {string|null} */ url) => {
+    const href = url === null ? null : safeHttpUrl(url);
+    return href === null ? '—' : html`<a href="${href}" rel="noopener noreferrer nofollow">Play Console</a>`;
+  };
+  const apps = v.apps.map((app) => html`<h3><code>${app.package}</code></h3><div class="figs">${app.figures.map((f) => html`<div class="fig"><b>${f.value}</b><span>${f.label}</span></div>`)}</div>
+<table><thead><tr><th>Month</th><th class="n">Reviews</th><th class="n">Average stars</th><th class="n">Replied to</th></tr></thead><tbody>${app.months.map((m) => html`<tr><td>${m.month}</td><td class="n">${m.reviews}</td><td class="n">${m.average}</td><td class="n">${m.replied}</td></tr>`)}</tbody></table>
+${app.unanswered.length > 0 ? html`<p class="meta">Newest reviews of 1 or 2 stars without a reply:</p><table><thead><tr><th>Submitted</th><th class="n">Stars</th><th>Language</th><th>Version code</th><th>Review</th></tr></thead><tbody>${app.unanswered.map((u) => html`<tr><td>${u.submitted}</td><td class="n">${u.stars}</td><td>${u.language}</td><td>${u.version}</td><td>${link(u.link)}</td></tr>`)}</tbody></table>` : ''}${notes(app.notes)}`);
+  return html`<section id="play-reviews"><h2>Google Play reviews (imported)</h2><p class="note">${v.supplied}</p><p class="meta">From the file <code>${v.file}</code>, imported on ${v.imported}.</p>${apps}${notes(v.notes)}</section>`;
+}
+
+/** @param {Report} r */
 function search(r) {
   const s = r.search;
   if (s === null) return '';
@@ -317,7 +332,7 @@ export function renderHtml(run, options) {
 </head>
 <body>
 <main>
-${titleBlock(r)}${summary(r)}${scope(r)}${fixes(r)}${layers(r)}${scores(r)}${vitals(r)}${search(r)}${linksSection(r)}${aiVisibilitySection(r)}${aiSection(r)}${logsSection(r)}${observed(r)}${topFixes(r)}${allFindings(r)}${suggestions(r)}${notRun(r)}${changes(r)}${method(r)}
+${titleBlock(r)}${summary(r)}${scope(r)}${fixes(r)}${layers(r)}${scores(r)}${vitals(r)}${search(r)}${linksSection(r)}${reviewsSection(r)}${aiVisibilitySection(r)}${aiSection(r)}${logsSection(r)}${observed(r)}${topFixes(r)}${allFindings(r)}${suggestions(r)}${notRun(r)}${changes(r)}${method(r)}
 <footer>Seekwide ${r.pluginVersion} &middot; rules ${r.rulesVersion} &middot; run <code>${r.runId}</code> &middot; ${r.date.iso}</footer>
 </main>
 </body>

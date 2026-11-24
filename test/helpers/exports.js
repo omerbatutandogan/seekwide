@@ -191,3 +191,39 @@ export function googleLatestLinksCsv() {
     '',
   ].join('\r\n');
 }
+
+const PLAY_REVIEW_HEADER = [
+  'Package Name', 'App Version Code', 'App Version Name', 'Reviewer Language', 'Device', 'Review Submit Date and Time', 'Review Submit Millis Since Epoch',
+  'Review Last Update Date and Time', 'Review Last Update Millis Since Epoch', 'Star Rating', 'Review Title', 'Review Text', 'Developer Reply Date and Time',
+  'Developer Reply Millis Since Epoch', 'Developer Reply Text', 'Review Link',
+];
+
+/**
+ * A row of Play Console's reviews report. The values are made up.
+ * @param {string} day YYYY-MM-DD @param {number} stars @param {boolean} replied @param {string} id
+ */
+const playReview = (day, stars, replied, id) => {
+  const millis = String(Date.parse(`${day}T10:00:00Z`));
+  return [
+    'com.example.app', '42', '1.4.2', 'tr', 'device1', `${day}T10:00:00Z`, millis, `${day}T10:00:00Z`, millis, String(stars), '', 'Text the reviewer wrote, "quoted", with a comma',
+    replied ? `${day}T12:00:00Z` : '', replied ? String(Number(millis) + 7200000) : '', replied ? 'Thanks' : '', `https://play.google.com/console/developers/1/app/2/user-feedback/review-details?reviewId=${id}`,
+  ];
+};
+
+/**
+ * A monthly reviews report of Play Console, written from the columns its help page lists, in UTF-16 with a byte
+ * order mark as the help page says the files are. The values are made up.
+ * @param {(string|number|boolean)[][]} rows  [day, stars, replied, id]
+ */
+export function playReviewsCsv(rows) {
+  const text = csv(PLAY_REVIEW_HEADER, rows.map(([day, stars, replied, id]) => playReview(String(day), Number(stars), Boolean(replied), String(id))));
+  return Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(text, 'utf16le')]);
+}
+
+/** Two months of reviews of one app. */
+export function playReviewsOctober() {
+  return playReviewsCsv([['2026-10-02', 5, true, 'a'], ['2026-10-05', 1, false, 'b'], ['2026-10-20', 2, false, 'c'], ['2026-10-21', 4, false, 'd']]);
+}
+export function playReviewsNovember() {
+  return playReviewsCsv([['2026-11-03', 2, true, 'e'], ['2026-11-04', 1, false, 'f'], ['2026-10-21', 4, false, 'd']]);
+}

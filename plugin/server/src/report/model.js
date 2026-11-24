@@ -10,6 +10,7 @@ import { aiLayer, viewAi } from './ai.js';
 import { viewLogs } from './logs.js';
 import { aiVisibilityLayer, viewAiVisibility } from './ai-visibility.js';
 import { viewLinks } from './links.js';
+import { viewReviews } from './reviews.js';
 import { viewObservations } from './observations.js';
 import { aiAccessNotJudged } from '../util/ai-summary.js';
 import { methodSections, reportTitle } from './copy.js';
@@ -66,6 +67,10 @@ function readOptions(run, options) {
   if (!Array.isArray(links) || !links.every((entry) => typeof obj(obj(entry).data).source === 'string' && (obj(entry).states === null || obj(entry).states instanceof Map))) {
     throw new TypeError('links must be an array of {data, states}.');
   }
+  const reviews = o.reviews ?? null;
+  if (reviews !== null && (obj(obj(reviews).data).source !== 'google_play_reviews' || !(obj(reviews).declared === null || (Array.isArray(obj(reviews).declared) && /** @type {unknown[]} */ (obj(reviews).declared).every((item) => typeof item === 'string'))))) {
+    throw new TypeError('reviews must be {data, declared} with a Play reviews import.');
+  }
   const logs = o.logs ?? null;
   if (logs !== null && (obj(logs).source !== 'server_logs' || !Array.isArray(obj(logs).bots))) throw new TypeError('logs must be a log import.');
   const comparison = o.comparison ?? null;
@@ -82,6 +87,7 @@ function readOptions(run, options) {
     logs: /** @type {import('../logs/record.js').LogImport|null} */ (logs),
     aiSearch: /** @type {import('../imports/ai-record.js').AiImport[]} */ (aiSearch),
     links: /** @type {Parameters<typeof viewLinks>[0]} */ (links),
+    reviews: /** @type {{data: import('../imports/reviews-record.js').ReviewImport, declared: string[]|null}|null} */ (reviews),
     recommendations: recommendations.map((item, index) => {
       const entry = obj(item);
       const title = text(entry.title);
@@ -265,6 +271,7 @@ export function buildReport(run, options = {}) {
     observations: viewObservations(run),
     search: viewSearch(opts.search, findings),
     links: viewLinks(opts.links),
+    reviews: opts.reviews === null ? null : viewReviews(opts.reviews.data, opts.reviews.declared),
     logs: viewLogs(opts.logs, run),
     scores,
     vitals,
