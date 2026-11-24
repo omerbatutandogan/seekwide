@@ -11,6 +11,9 @@ test('every SEO definition passes prepareChecks', () => {
 
 test('the SEO module ships exactly the checks in CHECKS-SPEC.md', () => {
   assert.deepEqual(checks.map((check) => check.id).sort(), [
+    'seo.article.author_missing',
+    'seo.article.author_unlinked',
+    'seo.article.date_missing',
     'seo.canonical.cross_host',
     'seo.canonical.invalid',
     'seo.canonical.missing',
@@ -122,6 +125,9 @@ test('severity, weight, confidence, scope and requirements match the spec', () =
     'seo.local.telephone_no_country_code': ['info', 0, 'likely', 'page', ['entity_pages', 'local_pages']],
     'seo.local.price_range_long': ['low', 1, 'confirmed', 'page', ['entity_pages', 'local_pages']],
     'seo.local.inconsistent': ['info', 0, 'likely', 'site', ['entity_pages', 'local_pages']],
+    'seo.article.author_missing': ['info', 0, 'confirmed', 'page', ['article_pages']],
+    'seo.article.author_unlinked': ['info', 0, 'confirmed', 'page', ['article_pages']],
+    'seo.article.date_missing': ['info', 0, 'confirmed', 'page', ['article_pages']],
     'seo.indexing.noindex_in_sitemap': ['high', 4, 'confirmed', 'page', ['sitemap']],
     'seo.sitemap.url_not_ok': ['medium', 3, 'confirmed', 'page', ['sitemap']],
     'seo.sitemap.url_canonicalized': ['medium', 2, 'confirmed', 'page', ['sitemap']],
@@ -148,7 +154,7 @@ test('severity, weight, confidence, scope and requirements match the spec', () =
       check.id,
     );
     assert.equal(check.module, 'seo');
-    assert.equal(check.last_verified, /^seo\.(?:hreflang|local)\.|^seo\.content\.template_/.test(check.id) ? '2026-11-24' : '2026-11-11', check.id);
+    assert.equal(check.last_verified, /^seo\.(?:hreflang|local|article)\.|^seo\.content\.template_/.test(check.id) ? '2026-11-24' : '2026-11-11', check.id);
   }
 });
 

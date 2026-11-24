@@ -1,6 +1,6 @@
 // JSON-LD blocks: validity and the schema.org types they declare. Pure.
 
-/** @import { JsonLdBlock, LocalBusinessFields, ProfileEntity, VideoObjectSummary } from '../types.js' */
+/** @import { ArticleSummary, JsonLdBlock, LocalBusinessFields, ProfileEntity, VideoObjectSummary } from '../types.js' */
 
 import { LIMITS } from '../config.js';
 import { clip } from '../util/strings.js';
@@ -10,6 +10,9 @@ const MAX_TYPES = 50;
 /** `VideoObject`s recorded per block, and how far and how wide the search for them goes. */
 const MAX_VIDEOS = 20;
 const MAX_PROFILES = 20;
+const MAX_ARTICLES = 20;
+/** The schema.org types Google's Article structured data is based on, also as `schema:BlogPosting` or a full URL. */
+const ARTICLE_TYPE = /(?:^|[:/])(?:Article|NewsArticle|BlogPosting)$/;
 const MAX_DEPTH = 16;
 const MAX_NODES = 10_000;
 /**
@@ -211,15 +214,7 @@ function localFields(value, text) {
 function profileEntities(data, text) {
   /** @type {ProfileEntity[]} */
   const profiles = [];
-  /** @type {Record<string, unknown>[]} */
-  const nodes = [];
-  for (const item of Array.isArray(data) ? data : [data]) {
-    if (!isObject(item)) continue;
-    nodes.push(item);
-    const graph = item['@graph'];
-    for (const node of Array.isArray(graph) ? graph : [graph]) if (isObject(node)) nodes.push(node);
-  }
-  for (const value of nodes) {
+  for (const value of topNodes(data)) {
     if (profiles.length >= MAX_PROFILES) break;
     const types = (Array.isArray(value['@type']) ? value['@type'] : [value['@type']]).filter((item) => typeof item === 'string');
     const local = types.find((item) => isLocalBusinessType(item));
@@ -240,11 +235,61 @@ function profileEntities(data, text) {
 }
 
 /**
+ * The objects at the top level of parsed JSON-LD (the value, or each item of a top-level array) and in their `@graph`,
+ * in document order.
+ * @param {unknown} data
+ * @returns {Record<string, unknown>[]}
+ */
+function topNodes(data) {
+  /** @type {Record<string, unknown>[]} */
+  const nodes = [];
+  for (const item of Array.isArray(data) ? data : [data]) {
+    if (!isObject(item)) continue;
+    nodes.push(item);
+    const graph = item['@graph'];
+    for (const node of Array.isArray(graph) ? graph : [graph]) if (isObject(node)) nodes.push(node);
+  }
+  return nodes;
+}
+
+/**
+ * Every Article, NewsArticle or BlogPosting at the top level of a block or in its `@graph`, with what Google's Article
+ * page and its authorship advice read (rule set 0.2.4): how many authors it names, how many of them have a name and
+ * a `url` or `sameAs`, and whether it gives `datePublished` and `dateModified`. An author given as text counts as named
+ * and not linked. At most `MAX_ARTICLES`.
+ * @param {unknown} data
+ * @returns {ArticleSummary[]}
+ */
+function articles(data) {
+  /** @type {ArticleSummary[]} */
+  const out = [];
+  for (const value of topNodes(data)) {
+    if (out.length >= MAX_ARTICLES) break;
+    const types = (Array.isArray(value['@type']) ? value['@type'] : [value['@type']]).filter((item) => typeof item === 'string');
+    const type = types.find((item) => ARTICLE_TYPE.test(item.trim()));
+    if (typeof type !== 'string') continue;
+    const authors = (Array.isArray(value.author) ? value.author : [value.author]).filter((item) => filled(item) || isObject(item));
+    const named = authors.filter((item) => filled(item) || (isObject(item) && filled(item.name)));
+    const linked = authors.filter((item) => isObject(item) && (filled(item.url) || firstText(item.sameAs) !== null));
+    out.push({
+      type: clip(type.trim(), LIMITS.maxStringLength),
+      authors: authors.length,
+      named_authors: named.length,
+      linked_authors: linked.length,
+      date_published: filled(value.datePublished),
+      date_modified: filled(value.dateModified),
+    });
+  }
+  return out;
+}
+
+/**
  * Parse the text of one `<script type="application/ld+json">`.
  * `types` holds `@type` values of the top-level object (or of each object in a
  * top-level array) and of the objects in their `@graph`, in order, once each.
  * `videos` holds every `VideoObject` in the block, at any depth, and
- * `profiles` every Organization, business or Person at the top level and in `@graph`, with its `sameAs` count.
+ * `profiles` every Organization, business or Person at the top level and in `@graph`, with its `sameAs` count, and
+ * `articles` every Article, NewsArticle or BlogPosting there.
  * Empty content is not valid JSON and is reported as such.
  * @param {string} text
  * @param {number|null} line
@@ -257,7 +302,7 @@ export function parseJsonLd(text, line) {
     data = JSON.parse(text);
   } catch (error) {
     const message = text.trim() === '' ? 'Empty JSON-LD script' : /** @type {Error} */ (error).message;
-    return { valid: false, types: [], error: clip(message, LIMITS.maxStringLength), line, videos: [], profiles: [] };
+    return { valid: false, types: [], error: clip(message, LIMITS.maxStringLength), line, videos: [], profiles: [], articles: [] };
   }
   /** @type {string[]} */
   const types = [];
@@ -269,5 +314,5 @@ export function parseJsonLd(text, line) {
       if (isObject(node)) addTypes(node['@type'], types);
     }
   }
-  return { valid: true, types, error: null, line, videos: videoObjects(data), profiles: profileEntities(data, text) };
+  return { valid: true, types, error: null, line, videos: videoObjects(data), profiles: profileEntities(data, text), articles: articles(data) };
 }

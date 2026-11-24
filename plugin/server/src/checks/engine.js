@@ -37,6 +37,7 @@ const SKIP_REASONS = {
   lab_audits: 'Needs Lighthouse\'s accessibility and best-practices audits from PageSpeed Insights. They were not collected.',
   form_pages: 'Needs the reading of forms the cro checks use. This crawl was made before rule set 0.2.1 and did not record it. Crawl the site again.',
   local_pages: 'Needs what the pages\' LocalBusiness markup gives (address, telephone, coordinates, opening hours). This crawl was made before rule set 0.2.3 and did not record it. Crawl the site again.',
+  article_pages: 'Needs the authors and dates of the pages\' Article markup. This crawl was made before rule set 0.2.4 and did not record them. Crawl the site again.',
   agent_pages: 'Needs the buttons and the WebMCP attributes of the pages\' forms. This crawl was made before rule set 0.2.2 and did not record them. Crawl the site again.',
   entity_pages: 'Needs the name, address and logo of the organisations in the pages\' JSON-LD. This crawl was made before rule set 0.2.2 and did not record them. Crawl the site again.',
   ai_pages: 'Needs the page signals the AI checks read (Bing\'s directives, data-nosnippet, scripts). This crawl was made before rule set 0.2.0 and did not record them. Crawl the site again.',
@@ -122,6 +123,7 @@ export function buildContext(crawl, extras = {}) {
   if (pages.length === 0 || pages.some((page) => page.forms !== undefined)) capabilities.add('form_pages');
   if (entitiesRecorded(htmlPages)) capabilities.add('entity_pages');
   if (htmlPages.every((page) => page.jsonld.every((block) => !block.valid || (block.profiles ?? []).every((entity) => entity.local !== undefined)))) capabilities.add('local_pages');
+  if (htmlPages.every((page) => page.jsonld.every((block) => !block.valid || block.articles !== undefined))) capabilities.add('article_pages');
   if (pages.length === 0 || pages.some((page) => page.forms?.buttons !== undefined)) capabilities.add('agent_pages');
   const llmsTxt = extras.llmsTxt ?? null;
   if (llmsTxt !== null) capabilities.add('llms_txt');
