@@ -2,7 +2,9 @@
 
 Notable changes to Seekwide. Versions follow [semantic versioning](https://semver.org/); the rule set has its own version (`RULES_VERSION`) that changes whenever a check starts reporting something different.
 
-## Unreleased
+## 0.4.0 (2026-11-24)
+
+First-party AI evidence: server access logs show which AI crawlers really asked for pages, and the AI reports of Search Console and Bing show how often the site appeared or was cited in AI answers. Rule set 0.2.1, unchanged: no check reports anything different.
 
 ### Added
 
