@@ -9,6 +9,9 @@
 
 import { AI_SOURCES, aiTables } from '../imports/ai-data.js';
 import { AI_IMPORT_SCHEMA_VERSION } from '../imports/ai-record.js';
+import { LINK_SOURCES, linkTables } from '../imports/links-data.js';
+import { LINK_IMPORT_SCHEMA_VERSION } from '../imports/links-record.js';
+import { linkStates } from '../report/links.js';
 import { ImportError } from '../imports/errors.js';
 import { matchPages, trafficOf } from '../imports/match.js';
 import { IMPORT_SOURCES, importExport, readTables } from '../imports/parse.js';
@@ -30,6 +33,80 @@ const LISTED = 10;
 
 /** @import { AiImport } from '../imports/ai-record.js' */
 /** @import { AiSource } from '../imports/ai-data.js' */
+/** @import { LinkImport } from '../imports/links-record.js' */
+/** @import { LinkSource } from '../imports/links-data.js' */
+
+/**
+ * Import a table of Search Console's Links report: read, store, and say how its pages fared in the latest audit.
+ * @param {ToolDeps} deps
+ * @param {string} projectDir
+ * @param {LinkSource} source
+ * @param {unknown} input
+ * @param {unknown} runId
+ */
+async function importLinkReport(deps, projectDir, source, input, runId) {
+  /** @type {LinkImport} */
+  let record;
+  try {
+    const file = await readImportFile(projectDir, /** @type {string} */ (input));
+    const { format, tables } = await readTables(file.bytes);
+    record = {
+      schema_version: LINK_IMPORT_SCHEMA_VERSION,
+      source,
+      imported_at: deps.now().toISOString(),
+      file: { path: clip(collapseWhitespace(file.relative), 300), format, bytes: file.bytes.length, sha256: createHash('sha256').update(file.bytes).digest('hex') },
+      ...linkTables(tables, source),
+    };
+  } catch (error) {
+    if (!(error instanceof ImportError)) throw error;
+    throw new ToolError(error.message);
+  }
+  /** @type {string[]} */
+  const notes = [];
+  let previous = null;
+  try {
+    previous = await deps.loadLinkImport(projectDir, source);
+  } catch (error) {
+    const code = /** @type {{code?: unknown}} */ (error)?.code;
+    if (code !== 'IMPORT_CORRUPT' && code !== 'STORE_FILE_TOO_LARGE') await withStoreErrors(() => Promise.reject(error));
+    notes.push('The earlier import from this source could not be read, so it was replaced without being compared.');
+  }
+  const saved = await withStoreErrors(() => deps.saveLinkImport(projectDir, record));
+  notes.push('Google calls the Links report a sample, not every link to the site, and a link in it may since have been removed.');
+  /** @type {{url: string, links: number, sites: number, state: string}[]|null} */
+  let problems = null;
+  if (source === 'google_search_console_links') {
+    const runs = runId === undefined ? await withStoreErrors(() => deps.listRuns(projectDir)) : null;
+    if (runs !== null && runs.length === 0) {
+      notes.push('The project has no saved audit yet, so how the linked pages answer is unknown. Audit the site, then render the report: it uses this import.');
+    } else {
+      const run = await withStoreErrors(() => deps.loadRun(projectDir, typeof runId === 'string' ? runId : 'last'));
+      const crawl = await crawlOfRun(deps, run);
+      if (crawl === null) notes.push('The crawl behind the audit is no longer stored, so how the linked pages answer is unknown. Audit the site again.');
+      const states = linkStates(record, run, crawl);
+      problems = record.targets
+        .filter((row) => !['ok', 'not_crawled', 'not_checked', 'unknown'].includes(states.get(row.url)?.state ?? 'unknown'))
+        .slice(0, LISTED)
+        .map((row) => ({ url: row.url, links: row.links, sites: row.sites, state: states.get(row.url)?.text ?? '' }));
+    }
+  } else {
+    notes.push('Latest links names the pages that link to the site, not the page each one links to.');
+  }
+  return {
+    source,
+    saved_to: saved.relative,
+    replaced: previous === null ? null : { imported_at: previous.imported_at },
+    file: { path: record.file.path, format: record.file.format, bytes: record.file.bytes },
+    targets: record.targets.length,
+    linking_pages: record.linking.length,
+    counts: record.counts,
+    top_targets: record.targets.slice(0, LISTED),
+    latest_linking: record.linking.slice(0, LISTED),
+    linked_pages_with_problems: problems,
+    notes,
+    _note: IMPORT_NOTE,
+  };
+}
 
 /**
  * Import an export of one of the AI reports: read, store, and say what it holds.
@@ -174,7 +251,8 @@ export function searchDataTools(deps) {
       title: 'Import search performance data',
       description:
         "Read a search performance export the user downloaded: Search Console's Performance report (the CSV zip, the Excel file, or its Pages table as CSV) " +
-        "or the Pages table of Bing Webmaster Tools' Search Performance report (CSV); or one of the AI reports: Search Console's " +
+        "or the Pages table of Bing Webmaster Tools' Search Performance report (CSV); or a table of Search Console's Links report: its top linked pages " +
+        '(CSV; source google_search_console_links) or Latest links (CSV; google_search_console_latest_links); or one of the AI reports: Search Console\'s ' +
         '"Performance on Search Generative AI Features" (CSV zip or Excel; source google_search_console_ai), the overview of Bing\'s AI Performance report ' +
         '(CSV; bing_ai_performance) or its table of pages (CSV; bing_ai_pages). The file must be inside the project folder. It is stored in ' +
         '.seekwide/imports/ (replacing the previous import from the same source) and used by report_render. The result says how its pages match the latest audit. ' +
@@ -183,7 +261,7 @@ export function searchDataTools(deps) {
         type: 'object',
         properties: {
           path: { type: 'string', maxLength: 4096, description: 'The export file, absolute or relative to project_dir. It must be inside the project folder.' },
-          source: { type: 'string', enum: [...IMPORT_SOURCES, ...AI_SOURCES], description: 'Where the user exported the file from, and which report.' },
+          source: { type: 'string', enum: [...IMPORT_SOURCES, ...AI_SOURCES, ...LINK_SOURCES], description: 'Where the user exported the file from, and which report.' },
           project_dir: PROJECT_DIR_SCHEMA,
           period_start: { ...DATE_SCHEMA, description: 'YYYY-MM-DD: the first day the export covers, as chosen in the report. Only for a file without a table of dates (Bing\'s Pages tables).' },
           period_end: { ...DATE_SCHEMA, description: 'YYYY-MM-DD: the last day the export covers. Only together with period_start.' },
@@ -195,6 +273,10 @@ export function searchDataTools(deps) {
       async handler(args) {
         const projectDir = resolveProjectDir(args.project_dir, deps.defaultProjectDir);
         const period = statedPeriod(args.period_start, args.period_end);
+        if (LINK_SOURCES.includes(/** @type {LinkSource} */ (args.source))) {
+          if (period !== undefined) throw new ToolError('The Links report states no period. Leave period_start and period_end out.');
+          return importLinkReport(deps, projectDir, /** @type {LinkSource} */ (args.source), args.path, args.run_id);
+        }
         if (AI_SOURCES.includes(/** @type {AiSource} */ (args.source))) return importAiReport(deps, projectDir, /** @type {AiSource} */ (args.source), period, args.path);
         const source = /** @type {SearchImport['source']} */ (args.source);
         let record;

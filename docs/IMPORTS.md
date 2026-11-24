@@ -15,6 +15,7 @@ Seekwide reads only files the user saved in the project folder. There is no OAut
 | Bing's Search Performance report is downloaded as CSV. Its Keywords and Pages tables have Impressions, Clicks, Avg. CTR and Avg. position (also written Average Click-Through Rate(CTR) and Average Position); position is available only for web traffic. | https://www.bing.com/webmasters/help/search-performance-c680da36 |
 | Search Console's generative AI performance report has an export button; its metric is impressions, by page, country, date and device, with the usual 1,000-row limit. The formats and columns are not stated. | https://support.google.com/webmasters/answer/16984139 |
 | Bing's AI Performance report exports CSV and Excel with grounding queries and citation counts, page-level citations and time series. No column is named. | https://www.bing.com/webmasters/help/ai-performance-9f8e7d6c |
+| Search Console's Links report shows external links (top linked pages, top linking sites, top linking text), internal links, and can export "latest links" and the sample tables. Google says it "isn't a comprehensive list of every link on your site". The columns of an export are not named. | https://support.google.com/webmasters/answer/9049606 |
 
 ## What no official page documents
 
@@ -85,3 +86,12 @@ Neither AI report has a documented column layout. These downloads were read, fro
 - **Bing, AI Performance pages** (`<site>_AIPageStatsReport_<date>.csv`): the same quoting, `Page,Citations`, no dates, so the period comes from the user (`bing_ai_pages`).
 
 What the reports count is the tools' own definition, quoted in the report as supplied, not measured: impressions in Google's AI Overviews and AI Mode, and citations of the site in Microsoft's AI answers.
+
+### The Links report (2026-11-24)
+
+Two exports of Search Console's Links report were read, from an English interface; neither is kept in the repository, and `googleTopLinkedCsv` and `googleLatestLinksCsv` in `test/helpers/exports.js` copy their shapes with made-up values.
+
+- **Top linked pages, external** (`<site>-Top_target_pages-<date>.csv`): `Target page,Incoming links,Linking sites`, whole numbers, no dates (`google_search_console_links`). A row with more linking sites than incoming links is refused.
+- **Latest links** (`<site>-Latest_links-<date>.csv`): `Linking page,Last crawled`, dates `YYYY-MM-DD`, newest first (`google_search_console_latest_links`). It names the pages that link to the site, not the page each one links to. A long address can be broken over lines inside its quotes, with spaces around the breaks; the URL parser drops the breaks and encodes the spaces, so such a row is kept.
+
+Neither table states a period: each is what Google knew when it was exported, so `period_start` and `period_end` are refused. Not seen yet: the top linking sites and top linking text tables, a Turkish interface, the Excel and Google Sheets forms, and any Bing backlinks export.

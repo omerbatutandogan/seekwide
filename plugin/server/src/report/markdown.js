@@ -167,6 +167,28 @@ function search(r) {
 }
 
 /** @param {Report} r */
+function linksSection(r) {
+  const l = r.links;
+  if (l === null) return [];
+  const lines = ['## Links from other sites (imported)', '', `*${mdText(l.supplied)}*`, ''];
+  if (l.targets !== null) {
+    const t = l.targets;
+    lines.push('### Pages other sites link to', '', `- **File:** ${mdCode(t.file)}, imported on ${mdText(t.imported)}.`);
+    lines.push(`- **Totals:** ${t.figures.map((f) => `${mdText(f.label)}: ${mdText(f.value)}`).join(' · ')}`, '');
+    lines.push(...table(['Page', 'Incoming links', 'Linking sites', 'In this audit'], t.rows.map((row) => [mdUrl(row.url, true), row.links, row.sites, mdText(row.state)])), '');
+    if (t.notes.length > 0) lines.push(...t.notes.map((note) => `- ${mdText(note)}`), '');
+  }
+  if (l.latest !== null) {
+    const a = l.latest;
+    lines.push('### Latest links', '', `- **File:** ${mdCode(a.file)}, imported on ${mdText(a.imported)}.`);
+    lines.push(`- **Totals:** ${a.figures.map((f) => `${mdText(f.label)}: ${mdText(f.value)}`).join(' · ')}`, '');
+    lines.push(...table(['Linking site', 'Linking pages', 'Last crawled'], a.hosts.map((host) => [mdCode(host.host), host.pages, host.newest])), '');
+    if (a.notes.length > 0) lines.push(...a.notes.map((note) => `- ${mdText(note)}`), '');
+  }
+  return lines;
+}
+
+/** @param {Report} r */
 function aiSection(r) {
   const a = r.ai;
   if (a === null) return [];
@@ -323,7 +345,7 @@ function method(r) {
 export function renderMarkdown(run, options) {
   const r = buildReport(run, options);
   const lines = [
-    ...header(r), ...summary(r), ...scope(r), ...fixes(r), ...layers(r), ...scores(r), ...vitals(r), ...search(r), ...aiVisibilitySection(r), ...aiSection(r), ...logsSection(r), ...observed(r), ...topFixes(r),
+    ...header(r), ...summary(r), ...scope(r), ...fixes(r), ...layers(r), ...scores(r), ...vitals(r), ...search(r), ...linksSection(r), ...aiVisibilitySection(r), ...aiSection(r), ...logsSection(r), ...observed(r), ...topFixes(r),
     ...allFindings(r), ...suggestions(r), ...notRun(r), ...changes(r), ...method(r),
   ];
   return `${lines.join('\n').trimEnd()}\n`;

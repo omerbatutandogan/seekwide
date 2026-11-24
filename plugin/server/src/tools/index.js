@@ -81,6 +81,8 @@ import { searchDataTools } from './search-data.js';
  * @property {(projectDir: string, record: import('../imports/ai-record.js').AiImport) => Promise<{file: string, relative: string}>} saveAiImport
  *   Store an AI report import under .seekwide/imports/, replacing the one from the same source.
  * @property {(projectDir: string, source: import('../imports/ai-data.js').AiSource) => Promise<import('../imports/ai-record.js').AiImport|null>} loadAiImport
+ * @property {(projectDir: string, record: import('../imports/links-record.js').LinkImport) => Promise<{file: string, relative: string}>} saveLinkImport
+ * @property {(projectDir: string, source: import('../imports/links-data.js').LinkSource) => Promise<import('../imports/links-record.js').LinkImport|null>} loadLinkImport
  *   The stored AI report import from one source; null when there is none.
  * @property {() => Date} now
  * @property {() => string} defaultProjectDir

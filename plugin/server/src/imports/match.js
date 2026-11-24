@@ -32,7 +32,7 @@ const EXAMPLES = 10;
  * @param {{local: string|null, deployed: string|null}} origins
  * @returns {string}
  */
-function auditAddress(url, origins) {
+export function auditAddress(url, origins) {
   if (origins.local === null || origins.deployed === null) return url;
   const parsed = new URL(url);
   if (parsed.origin !== origins.deployed) return url;

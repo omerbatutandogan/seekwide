@@ -10,6 +10,8 @@ import { ensureRunDir } from '../store/project.js';
 import { PROJECT_DIR_SCHEMA, loadBaseRun, resolveProjectDir, runRefSchema, settingValue, withStoreErrors } from './common.js';
 import { IMPORT_SOURCES } from '../imports/parse.js';
 import { AI_SOURCES } from '../imports/ai-data.js';
+import { LINK_SOURCES } from '../imports/links-data.js';
+import { linkStates } from '../report/links.js';
 import { matchPages } from '../imports/match.js';
 import { loadLogo } from './logo.js';
 import { crawlOfRun } from './search-data.js';
@@ -68,9 +70,9 @@ export function reportTools(deps) {
           compare_to: runRefSchema('Run id, or "previous" for the newest run older than the one rendered, to include a "changes since" section.'),
           search_data: {
             type: 'array',
-            items: { type: 'string', enum: [...IMPORT_SOURCES, ...AI_SOURCES] },
-            maxItems: IMPORT_SOURCES.length + AI_SOURCES.length,
-            description: 'Imported search data and AI reports to show (search_data_import). Defaults to every source imported into the project; [] leaves them out.',
+            items: { type: 'string', enum: [...IMPORT_SOURCES, ...AI_SOURCES, ...LINK_SOURCES] },
+            maxItems: IMPORT_SOURCES.length + AI_SOURCES.length + LINK_SOURCES.length,
+            description: 'Imported search data, AI reports and Links report tables to show (search_data_import). Defaults to every source imported into the project; [] leaves them out.',
           },
         },
         additionalProperties: false,
@@ -114,6 +116,15 @@ export function reportTools(deps) {
           }
           aiSearch.push(data);
         }
+        const links = [];
+        for (const source of named === null ? LINK_SOURCES : LINK_SOURCES.filter((item) => named.has(item))) {
+          const data = await withStoreErrors(() => deps.loadLinkImport(projectDir, source));
+          if (data === null) {
+            if (named === null) continue;
+            throw new ToolError(`No Links report table from ${source} was imported into this project. Import the export with search_data_import, or leave it out of search_data.`);
+          }
+          links.push({ data, states: data.targets.length > 0 ? linkStates(data, run, await crawlOfRun(deps, run)) : null });
+        }
         const logs = await withStoreErrors(() => deps.loadLogImport(projectDir));
 
         const options = {
@@ -125,6 +136,7 @@ export function reportTools(deps) {
           ...(search.length > 0 ? { search } : {}),
           ...(logs !== null ? { logs } : {}),
           ...(aiSearch.length > 0 ? { aiSearch } : {}),
+          ...(links.length > 0 ? { links } : {}),
         };
 
         const formats = args.formats && args.formats.length > 0 ? [...new Set(/** @type {('markdown'|'html')[]} */ (args.formats))] : [...FORMATS];
@@ -148,7 +160,7 @@ export function reportTools(deps) {
           files[format] = file;
           bytes[format] = Buffer.byteLength(content, 'utf8');
         }
-        return { run_id: run.run_id, files, bytes, search_data: [...search.map((entry) => entry.data.source), ...aiSearch.map((data) => data.source)], server_logs: logs !== null };
+        return { run_id: run.run_id, files, bytes, search_data: [...search.map((entry) => entry.data.source), ...aiSearch.map((data) => data.source), ...links.map((entry) => entry.data.source)], server_logs: logs !== null };
       },
     },
   ];
