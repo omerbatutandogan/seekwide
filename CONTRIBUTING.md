@@ -116,3 +116,13 @@ The codes an hreflang value may use are in `plugin/server/data/iso-codes.json`, 
 node scripts/gen-iso-codes.js /usr/share/iso-codes/json 4.16.0
 ```
 
+The LocalBusiness types are in `plugin/server/data/local-business-types.json`, schema.org's LocalBusiness and every type below it. To update them for a new schema.org release, download its types file, regenerate, raise `RULES_VERSION` and update the count in `test/checks/seo/local.test.js`:
+
+```bash
+curl -fsSL -o /tmp/types.csv https://raw.githubusercontent.com/schemaorg/schemaorg/main/data/releases/30.1/schemaorg-current-https-types.csv
+```
+
+```bash
+node scripts/gen-local-business-types.js /tmp/types.csv 30.1
+```
+

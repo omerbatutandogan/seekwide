@@ -1,9 +1,10 @@
 // JSON-LD blocks: validity and the schema.org types they declare. Pure.
 
-/** @import { JsonLdBlock, ProfileEntity, VideoObjectSummary } from '../types.js' */
+/** @import { JsonLdBlock, LocalBusinessFields, ProfileEntity, VideoObjectSummary } from '../types.js' */
 
 import { LIMITS } from '../config.js';
 import { clip } from '../util/strings.js';
+import { isLocalBusinessType } from '../util/local-business.js';
 
 const MAX_TYPES = 50;
 /** `VideoObject`s recorded per block, and how far and how wide the search for them goes. */
@@ -127,6 +128,76 @@ function firstImage(value) {
   return null;
 }
 
+/** The parts of a PostalAddress, in the order the record lists the ones given. */
+const ADDRESS_PARTS = ['streetAddress', 'addressLocality', 'addressRegion', 'postalCode', 'addressCountry'];
+
+/**
+ * The digits after the decimal point of each number written for `key` in the block's text, by the value it parses to:
+ * JSON.parse turns 41.10000 into 41.1, and Google counts the decimal places as written.
+ * @param {string} text
+ * @param {string} key
+ * @returns {Map<number, number>}
+ */
+function writtenDecimals(text, key) {
+  /** @type {Map<number, number>} */
+  const found = new Map();
+  const pattern = new RegExp(`"${key}"\\s*:\\s*"?(-?\\d{1,3}(?:\\.(\\d{1,20}))?)"?`, 'g');
+  let count = 0;
+  for (const match of text.matchAll(pattern)) {
+    if ((count += 1) > MAX_PROFILES * 4) break;
+    const value = Number(match[1]);
+    const places = match[2]?.length ?? 0;
+    if (!found.has(value) || /** @type {number} */ (found.get(value)) < places) found.set(value, places);
+  }
+  return found;
+}
+
+/**
+ * A coordinate and how many decimal places it is written with, or null when the value is not a number or a numeric string.
+ * @param {unknown} value
+ * @param {Map<number, number>} written
+ * @returns {{value: number, places: number}|null}
+ */
+function coordinate(value, written) {
+  if (typeof value === 'string' && /^\s*-?\d{1,3}(?:\.\d+)?\s*$/.test(value)) {
+    return { value: Number(value), places: value.trim().split('.')[1]?.length ?? 0 };
+  }
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  const shortest = String(value).split('.')[1]?.length ?? 0;
+  return { value, places: Math.max(shortest, written.get(value) ?? 0) };
+}
+
+/**
+ * What Google's local business rules read of a LocalBusiness (rule set 0.2.3).
+ * @param {Record<string, unknown>} value
+ * @param {string} text  The block's JSON text, for the decimal places of the coordinates.
+ * @returns {LocalBusinessFields}
+ */
+function localFields(value, text) {
+  const address = Array.isArray(value.address) ? value.address.find((item) => filled(item) || isObject(item)) : value.address;
+  const parts = isObject(address) ? ADDRESS_PARTS.filter((part) => firstText(address[part]) !== null || (isObject(address[part]) && firstText(address[part].name) !== null)) : [];
+  const geo = Array.isArray(value.geo) ? value.geo.find(isObject) : value.geo;
+  const hours = value.openingHoursSpecification;
+  const price = (Array.isArray(value.priceRange) ? value.priceRange : [value.priceRange]).find(filled);
+  return {
+    address: filled(address) ? 'text' : parts.length > 0 ? 'parts' : null,
+    address_parts: parts,
+    address_text: filled(address) ? clip(String(address).replace(/\s+/g, ' ').trim(), LIMITS.maxStringLength)
+      : parts.length > 0 ? clip(parts.map((part) => {
+        const item = /** @type {Record<string, unknown>} */ (address)[part];
+        return firstText(item) ?? (isObject(item) ? firstText(item.name) : null);
+      }).join(', '), LIMITS.maxStringLength) : null,
+    telephone: firstText(value.telephone),
+    geo: isObject(geo) ? {
+      latitude: coordinate(geo.latitude, writtenDecimals(text, 'latitude')),
+      longitude: coordinate(geo.longitude, writtenDecimals(text, 'longitude')),
+    } : null,
+    hours_specification: isObject(hours) || (Array.isArray(hours) && hours.some(isObject)),
+    hours_text: (Array.isArray(value.openingHours) ? value.openingHours : [value.openingHours]).some(filled),
+    price_range_length: typeof price === 'string' ? price.trim().length : null,
+  };
+}
+
 /**
  * Every Organization, business or Person at the top level of parsed JSON-LD
  * (the object, each object of a top-level array, and the objects in their
@@ -134,9 +205,10 @@ function firstImage(value) {
  * (a string or an array of them), and its `@id`, `name`, `url` and `logo` (since rule set 0.2.2). An author or publisher nested inside another
  * object describes someone else, so it is not read. At most `MAX_PROFILES`.
  * @param {unknown} data
+ * @param {string} text  The block's JSON text.
  * @returns {ProfileEntity[]}
  */
-function profileEntities(data) {
+function profileEntities(data, text) {
   /** @type {ProfileEntity[]} */
   const profiles = [];
   /** @type {Record<string, unknown>[]} */
@@ -149,8 +221,9 @@ function profileEntities(data) {
   }
   for (const value of nodes) {
     if (profiles.length >= MAX_PROFILES) break;
-    const type = (Array.isArray(value['@type']) ? value['@type'] : [value['@type']])
-      .find((item) => typeof item === 'string' && PROFILE_TYPE.test(item.trim()));
+    const types = (Array.isArray(value['@type']) ? value['@type'] : [value['@type']]).filter((item) => typeof item === 'string');
+    const local = types.find((item) => isLocalBusinessType(item));
+    const type = local ?? types.find((item) => PROFILE_TYPE.test(item.trim()));
     if (typeof type !== 'string') continue;
     const sameAs = Array.isArray(value.sameAs) ? value.sameAs : [value.sameAs];
     profiles.push({
@@ -160,6 +233,7 @@ function profileEntities(data) {
       name: firstText(value.name),
       url: firstText(value.url),
       logo: firstImage(value.logo),
+      local: local === undefined ? null : localFields(value, text),
     });
   }
   return profiles;
@@ -195,5 +269,5 @@ export function parseJsonLd(text, line) {
       if (isObject(node)) addTypes(node['@type'], types);
     }
   }
-  return { valid: true, types, error: null, line, videos: videoObjects(data), profiles: profileEntities(data) };
+  return { valid: true, types, error: null, line, videos: videoObjects(data), profiles: profileEntities(data, text) };
 }

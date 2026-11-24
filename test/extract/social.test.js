@@ -96,6 +96,9 @@ test('a page without these tags has an empty record, and a non-HTML response has
   assert.deepEqual(pdf.social, { outside_head: [], streamed: false, head_end: null, app_banners: [], rel_me: [] });
 });
 
+/** What a LocalBusiness without any of the local properties records. */
+const EMPTY_LOCAL = { address: null, address_parts: [], address_text: null, telephone: null, geo: null, hours_specification: false, hours_text: false, price_range_length: null };
+
 test('JSON-LD: Organization, business and Person entities at the top level and in @graph, with their sameAs count', () => {
   const block = parseJsonLd(JSON.stringify({
     '@context': 'https://schema.org',
@@ -108,13 +111,13 @@ test('JSON-LD: Organization, business and Person entities at the top level and i
     ],
   }), 1);
   assert.deepEqual(block.profiles, [
-    { type: 'Organization', same_as: 2, id: null, name: 'Acme', url: null, logo: null },
-    { type: 'Restaurant', same_as: 1, id: null, name: null, url: null, logo: null },
-    { type: 'NewsMediaOrganization', same_as: 0, id: null, name: null, url: null, logo: null },
+    { type: 'Organization', same_as: 2, id: null, name: 'Acme', url: null, logo: null, local: null },
+    { type: 'Restaurant', same_as: 1, id: null, name: null, url: null, logo: null, local: EMPTY_LOCAL },
+    { type: 'NewsMediaOrganization', same_as: 0, id: null, name: null, url: null, logo: null, local: null },
   ], 'a nested publisher or author is someone else and is not read');
   assert.deepEqual(parseJsonLd('[{"@type":"Person","sameAs":"https://mastodon.social/@me"},{"@type":"LocalBusiness"}]', 1).profiles, [
-    { type: 'Person', same_as: 1, id: null, name: null, url: null, logo: null },
-    { type: 'LocalBusiness', same_as: 0, id: null, name: null, url: null, logo: null },
+    { type: 'Person', same_as: 1, id: null, name: null, url: null, logo: null, local: null },
+    { type: 'LocalBusiness', same_as: 0, id: null, name: null, url: null, logo: null, local: EMPTY_LOCAL },
   ]);
   assert.deepEqual(parseJsonLd('{', 1).profiles, []);
 });
@@ -123,9 +126,9 @@ test('JSON-LD: the @id, name, url and logo of an entity, as written', () => {
   const profiles = (/** @type {unknown} */ value) => parseJsonLd(JSON.stringify(value), 1).profiles;
   assert.deepEqual(profiles({
     '@type': 'Organization', '@id': ' https://acme.test/#org ', name: ['', '  Acme Inc. '], url: '/', logo: { '@type': 'ImageObject', contentUrl: 'https://acme.test/logo.png' },
-  }), [{ type: 'Organization', same_as: 0, id: 'https://acme.test/#org', name: 'Acme Inc.', url: '/', logo: 'https://acme.test/logo.png' }]);
+  }), [{ type: 'Organization', same_as: 0, id: 'https://acme.test/#org', name: 'Acme Inc.', url: '/', logo: 'https://acme.test/logo.png', local: null }]);
   assert.deepEqual(profiles({ '@type': 'Corporation', name: 7, url: { href: 'x' }, logo: [{}, 'https://acme.test/a.svg'] }),
-    [{ type: 'Corporation', same_as: 0, id: null, name: null, url: null, logo: 'https://acme.test/a.svg' }], 'a value that is not text is not read');
+    [{ type: 'Corporation', same_as: 0, id: null, name: null, url: null, logo: 'https://acme.test/a.svg', local: null }], 'a value that is not text is not read');
   assert.deepEqual(profiles({ '@type': 'Person', logo: { url: 'https://acme.test/me.jpg', contentUrl: 'https://acme.test/other.jpg' } })?.[0].logo, 'https://acme.test/me.jpg');
   assert.equal(profiles({ '@type': 'Organization', name: 'x'.repeat(5000) })?.[0].name?.length, 300, 'clipped');
 });

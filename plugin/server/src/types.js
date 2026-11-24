@@ -25,6 +25,7 @@ export {};
 /** @typedef {import('./types/page.js').Heading} Heading */
 /** @typedef {import('./types/page.js').JsonLdBlock} JsonLdBlock */
 /** @typedef {import('./types/page.js').ProfileEntity} ProfileEntity */
+/** @typedef {import('./types/page.js').LocalBusinessFields} LocalBusinessFields */
 /** @typedef {import('./types/page.js').SocialRecord} SocialRecord */
 /** @typedef {import('./types/page.js').AppBannerRecord} AppBannerRecord */
 /** @typedef {import('./types/page.js').Indexability} Indexability */

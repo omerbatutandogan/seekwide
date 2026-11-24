@@ -9,6 +9,11 @@ Rule set 0.2.3.
 ### Added
 
 - **hreflang (seo module).** Seven checks read the language versions a page names with `<link rel="alternate" hreflang>` and `Link` headers, after Google's page on localized versions: a value Google does not support (a region alone, `es-419`, `en-UK`), an address that is not a full URL, links outside the head, a page that does not list itself, an alternate page that does not point back (Google then ignores both), and, as information, an alternate that redirects, fails or is not indexable, and no `x-default`. The ISO 639-1, ISO 15924 and ISO 3166-1 codes are in `plugin/server/data/iso-codes.json`, written by `scripts/gen-iso-codes.js`. The crawl now records whether each hreflang link is in the head. Annotations in sitemaps are not read yet.
+- **Local businesses (seo module).** Six checks read LocalBusiness markup (and every schema.org type below it, such as Dentist or Bakery) after Google's local business page: no `name` or `address` (required), missing `telephone`, `url`, `geo` or `openingHoursSpecification` (information), coordinates with fewer than 5 decimal places as written, a telephone without an international prefix (information), a `priceRange` of 100 characters or more, and one location given two addresses or phone numbers on different pages (information). The types are in `plugin/server/data/local-business-types.json`, written by `scripts/gen-local-business-types.js` from schema.org 30.1.
+
+### Changed
+
+- Every LocalBusiness type is now a profile entity, so a Dentist or a Bakery is also read by `smo.profiles.sameas_missing` and the entity checks; before, only type names ending in "Business" and a few others were.
 
 ## 0.5.0 (2026-11-24)
 
