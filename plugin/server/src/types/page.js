@@ -136,10 +136,15 @@ export {};
  */
 
 /**
- * An organisation, business or person described in JSON-LD, and how many `sameAs` URLs it gives (smo module).
+ * An organisation, business or person described in JSON-LD, how many `sameAs` URLs it gives (smo module), and what
+ * names it (ai module's entity checks). Values are as written, trimmed and clipped; a URL is not resolved.
  * @typedef {Object} ProfileEntity
  * @property {string} type
  * @property {number} same_as
+ * @property {string|null} [id]    `@id`. The four fields are absent in records made before rule set 0.2.2.
+ * @property {string|null} [name]
+ * @property {string|null} [url]
+ * @property {string|null} [logo]  The logo's address: the value, or the `url` or `contentUrl` of an ImageObject.
  */
 
 /**

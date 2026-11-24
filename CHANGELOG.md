@@ -2,6 +2,14 @@
 
 Notable changes to Seekwide. Versions follow [semantic versioning](https://semver.org/); the rule set has its own version (`RULES_VERSION`) that changes whenever a check starts reporting something different.
 
+## Unreleased
+
+Rule set 0.2.2.
+
+### Added
+
+- **Entity checks (ai module).** Three information checks read the Organization, business and Person markup of the crawled pages' JSON-LD, after Google's Organization structured data page: no page has one (`ai.entity.missing`), the home page's Organization gives another site's address as its `url` (`ai.entity.url_offsite`), and one of the site's entities has two names or two logos on different pages (`ai.entity.inconsistent`). Google requires none of these properties, so they change no count. The crawl now records each entity's `@id`, `name`, `url` and `logo`; a crawl made before skips the checks and says to crawl again.
+
 ## 0.4.0 (2026-11-24)
 
 First-party AI evidence: server access logs show which AI crawlers really asked for pages, and the AI reports of Search Console and Bing show how often the site appeared or was cited in AI answers. Rule set 0.2.1, unchanged: no check reports anything different.

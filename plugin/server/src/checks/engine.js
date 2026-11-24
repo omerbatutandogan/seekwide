@@ -10,6 +10,17 @@ import { scoreModules } from './scoring.js';
 /** Why a measurement that has lab data has no lab audits. */
 export const LAB_AUDITS_NOT_ASKED = 'Needs Lighthouse\'s accessibility and best-practices audits, which the lab tests of this measurement did not ask for. Audit with the cro module to have them asked for.';
 
+/**
+ * Whether the records name the JSON-LD entities' `@id`, `name`, `url` and
+ * `logo`: false when a record made before rule set 0.2.2 (or before 0.1.9,
+ * without `profiles`) has a valid JSON-LD block.
+ * @param {PageRecord[]} pages
+ */
+function entitiesRecorded(pages) {
+  return pages.every((page) => page.jsonld.every((block) => !block.valid
+    || (Array.isArray(block.profiles) && block.profiles.every((entity) => entity.name !== undefined))));
+}
+
 const SKIP_REASONS = {
   full_crawl: 'Needs a complete crawl. This crawl stopped at a limit (of pages, of size or of time) or was blocked.',
   sitemap: 'Needs an XML sitemap. None was found.',
@@ -25,6 +36,7 @@ const SKIP_REASONS = {
   ai_robots: 'Needs what robots.txt tells AI crawlers. This crawl did not record it.',
   lab_audits: 'Needs Lighthouse\'s accessibility and best-practices audits from PageSpeed Insights. They were not collected.',
   form_pages: 'Needs the reading of forms the cro checks use. This crawl was made before rule set 0.2.1 and did not record it. Crawl the site again.',
+  entity_pages: 'Needs the name, address and logo of the organisations in the pages\' JSON-LD. This crawl was made before rule set 0.2.2 and did not record them. Crawl the site again.',
   ai_pages: 'Needs the page signals the AI checks read (Bing\'s directives, data-nosnippet, scripts). This crawl was made before rule set 0.2.0 and did not record them. Crawl the site again.',
 };
 
@@ -106,6 +118,7 @@ export function buildContext(crawl, extras = {}) {
   else skipReasons.ai_robots = aiReason;
   if (pages.length === 0 || pages.some((page) => page.ai !== undefined)) capabilities.add('ai_pages');
   if (pages.length === 0 || pages.some((page) => page.forms !== undefined)) capabilities.add('form_pages');
+  if (entitiesRecorded(htmlPages)) capabilities.add('entity_pages');
   const llmsTxt = extras.llmsTxt ?? null;
   if (llmsTxt !== null) capabilities.add('llms_txt');
   else if (extras.llmsTxtReason) skipReasons.llms_txt = extras.llmsTxtReason;
