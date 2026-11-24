@@ -7,7 +7,7 @@ import { plural } from './facts.js';
 import { affectedText, confidenceText } from './findings.js';
 import { CSS } from './html-css.js';
 import { buildReport } from './model.js';
-import { trafficText } from './search.js';
+import { CTR_NONE, CTR_TOO_FEW, trafficText } from './search.js';
 import { OBSERVED_NOTE } from './observations.js';
 
 /** @typedef {ReturnType<typeof buildReport>} Report */
@@ -158,6 +158,14 @@ ${o.note !== null ? html`<p class="meta">${o.note}</p>` : ''}${o.source !== null
 </section>`;
 }
 
+/** @param {NonNullable<Report['search']>['sources'][number]['clickThrough']} c */
+function clickThrough(c) {
+  if (!c.compared) return html`<h4>Click-through rate by position</h4><p>${CTR_TOO_FEW}</p>`;
+  const bands = html`<table><thead><tr><th>Position</th><th class="n">Pages compared</th><th class="n">Median CTR</th></tr></thead><tbody>${c.bands.map((band) => html`<tr><td>${band.label}</td><td class="n">${String(band.pages)}</td><td class="n">${band.median}</td></tr>`)}</tbody></table>`;
+  const pages = c.listed === 0 ? html`<p>${CTR_NONE}</p>` : html`<table><thead><tr><th>Page</th><th class="n">Position</th><th class="n">Impressions</th><th class="n">CTR</th><th class="n">Median at that position</th><th>Title and description findings</th></tr></thead><tbody>${c.pages.map((page) => html`<tr><td>${urlHtml(page.url)}</td><td class="n">${page.position}</td><td class="n">${page.impressions}</td><td class="n">${page.ctr}</td><td class="n">${page.median}</td><td>${page.snippet.length === 0 ? '—' : page.snippet.join('; ')}</td></tr>`)}</tbody></table>${c.listed > c.pages.length ? html`<p class="meta">${`${c.listed} pages in all; the ${c.pages.length} with the most impressions are shown.`}</p>` : ''}`;
+  return html`<h4>Click-through rate by position</h4>${bands}${pages}<p class="meta">${c.note}</p>`;
+}
+
 /** @param {Report} r */
 function search(r) {
   const s = r.search;
@@ -170,6 +178,7 @@ ${source.filters.length > 0 ? html`<dt>Filters stated in the export</dt><dd>${so
 <div class="figs">${source.figures.map((f) => html`<div class="fig"><b>${f.value}</b><span>${f.label}</span></div>`)}</div>
 <p class="meta">${source.totalsNote}</p>
 <table><thead><tr><th>Page</th><th class="n">Clicks</th><th class="n">Impressions</th><th class="n">CTR</th><th class="n">Position</th><th class="n">Findings in this audit</th></tr></thead><tbody>${source.topPages.map((page) => html`<tr><td>${urlHtml(page.url)}</td><td class="n">${page.clicks}</td><td class="n">${page.impressions}</td><td class="n">${page.ctr}</td><td class="n">${page.position}</td><td class="n">${page.findings}</td></tr>`)}</tbody></table>
+${clickThrough(source.clickThrough)}
 ${source.notes.length > 0 ? html`<ul class="meta">${source.notes.map((note) => html`<li>${note}</li>`)}</ul>` : ''}`);
   return html`<section id="search-performance"><h2>Search performance (imported)</h2><p class="note">${s.supplied}</p>${sources}<p class="meta">${s.orderNote}</p></section>`;
 }

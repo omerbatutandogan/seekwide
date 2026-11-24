@@ -5,7 +5,7 @@ import { mdCode, mdText, mdUrl } from './escape.js';
 import { plural } from './facts.js';
 import { affectedText, confidenceText } from './findings.js';
 import { buildReport } from './model.js';
-import { trafficText } from './search.js';
+import { CTR_NONE, CTR_TOO_FEW, trafficText } from './search.js';
 import { OBSERVED_NOTE } from './observations.js';
 
 /** @typedef {ReturnType<typeof buildReport>} Report */
@@ -131,6 +131,20 @@ function vitals(r) {
   return lines;
 }
 
+/** @param {NonNullable<Report['search']>['sources'][number]['clickThrough']} c */
+function clickThrough(c) {
+  const lines = ['#### Click-through rate by position', ''];
+  if (!c.compared) return [...lines, `${mdText(CTR_TOO_FEW)}`, ''];
+  lines.push(...table(['Position', 'Pages compared', 'Median CTR'], c.bands.map((band) => [mdText(band.label), String(band.pages), band.median])), '');
+  if (c.listed === 0) lines.push(mdText(CTR_NONE), '');
+  else {
+    const rows = c.pages.map((page) => [mdUrl(page.url, true), page.position, page.impressions, page.ctr, page.median, page.snippet.length === 0 ? '—' : page.snippet.map(mdText).join('; ')]);
+    lines.push(...table(['Page', 'Position', 'Impressions', 'CTR', 'Median at that position', 'Title and description findings'], rows), '');
+    if (c.listed > c.pages.length) lines.push(mdText(`${c.listed} pages in all; the ${c.pages.length} with the most impressions are shown.`), '');
+  }
+  return [...lines, `*${mdText(c.note)}*`, ''];
+}
+
 /** @param {Report} r */
 function search(r) {
   const s = r.search;
@@ -146,6 +160,7 @@ function search(r) {
     lines.push(`- **Matched with this audit:** ${mdText(source.matchText)}`, '', `*${mdText(source.totalsNote)}*`, '');
     const rows = source.topPages.map((page) => [mdUrl(page.url, true), page.clicks, page.impressions, page.ctr, page.position, page.findings]);
     lines.push(...table(['Page', 'Clicks', 'Impressions', 'CTR', 'Position', 'Findings in this audit'], rows), '');
+    lines.push(...clickThrough(source.clickThrough));
     if (source.notes.length > 0) lines.push(...source.notes.map((note) => `- ${mdText(note)}`), '');
   }
   return [...lines, `*${mdText(s.orderNote)}*`, ''];

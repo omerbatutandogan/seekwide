@@ -2,6 +2,12 @@
 
 Notable changes to Seekwide. Versions follow [semantic versioning](https://semver.org/); the rule set has its own version (`RULES_VERSION`) that changes whenever a check starts reporting something different.
 
+## Unreleased
+
+### Added
+
+- **Click-through rate by position (report).** With imported Search Console or Bing data, the "Search performance (imported)" section now groups the export's pages with 100 or more impressions by average position (1, 2, 3, 4–5, 6–10), gives each group's median click-through rate when it has 5 or more pages, and lists the pages under half of it, most impressions first, with their title and description findings. Neither search engine publishes an expected rate per position, so pages are compared only with the site's own. It is a place to look, not a finding: no check, finding or score changes, and the rule set stays 0.2.4.
+
 ## 0.7.0 (2026-11-24)
 
 The end of roadmap item 1: the seo module now points out near-duplicate pages made from one template and reads the authors and dates of article markup. Rule set 0.2.4: four new checks, all information, so no score changes.
