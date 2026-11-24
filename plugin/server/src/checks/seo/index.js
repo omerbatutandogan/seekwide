@@ -6,6 +6,7 @@ import { cwvChecks } from './cwv.js';
 import { headingChecks } from './headings.js';
 import { htmlChecks } from './html.js';
 import { httpChecks } from './http.js';
+import { hreflangChecks } from './hreflang.js';
 import { httpsChecks } from './https.js';
 import { indexingChecks } from './indexing.js';
 import { metaDescriptionChecks } from './meta-description.js';
@@ -32,6 +33,7 @@ export const checks = [
   ...metaDescriptionChecks,
   ...headingChecks,
   ...canonicalChecks,
+  ...hreflangChecks,
   ...mobileChecks,
   ...htmlChecks,
   ...contentChecks,

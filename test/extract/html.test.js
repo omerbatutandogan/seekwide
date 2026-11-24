@@ -93,7 +93,7 @@ test('a canonical after an element that closes <head> is outside <head>', () => 
 
 test('hreflang alternates from link elements', () => {
   const record = page('<head><link rel="alternate" hreflang="tr" href="/tr/"><link rel="alternate" href="/feed"></head>');
-  assert.deepEqual(record.hreflang, [{ hreflang: 'tr', href: '/tr/', url: 'https://example.test/tr/', source: 'html' }]);
+  assert.deepEqual(record.hreflang, [{ hreflang: 'tr', href: '/tr/', url: 'https://example.test/tr/', source: 'html', in_head: true }]);
 });
 
 test('anchors: missing, empty, javascript:, mailto: and fragment-only hrefs', () => {

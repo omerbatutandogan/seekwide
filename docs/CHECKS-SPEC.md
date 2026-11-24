@@ -1,4 +1,4 @@
-# Check specification (rules 0.2.2)
+# Check specification (rules 0.2.3)
 
 Every scripted check the plugin ships is defined here. The code in `plugin/server/src/checks/` implements this table exactly; `docs/checks.md` is generated from the code for users.
 
@@ -121,6 +121,25 @@ Notes:
 - A redirect that leads to a file and not a page (judged by its URL) is followed with a `HEAD` request. When the HEAD fails or answers 400 or above (429 and bot challenges excepted), a `GET` limited to 16 KB is sent and its answer is used. The answer sets the redirect's `final_status`, so `seo.redirect.broken` and `links.internal.broken` see it, but the file gets no record of its own.
 
 **`X-Robots-Tag` lines with Bing's AI directives** (rule set 0.2.0). Google's robots meta tag page shows a user agent before the rules (`X-Robots-Tag: otherbot: noindex, nofollow`) and says rules without a user agent are valid for all crawlers; it documents nothing about `ai-training:` or `ai-grounding:`, which Bing's blog of 2026-10-30 defines as directives (`X-Robots-Tag: Bingbot: ai-training:disallow`). A line such as `ai-training:disallow, noindex` could therefore be read by Google as rules for a user agent named `ai-training`. Seekwide reads `ai-training:` and `ai-grounding:` as directives in its Google reading too, so the `noindex` after them is not lost, and records the rules that came after such a directive in its own line (`x_robots_unclear`): a noindex finding is `likely`, with the reason in its detail, only when every `noindex` of the header is one of those and the meta tag gives none; a `noindex` on a line of its own stays `confirmed`.
+
+### hreflang (`checks/seo/hreflang.js`)
+
+Rule set 0.2.3; LOCALIZED_VERSIONS read on 2026-11-24 (last updated 2026-09-21). What is read: `PageRecord.hreflang`, the `<link rel="alternate" hreflang>` elements (with `in_head`, whether the parsed `<head>` holds them, since rule set 0.2.3) and the `Link` header lines with `hreflang`. Google reads a sitemap's annotations too ("The three methods are equivalent from Google's perspective"); those are not read in this version, so a site that gives them only in its sitemap has no units. The crawler follows links, not annotations, so an alternate version that no crawled page links to is not crawled and not judged. A *value* is valid when `util/iso-codes.js` finds an ISO 639-1 language code, then optionally an ISO 15924 script code and an ISO 3166-1 alpha-2 region code, separated by hyphens, in any case, or `x-default`. The codes are in `plugin/server/data/iso-codes.json`, written by `scripts/gen-iso-codes.js` from Debian's iso-codes 4.16.0 (184 languages, 249 regions, 173 scripts without the private-use and special codes); a change of the file is a change of the rule set.
+
+| Id | Scope | Unit | Fails when | Sev / W | Conf | Needs | Doc |
+|---|---|---|---|---|---|---|---|
+| `seo.hreflang.invalid_code` | page | Each distinct value of an html page's annotations, `selector` = the value | it is not valid: a region alone (`GB`), an unknown language, script or region (`es-419`), the reserved `EU`, `UN` or `UK`, or another form (`en_GB`); the evidence names which | medium / 2 | confirmed | — | LOCALIZED_VERSIONS |
+| `seo.hreflang.not_absolute` | page | Each distinct address of an html page's annotations, `selector` = the address as written | it does not start with `http://` or `https://` | medium / 2 | confirmed | — | LOCALIZED_VERSIONS |
+| `seo.hreflang.outside_head` | page | Every html page with an annotation from a `<link>` whose record has `in_head` | one of them is outside the head | medium / 2 | confirmed | — | LOCALIZED_VERSIONS |
+| `seo.hreflang.self_missing` | page | Every html page with an annotation other than `x-default` | no annotation names the page itself (*names the page itself*) | medium / 2 | confirmed | — | LOCALIZED_VERSIONS |
+| `seo.hreflang.no_return` | page | Each distinct other URL an html page's annotations name, when that URL was crawled as itself (not reached through a redirect) and is an html page, `selector` = the URL | none of that page's annotations names the first page | medium / 3 | confirmed | — | LOCALIZED_VERSIONS |
+| `seo.hreflang.target_not_ok` | page | Each distinct URL an html page's annotations name that was crawled | it redirects, does not answer 200, or is not indexable | info / 0 | likely | — | LOCALIZED_VERSIONS |
+| `seo.hreflang.x_default_missing` | site | One unit, `url` = the start page, when an html page has an annotation | no html page has an `x-default` annotation | info / 0 | confirmed | — | LOCALIZED_VERSIONS |
+
+Notes:
+
+- **Google's words.** "If two pages don't both point to each other, the tags will be ignored." "Each language version must list itself as well as all other language versions." "Alternate URLs must be fully-qualified, including the transport method (http/https)". "The `<link>` tags must be inside a well-formed `<head>` section of the HTML." "Only language codes listed in ISO 639-1 and region codes listed in ISO 3166-1 Alpha 2 are supported; other codes that aren't listed in those standards, such as es-419, aren't supported." "You can also specify the script itself explicitly using ISO 15924". "You can't specify the country code by itself." "using `EU`, `UN`, or `UK` in `hreflang` annotations doesn't have an effect on Google Search". "The `hreflang` value is case-insensitive". x-default: "Consider adding a fallback page for unmatched languages", a suggestion, hence `info`.
+- **What Google does not say.** Its page says nothing about an annotation that names a redirect, an error page or a page that is not indexable, so `target_not_ok` is `info`. `be` is a valid code (Belarusian) even where Belgium was meant; that cannot be told from the markup.
 
 ### Core Web Vitals (`checks/seo/cwv.js`)
 
@@ -498,6 +517,7 @@ For rule set 0.1.5, LINKS, QUALIFY_LINKS, HTTP_STATUS, SITE_MOVE and OPEN_GRAPH 
 | HEADINGS | https://www.w3.org/WAI/tutorials/page-structure/headings/ |
 | STRUCTURED_DATA | https://developers.google.com/search/docs/appearance/structured-data/sd-policies |
 | HELPFUL_CONTENT | https://developers.google.com/search/docs/fundamentals/creating-helpful-content |
+| LOCALIZED_VERSIONS | https://developers.google.com/search/docs/specialty/international/localized-versions |
 | OPEN_GRAPH | https://ogp.me/ |
 | LCP | https://web.dev/articles/lcp |
 | INP | https://web.dev/articles/inp |

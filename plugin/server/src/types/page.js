@@ -104,6 +104,8 @@ export {};
  * @property {string} href
  * @property {string|null} url
  * @property {'html'|'header'} source
+ * @property {boolean} [in_head]  For a `<link>`: whether it is inside the parsed `<head>`. Absent for a header, and in
+ *   records made before rule set 0.2.3.
  */
 
 /**

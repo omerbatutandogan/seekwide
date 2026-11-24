@@ -30,6 +30,13 @@ test('the SEO module ships exactly the checks in CHECKS-SPEC.md', () => {
     'seo.h1.missing',
     'seo.h1.multiple',
     'seo.headings.skipped_level',
+    'seo.hreflang.invalid_code',
+    'seo.hreflang.no_return',
+    'seo.hreflang.not_absolute',
+    'seo.hreflang.outside_head',
+    'seo.hreflang.self_missing',
+    'seo.hreflang.target_not_ok',
+    'seo.hreflang.x_default_missing',
     'seo.html.lang_missing',
     'seo.http.fetch_failed',
     'seo.http.server_error',
@@ -95,6 +102,13 @@ test('severity, weight, confidence, scope and requirements match the spec', () =
     'seo.canonical.relative': ['low', 1, 'confirmed', 'page', []],
     'seo.canonical.target_not_ok': ['high', 4, 'confirmed', 'page', []],
     'seo.canonical.cross_host': ['medium', 2, 'likely', 'page', []],
+    'seo.hreflang.invalid_code': ['medium', 2, 'confirmed', 'page', []],
+    'seo.hreflang.not_absolute': ['medium', 2, 'confirmed', 'page', []],
+    'seo.hreflang.outside_head': ['medium', 2, 'confirmed', 'page', []],
+    'seo.hreflang.self_missing': ['medium', 2, 'confirmed', 'page', []],
+    'seo.hreflang.no_return': ['medium', 3, 'confirmed', 'page', []],
+    'seo.hreflang.target_not_ok': ['info', 0, 'likely', 'page', []],
+    'seo.hreflang.x_default_missing': ['info', 0, 'confirmed', 'site', []],
     'seo.indexing.noindex_in_sitemap': ['high', 4, 'confirmed', 'page', ['sitemap']],
     'seo.sitemap.url_not_ok': ['medium', 3, 'confirmed', 'page', ['sitemap']],
     'seo.sitemap.url_canonicalized': ['medium', 2, 'confirmed', 'page', ['sitemap']],
@@ -120,7 +134,7 @@ test('severity, weight, confidence, scope and requirements match the spec', () =
       check.id,
     );
     assert.equal(check.module, 'seo');
-    assert.equal(check.last_verified, '2026-11-11');
+    assert.equal(check.last_verified, check.id.startsWith('seo.hreflang.') ? '2026-11-24' : '2026-11-11', check.id);
   }
 });
 
