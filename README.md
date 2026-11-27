@@ -4,7 +4,7 @@
 
 Claude Code plugin for site audits you can re-run and trust: scripted SEO, Core Web Vitals, links, signs of a hacked site, images and video, social sharing previews, app links, AI access and readiness, forms and contact paths and the search experience, with evidence for every finding, repeatable scores, a client-ready report and fixes verified by a second audit.
 
-> **Status: 0.9.0.** Nine modules work today, `seo`, `links`, `security`, `media`, `smo` (social sharing), `aso` (the site's side of its apps), `ai` (AI access and readiness), `cro` (forms and contact paths) and `sxo` (search experience), plus fixes for metadata, internal links and image markup (including alt text) in a project in its own folder, imports of server access logs and of the AI reports of Search Console and Bing, checks of Organization markup and of button names for agents, and checks of hreflang and LocalBusiness markup, and of near-duplicate template pages and article authors and dates, a click-through rate view by position, and imports of Search Console's Links report, Play Console reviews and YouTube Studio's search data. The [roadmap](#roadmap) lists what is planned and not built yet.
+> **Status: 0.9.0.** Nine modules work today, `seo`, `links`, `security`, `media`, `smo` (social sharing), `aso` (the site's side of its apps), `ai` (AI access and readiness), `cro` (forms and contact paths) and `sxo` (search experience), plus fixes for metadata, internal links and image markup (including alt text) in a project in its own folder, imports of server access logs and of the AI reports of Search Console and Bing, checks of Organization markup and of button names for agents, and checks of hreflang and LocalBusiness markup, and of near-duplicate template pages and article authors and dates, a click-through rate view by position, and imports of Search Console's Links report, Play Console reviews and YouTube Studio's search data. The [roadmap](#roadmap) says what is built and what is planned and not built yet.
 
 ![The top of a Seekwide report for a fictional café site: the logo and name of the agency that prepared it, a written summary marked as not scored, four measured figures, and the results of all nine modules and the security headers, each with its coverage](docs/images/report-overview.png)
 
@@ -122,7 +122,8 @@ The pictures below come from one run of the plugin on [`fixtures/sample-site`](f
 - It does not measure Core Web Vitals of every page. A lab test takes many seconds and Google limits how many can be run, so a few pages stand for the rest.
 - It does not change your code by itself. The plugin's own server never writes into a project. With `/seekwide:fix`, Claude edits files with its normal tools, after showing you each diff and getting your yes, and it never commits. Only metadata, internal-link and image-markup fixes exist; image files and content are not touched.
 - It does not look for cloaking or sneaky redirects, and it does not test a site's defences. Finding cloaking needs a request that pretends to be Google, which this crawler never sends, so a clean security result is not proof of a clean site.
-- Its checks do not look at images themselves, so an audit cannot tell whether alt text describes a picture. Only `/seekwide:fix` has Claude look at an image, a file in the project, to suggest alt text; it never downloads one, and it does not convert images. It has no local SEO module yet.
+- Its checks do not look at images themselves, so an audit cannot tell whether alt text describes a picture. Only `/seekwide:fix` has Claude look at an image, a file in the project, to suggest alt text; it never downloads one, and it does not convert images.
+- It has no local SEO module. The `seo` module checks LocalBusiness markup; a Google Business Profile, local listings and local rankings are not read.
 - It does not pretend to be an AI crawler and does not contact AI vendors. Whether GPTBot, ClaudeBot or PerplexityBot may read a site is read from its robots.txt with that crawler's own token; what a CDN or firewall does to the real crawler is not tested, and the report says so.
 - It does not read social platforms or app stores. It never requests a Facebook, X, LinkedIn or other social page, a Google Play page or an App Store page, and never pretends to be a platform's crawler, so what a platform finally shows in a preview (after its own cache and rules) is not measured.
 
@@ -457,11 +458,11 @@ A project profile (`/seekwide:setup`) overrides them for one client.
 
 ## Roadmap
 
-Planned, in this order, and not built yet:
+Three items, in the order they are worked on:
 
-1. E-E-A-T, international, local, programmatic pages. (First-party AI evidence: server logs and the AI reports of Search Console and Bing are imported since 0.4.0; the entity and agent readiness checks since 0.5.0. International (hreflang) and local business checks are in since 0.6.0; near-duplicate template pages and article authorship since 0.7.0.)
-2. Measured AI visibility (sampled through your own API keys, as a rate with an interval), App Store Connect data and Play's statistics and store performance (each waiting for a real export), and social search beyond YouTube. (Click-through by position and backlinks from Search Console's Links report are in since 0.8.0; Play reviews and YouTube search since 0.9.0.)
-3. WordPress core and plugin vulnerabilities, using Wordfence Intelligence with your own key.
+1. **Built.** E-E-A-T, international, local, programmatic pages. First-party AI evidence: server logs and the AI reports of Search Console and Bing are imported since 0.4.0; the entity and agent readiness checks since 0.5.0. International (hreflang) and local business checks are in since 0.6.0; near-duplicate template pages and article authorship since 0.7.0.
+2. **Built in part.** Click-through by position and backlinks from Search Console's Links report are in since 0.8.0; Play reviews and YouTube search since 0.9.0. Planned and not built yet: measured AI visibility (sampled through your own API keys, as a rate with an interval), App Store Connect data and Play's statistics and store performance (each waiting for a real export), and social search beyond YouTube.
+3. **Planned, not built yet.** WordPress core and plugin vulnerabilities, using Wordfence Intelligence with your own key.
 
 Seekwide will never pretend to be a search engine's crawler to look for cloaking.
 

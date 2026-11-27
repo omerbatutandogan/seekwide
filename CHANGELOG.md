@@ -2,6 +2,12 @@
 
 Notable changes to Seekwide. Versions follow [semantic versioning](https://semver.org/); the rule set has its own version (`RULES_VERSION`) that changes whenever a check starts reporting something different.
 
+## Unreleased
+
+### Changed
+
+- The description in `plugin.json`, `plugin/package.json` and the marketplace names what all nine modules cover, in the words of the README's first sentence; it had stopped at images and video. Nothing the plugin does has changed.
+
 ## 0.9.0 (2026-11-24)
 
 The end of roadmap item 2: Play Console's reviews report and YouTube Studio's traffic sources and search terms can be imported, after the click-through view and the Links report of 0.8.0. All are report views of data the user exported: the rule set stays 0.2.4 and no score changes. Measured AI visibility was set aside, the App Store and Play's statistics wait for an app with real exports, and social search covers YouTube only.
