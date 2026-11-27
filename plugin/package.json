@@ -2,7 +2,7 @@
   "name": "seekwide",
   "version": "0.9.0",
   "private": true,
-  "description": "Claude Code plugin for site audits you can re-run and trust: scripted SEO, Core Web Vitals, links, signs of a hacked site, images and video, with evidence for every finding, repeatable scores, a client-ready report and fixes verified by a second audit.",
+  "description": "Claude Code plugin for site audits you can re-run and trust: scripted SEO, Core Web Vitals, links, signs of a hacked site, images and video, social sharing previews, app links, AI access and readiness, forms and contact paths and the search experience, with evidence for every finding, repeatable scores, a client-ready report and fixes verified by a second audit.",
   "type": "module",
   "license": "MIT",
   "homepage": "https://github.com/omerbatutandogan/seekwide",

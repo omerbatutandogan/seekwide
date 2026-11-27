@@ -33,13 +33,13 @@ Start a new Claude Code session, then audit a site:
 | `/seekwide:media [url]` | Images and video: alt text, sizes, formats, broken files, robots.txt for Google, captions and video structured data |
 | `/seekwide:smo [url]` | Social sharing previews: Open Graph tags, where they stand in the HTML, the sharing image's size and weight, and robots.txt for Meta's preview crawler |
 | `/seekwide:aso [url]` | The site's side of its apps: the Smart App Banner, and the association files for iOS universal links and Android App Links |
-| `/seekwide:ai [url]` | AI access and readiness: which AI crawlers robots.txt lets in, training preferences, snippet controls for AI answers, content in the served HTML, and `/llms.txt` as information; a count, never a score |
+| `/seekwide:ai [url]` | AI access and readiness: which AI crawlers robots.txt lets in, training preferences, snippet controls for AI answers, content in the served HTML, Organization markup, button names for agents, and `/llms.txt` as information; a count, never a score |
 | `/seekwide:cro [url]` | Forms and contact paths: field names, autofill, input types, blocked pasting, forms that send over http, tel and mailto links, tap targets; markup only, no form is ever submitted |
 | `/seekwide:sxo [url]` | Search experience: titles Google is likely to rewrite, zooming on a phone, redirects to a consent page, with the SEO module's titles, HTTPS and Core Web Vitals |
 | `/seekwide:all [url]` | Every installed module in one report |
-| `/seekwide:fix [run-id]` | Fix metadata findings of an audit of the project in this folder, with your approval for each change, then audit again to verify |
+| `/seekwide:fix [run-id]` | Fix metadata, internal-link and image-markup findings of an audit of the project in this folder, with your approval for each change, then audit again to verify |
 | `/seekwide:report [run-id]` | Rebuild a report, brand it, or compare two audits |
-| `/seekwide:setup [url]` | Save a project profile and report branding |
+| `/seekwide:setup [url]` | Save a project profile (with the apps and the AI policy) and report branding |
 
 ## Settings
 

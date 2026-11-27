@@ -175,7 +175,7 @@ export function fixTools(deps) {
       description:
         'For a saved run made in repo mode, say which findings a fix exists for (a missing or duplicate title or meta description, ' +
         'a missing canonical, missing Open Graph tags, a missing sitemap, an internal link that goes through a redirect or leads to a broken page, ' +
-        'an image without width and height, a main image that is lazy-loaded), ' +
+        'an image without width and height, a main image that is lazy-loaded, alt text that is missing or a placeholder), ' +
         'which file each fix belongs in, what the page sends today and how to change it. ' +
         'Findings that cannot be fixed safely are listed with the reason, grouped by check and reason with counts and examples. Reads the saved run, the project\'s file names and the first bytes of the project\'s image files that an image fix needs; it changes nothing.',
       inputSchema: {
